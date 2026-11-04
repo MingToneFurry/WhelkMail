@@ -285,6 +285,10 @@ export class ImapConnection {
     await this.command('EXPUNGE')
   }
 
+  async create(folder: string): Promise<void> {
+    await this.command(`CREATE ${quote(folder)}`)
+  }
+
   async append(
     folder: string,
     message: Uint8Array,
