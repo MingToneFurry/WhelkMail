@@ -152,9 +152,10 @@ const en: Record<string, string> = {
   'settings.language': 'Language',
   'settings.addAccount': 'Add account',
   'settings.defaultSender': 'Default sender',
-  'settings.defaultSenderAuto': 'Automatic (selected account; replies use the receiving account)',
+  'settings.defaultSenderAuto':
+    'Automatic (new messages use the selected account; replies use the receiving account)',
   'settings.defaultSenderHint':
-    'Used for new messages. Replies always use the account that received the message.',
+    'Applies to new messages and replies. Automatic mode replies from the account that received the message.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'connected',
@@ -410,9 +411,9 @@ const it: Record<string, string> = {
   'settings.addAccount': 'Aggiungi account',
   'settings.defaultSender': 'Mittente predefinito',
   'settings.defaultSenderAuto':
-    'Automatico (account selezionato; le risposte usano l’account che ha ricevuto il messaggio)',
+    'Automatico (i nuovi messaggi usano l’account selezionato; le risposte usano l’account che ha ricevuto il messaggio)',
   'settings.defaultSenderHint':
-    'Usato per i nuovi messaggi. Le risposte usano sempre l’account che ha ricevuto il messaggio.',
+    'Si applica ai nuovi messaggi e alle risposte. In modalità automatica, le risposte usano l’account che ha ricevuto il messaggio.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'collegato',

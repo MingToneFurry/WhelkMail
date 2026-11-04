@@ -270,14 +270,23 @@ export default function App() {
   }
 
   function replyTo(message: MessageDetail, all: boolean) {
-    const own = message.accountEmail.toLowerCase()
+    const sendingAccountId =
+      defaultSender !== 'auto' && accounts.some((account) => account.id === defaultSender)
+        ? defaultSender
+        : message.accountId
+    const sendingAccount = accounts.find((account) => account.id === sendingAccountId)
+    const ownAddresses = new Set(
+      [message.accountEmail, sendingAccount?.email ?? '']
+        .filter(Boolean)
+        .map((email) => email.toLowerCase()),
+    )
     const normalize = (values: string[]): string[] => {
       const seen = new Set<string>()
       const result: string[] = []
       for (const value of values) {
         const email = value.trim()
         const key = email.toLowerCase()
-        if (!email || key === own || seen.has(key)) {
+        if (!email || ownAddresses.has(key) || seen.has(key)) {
           continue
         }
         seen.add(key)
@@ -306,7 +315,7 @@ export default function App() {
       message.from,
     )} wrote:\n${quoted}`
     openCompose(null, {
-      accountId: message.accountId,
+      accountId: sendingAccountId,
       to,
       cc,
       bcc: [],
