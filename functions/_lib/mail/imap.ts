@@ -68,7 +68,7 @@ export async function resolveSentFolder(
     connection,
     '\\Sent',
     account.sent_folder || 'Sent',
-    /(^|[./])(sent|sent items|sent mail|inviati|inviate|posta inviata)$/i,
+    /(^|[./])(sent|sent items|sent mail|sent messages|inviati|inviate|invio|posta inviata|inviata)$/i,
   )
 }
 
@@ -77,30 +77,104 @@ export async function resolveDraftsFolder(connection: ImapConnection): Promise<s
     connection,
     '\\Drafts',
     'Drafts',
-    /(^|[./])(draft|drafts|bozza|bozze)$/i,
+    /(^|[./])(draft|drafts|draft messages|bozza|bozze)$/i,
   )
+}
+
+const MISSING_FOLDER = /TRYCREATE|NONEXISTENT|doesn't exist|does not exist|Mailbox doesn't exist/i
+
+function uniqueFolders(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))]
+}
+
+function folderCandidates(preferred: string, kind: 'sent' | 'draft'): string[] {
+  const names =
+    kind === 'sent'
+      ? [
+          preferred,
+          `INBOX.${preferred}`,
+          `INBOX/${preferred}`,
+          'Sent',
+          'INBOX.Sent',
+          'INBOX/Sent',
+          'Sent Items',
+          'INBOX.Sent Items',
+          'Sent Mail',
+          'INBOX.Sent Mail',
+          'Sent Messages',
+          'INBOX.Sent Messages',
+          'Posta inviata',
+          'INBOX.Posta inviata',
+          'Inviati',
+          'INBOX.Inviati',
+          'Inviate',
+          'INBOX.Inviate',
+        ]
+      : [
+          preferred,
+          `INBOX.${preferred}`,
+          `INBOX/${preferred}`,
+          'Drafts',
+          'INBOX.Drafts',
+          'INBOX/Drafts',
+          'Bozze',
+          'INBOX.Bozze',
+          'Bozza',
+          'INBOX.Bozza',
+          'Draft',
+          'INBOX.Draft',
+        ]
+  return uniqueFolders(names)
 }
 
 async function appendWithCreate(
   connection: ImapConnection,
-  folder: string,
+  preferred: string,
   message: Uint8Array,
   flags: string,
-): Promise<{ uid: number | null }> {
-  try {
-    return await connection.append(folder, message, flags)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    if (!/TRYCREATE|doesn't exist|does not exist|NONEXISTENT|Mailbox doesn't exist/i.test(detail)) {
-      throw error
-    }
+  kind: 'sent' | 'draft',
+): Promise<{ uid: number | null; folder: string }> {
+  let lastError: unknown = null
+  for (const folder of folderCandidates(preferred, kind)) {
     try {
-      await connection.create(folder)
-    } catch {
-      // It may already exist or the server may not allow CREATE; retry anyway.
+      const result = await connection.append(folder, message, flags)
+      return { uid: result.uid, folder }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      if (!MISSING_FOLDER.test(detail)) {
+        throw error
+      }
+      lastError = error
+      try {
+        await connection.create(folder)
+      } catch {
+        // It may already exist or the server may not allow CREATE; retry anyway.
+      }
+      try {
+        const result = await connection.append(folder, message, flags)
+        return { uid: result.uid, folder }
+      } catch (retryError) {
+        const retryDetail = retryError instanceof Error ? retryError.message : String(retryError)
+        if (!MISSING_FOLDER.test(retryDetail)) {
+          throw retryError
+        }
+        lastError = retryError
+      }
     }
-    return connection.append(folder, message, flags)
   }
+  let available = ''
+  try {
+    available = (await connection.listFolders())
+      .slice(0, 30)
+      .map((folder) => folder.name)
+      .join(', ')
+  } catch {
+    // ignore
+  }
+  const detail = lastError instanceof Error ? lastError.message : 'Folder not available'
+  throw new Error(
+    available ? `${detail} | Available folders: ${available}` : detail,
+  )
 }
 
 async function targetFolder(
@@ -160,7 +234,7 @@ export async function appendToSent(
 ): Promise<void> {
   await withImap(env, account, async (connection) => {
     const folder = await resolveSentFolder(connection, account)
-    await appendWithCreate(connection, folder, message, '(\\Seen)')
+    await appendWithCreate(connection, folder, message, '(\\Seen)', 'sent')
   })
 }
 
@@ -171,11 +245,11 @@ export async function saveDraft(
 ): Promise<{ uid: number }> {
   return withImap(env, account, async (connection) => {
     const folder = await resolveDraftsFolder(connection)
-    const result = await appendWithCreate(connection, folder, message, '(\\Draft \\Seen)')
+    const result = await appendWithCreate(connection, folder, message, '(\\Draft \\Seen)', 'draft')
     if (result.uid) {
       return { uid: result.uid }
     }
-    await connection.select(folder)
+    await connection.select(result.folder)
     const uids = await connection.searchAll()
     if (uids.length === 0) {
       throw new Error('Bozza non trovata dopo APPEND')
