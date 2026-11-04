@@ -1,0 +1,91 @@
+import { z } from 'zod'
+
+const email = z.string().trim().toLowerCase().pipe(z.string().email())
+const security = z.enum(['tls', 'starttls'])
+
+const imapAccountSchema = z.object({
+  kind: z.literal('imap'),
+  email,
+  displayName: z.string().trim().min(1).max(120),
+  preset: z.string().trim().max(40).optional(),
+  imapHost: z.string().trim().min(1).max(255).optional(),
+  imapPort: z.number().int().min(1).max(65535).optional(),
+  imapSecurity: security.optional(),
+  smtpHost: z.string().trim().min(1).max(255).optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpSecurity: security.optional(),
+  username: z.string().trim().min(1).max(255).optional(),
+  authType: z.enum(['password', 'oauth2']).default('password'),
+  oauthProvider: z.enum(['google', 'microsoft']).optional(),
+  password: z.string().min(1).max(500).optional(),
+  autoSavesSent: z.boolean().optional(),
+})
+
+const relayAccountSchema = z.object({
+  kind: z.literal('relay'),
+  email,
+  displayName: z.string().trim().min(1).max(120),
+  storageDriver: z.enum(['drive', 'r2']).default('drive'),
+  relayProvider: z.string().trim().min(1).max(40).default('smtp2go'),
+  relayApiKey: z.string().trim().min(1).max(2000).optional(),
+  relayApiSecret: z.string().trim().max(2000).optional(),
+  relayDomain: z.string().trim().max(255).optional(),
+  relayRegion: z.enum(['us', 'eu']).optional(),
+})
+
+export const accountCreateSchema = z.discriminatedUnion('kind', [
+  imapAccountSchema,
+  relayAccountSchema,
+])
+
+export const accountUpdateSchema = z.object({
+  displayName: z.string().trim().min(1).max(120).optional(),
+  sentFolder: z.string().trim().min(1).max(255).optional(),
+  autoSavesSent: z.boolean().optional(),
+  storageDriver: z.enum(['provider', 'drive', 'r2']).optional(),
+  password: z.string().min(1).max(500).optional(),
+  username: z.string().trim().min(1).max(255).optional(),
+  imapHost: z.string().trim().min(1).max(255).optional(),
+  imapPort: z.number().int().min(1).max(65535).optional(),
+  imapSecurity: security.optional(),
+  smtpHost: z.string().trim().min(1).max(255).optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpSecurity: security.optional(),
+  relayProvider: z.string().trim().min(1).max(40).optional(),
+  relayApiKey: z.string().trim().min(1).max(2000).optional(),
+  relayApiSecret: z.string().trim().max(2000).optional(),
+  relayDomain: z.string().trim().max(255).optional(),
+  relayRegion: z.enum(['us', 'eu']).optional(),
+})
+
+export const attachmentInputSchema = z.object({
+  filename: z.string().trim().min(1).max(255),
+  contentType: z.string().trim().min(1).max(200).default('application/octet-stream'),
+  dataBase64: z.string().min(1),
+})
+
+export const draftSchema = z.object({
+  accountId: z.string().min(1),
+  draftId: z.string().optional(),
+  to: z.array(email).max(50).default([]),
+  cc: z.array(email).max(50).default([]),
+  bcc: z.array(email).max(50).default([]),
+  subject: z.string().max(500).default(''),
+  text: z.string().max(1_000_000).default(''),
+  html: z.string().max(2_000_000).optional(),
+  attachments: z.array(attachmentInputSchema).max(20).default([]),
+})
+
+export const sendSchema = z.object({
+  accountId: z.string().min(1),
+  draftId: z.string().optional(),
+  to: z.array(email).min(1).max(50),
+  cc: z.array(email).max(50).default([]),
+  bcc: z.array(email).max(50).default([]),
+  subject: z.string().max(500).default(''),
+  text: z.string().max(1_000_000).default(''),
+  html: z.string().max(2_000_000).optional(),
+  attachments: z.array(attachmentInputSchema).max(20).default([]),
+})
+
+export type SendInput = z.infer<typeof sendSchema>

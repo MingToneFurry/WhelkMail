@@ -1,0 +1,120 @@
+import type {
+  Account,
+  AccountCreateInput,
+  AccountPatch,
+  DraftPayload,
+  DraftSavePayload,
+  Folder,
+  HealthStatus,
+  MessageDetail,
+  MessageSummary,
+  SendPayload,
+  StorageOptions,
+} from '../../shared/types'
+
+export class ApiError extends Error {
+  status: number
+  detail?: string
+  code?: string
+
+  constructor(status: number, message: string, detail?: string, code?: string) {
+    super(message)
+    this.status = status
+    this.detail = detail
+    this.code = code
+  }
+
+  get isUnauthorized(): boolean {
+    return this.status === 401
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+  const contentType = response.headers.get('Content-Type') ?? ''
+  const data = contentType.includes('application/json') ? await response.json() : null
+  if (!response.ok) {
+    const message = (data as { error?: string } | null)?.error ?? `HTTP ${response.status}`
+    const detail = (data as { detail?: string } | null)?.detail
+    const code = (data as { code?: string } | null)?.code
+    throw new ApiError(response.status, message, detail, code)
+  }
+  return data as T
+}
+
+export interface AccountError {
+  accountId: string
+  email: string
+  message: string
+}
+
+export const api = {
+  login(password: string): Promise<{ ok: boolean }> {
+    return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) })
+  },
+  logout(): Promise<{ ok: boolean }> {
+    return request('/api/auth/logout', { method: 'POST' })
+  },
+  health(): Promise<HealthStatus> {
+    return request('/api/health')
+  },
+  storageOptions(): Promise<StorageOptions> {
+    return request('/api/storage/options')
+  },
+  accounts(): Promise<{ accounts: Account[] }> {
+    return request('/api/accounts')
+  },
+  createAccount(input: AccountCreateInput): Promise<{ account: Account }> {
+    return request('/api/accounts', { method: 'POST', body: JSON.stringify(input) })
+  },
+  updateAccount(id: string, patch: AccountPatch): Promise<{ account: Account }> {
+    return request(`/api/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  },
+  deleteAccount(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/accounts/${id}`, { method: 'DELETE' })
+  },
+  testAccount(id: string): Promise<{ ok: boolean; checks?: Record<string, string> }> {
+    return request(`/api/accounts/${id}/test`, { method: 'POST' })
+  },
+  messages(
+    accountId: string,
+    folder: Folder,
+  ): Promise<{ messages: MessageSummary[]; errors: AccountError[] }> {
+    const search = new URLSearchParams({ accountId, folder })
+    return request(`/api/messages?${search.toString()}`)
+  },
+  message(id: string): Promise<{ message: MessageDetail }> {
+    return request(`/api/messages/${encodeURIComponent(id)}`)
+  },
+  send(payload: SendPayload): Promise<{ ok: boolean; warning?: string }> {
+    return request('/api/messages/send', { method: 'POST', body: JSON.stringify(payload) })
+  },
+  draft(id: string): Promise<{ draft: DraftPayload }> {
+    return request(`/api/messages/${encodeURIComponent(id)}/draft`)
+  },
+  saveDraft(payload: DraftSavePayload): Promise<{ ok: boolean; draftId?: string }> {
+    return request('/api/drafts', { method: 'POST', body: JSON.stringify(payload) })
+  },
+  deleteDraft(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  rawUrl(id: string): string {
+    return `/api/messages/${encodeURIComponent(id)}/raw`
+  },
+  attachmentUrl(id: string, index: number): string {
+    return `/api/messages/${encodeURIComponent(id)}/attachments/${index}`
+  },
+  driveConnectUrl(accountId: string): string {
+    return `/api/drive/oauth/start?accountId=${encodeURIComponent(accountId)}`
+  },
+  microsoftConnectUrl(accountId: string): string {
+    return `/api/microsoft/oauth/start?accountId=${encodeURIComponent(accountId)}`
+  },
+  googleConnectUrl(accountId: string): string {
+    return `/api/google/oauth/start?accountId=${encodeURIComponent(accountId)}`
+  },
+}

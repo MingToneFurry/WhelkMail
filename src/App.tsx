@@ -1,0 +1,650 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertCircle, CloudOff } from 'lucide-react'
+import type {
+  Account,
+  AccountCreateInput,
+  AccountPatch,
+  DraftPayload,
+  Folder,
+  HealthStatus,
+  MessageDetail,
+  MessageSummary,
+  StorageOptions,
+} from '../shared/types'
+import { useI18n } from './i18n'
+import { api, ApiError, type AccountError } from './lib/api'
+import { errorText } from './lib/errors'
+import { accountLabelStyle, cn } from './lib/utils'
+import { Compose } from './components/Compose'
+import { Login } from './components/Login'
+import { MailList } from './components/MailList'
+import { Onboarding } from './components/Onboarding'
+import { ReadingPane } from './components/ReadingPane'
+import { Settings } from './components/Settings'
+import { Sidebar } from './components/Sidebar'
+import { Topbar } from './components/Topbar'
+
+type View = 'mail' | 'settings'
+type AuthState = 'loading' | 'needed' | 'ok'
+
+export default function App() {
+  const { t } = useI18n()
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  })
+  const [auth, setAuth] = useState<AuthState>('loading')
+  const [fatal, setFatal] = useState<string | null>(null)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
+  const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [folder, setFolder] = useState<Folder>('inbox')
+  const [messages, setMessages] = useState<MessageSummary[]>([])
+  const [listErrors, setListErrors] = useState<AccountError[]>([])
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<MessageDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [view, setView] = useState<View>('mail')
+  const [query, setQuery] = useState('')
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [addingAccount, setAddingAccount] = useState(false)
+  const [readingPane, setReadingPane] = useState(() => {
+    try {
+      return localStorage.getItem('mc_reading_pane') === '1'
+    } catch {
+      return false
+    }
+  })
+  const [composeDraft, setComposeDraft] = useState<DraftPayload | null>(null)
+  const [composeKey, setComposeKey] = useState(0)
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [onboardingBusy, setOnboardingBusy] = useState(false)
+  const [onboardingError, setOnboardingError] = useState<string | null>(null)
+  const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
+  const showAccount = selectedAccountId === 'all' && accounts.length > 1
+
+  const load = useCallback(async () => {
+    setAuth('loading')
+    setFatal(null)
+    try {
+      const [accountsResponse, storageResponse, healthResponse] = await Promise.all([
+        api.accounts(),
+        api.storageOptions(),
+        api.health(),
+      ])
+      setAccounts(accountsResponse.accounts)
+      setStorage(storageResponse)
+      setHealth(healthResponse)
+      setAuth('ok')
+    } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        setAuth('needed')
+        return
+      }
+      setFatal(error instanceof Error ? error.message : 'Loading error')
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauth = params.get('microsoft') ?? params.get('google') ?? params.get('drive')
+    if (!oauth) {
+      return
+    }
+    if (oauth === 'connected') {
+      if (params.get('google')) {
+        setNotice(t('app.googleConnected'))
+      } else if (params.get('microsoft')) {
+        setNotice(t('app.microsoftConnected'))
+      } else {
+        setNotice(t('app.driveConnected'))
+      }
+    } else {
+      setNotice(t('app.connectFailed', { reason: params.get('reason') ?? 'error' }))
+    }
+    const accountId = params.get('account')
+    if (accountId) {
+      setSelectedAccountId(accountId)
+    }
+    params.delete('microsoft')
+    params.delete('google')
+    params.delete('drive')
+    params.delete('reason')
+    params.delete('account')
+    const search = params.toString()
+    window.history.replaceState({}, '', `${window.location.pathname}${search ? `?${search}` : ''}`)
+  }, [t])
+
+  useEffect(() => {
+    if (auth !== 'ok') {
+      return
+    }
+    let cancelled = false
+    setLoadingMessages(true)
+    api
+      .messages(selectedAccountId, folder)
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        setMessages(response.messages)
+        setListErrors(response.errors)
+        setSelectedMessageId((current) =>
+          current && response.messages.some((item) => item.id === current) ? current : null,
+        )
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return
+        }
+        if (error instanceof ApiError && error.isUnauthorized) {
+          setAuth('needed')
+          return
+        }
+        setSettingsError(errorText(error, tRef.current))
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingMessages(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [auth, selectedAccountId, folder, refreshKey])
+
+  useEffect(() => {
+    if (!notice) {
+      return
+    }
+    const timer = window.setTimeout(() => setNotice(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
+  useEffect(() => {
+    if (!selectedMessageId || auth !== 'ok') {
+      setDetail(null)
+      setDetailError(null)
+      return
+    }
+    let cancelled = false
+    setDetailLoading(true)
+    setDetailError(null)
+    api
+      .message(selectedMessageId)
+      .then((response) => {
+        if (!cancelled) {
+          setDetail(response.message)
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return
+        }
+        if (error instanceof ApiError && error.isUnauthorized) {
+          setAuth('needed')
+          return
+        }
+        setDetailError(errorText(error, tRef.current))
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDetailLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedMessageId, auth])
+
+  const unreadByAccount = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const message of messages) {
+      if (message.unread) {
+        counts.set(message.accountId, (counts.get(message.accountId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [messages])
+
+  const visibleMessages = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) {
+      return messages
+    }
+    return messages.filter((message) => {
+      const haystack = [
+        message.subject,
+        message.snippet,
+        message.accountEmail,
+        message.from.name ?? '',
+        message.from.email,
+        ...message.to.map((item) => `${item.name ?? ''} ${item.email}`),
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(needle)
+    })
+  }, [messages, query])
+
+  function openCompose(draft: DraftPayload | null) {
+    setComposeDraft(draft)
+    setComposeKey((key) => key + 1)
+    setComposeOpen(true)
+  }
+
+  async function selectMessage(id: string) {
+    if (folder === 'draft') {
+      try {
+        const response = await api.draft(id)
+        openCompose(response.draft)
+      } catch (error) {
+        setSettingsError(errorText(error, t))
+      }
+      return
+    }
+    setSelectedMessageId(id)
+    setMessages((current) => current.map((item) => (item.id === id ? { ...item, unread: false } : item)))
+  }
+
+  async function createAccount(input: AccountCreateInput): Promise<Account | null> {
+    setOnboardingBusy(true)
+    setOnboardingError(null)
+    try {
+      const response = await api.createAccount(input)
+      setAccounts((current) => [...current, response.account])
+      setSelectedAccountId(response.account.id)
+      setAddingAccount(false)
+      setView('mail')
+      setNotice(input.kind === 'imap' ? t('app.accountCreatedTest') : t('app.accountCreated'))
+      setRefreshKey((key) => key + 1)
+      return response.account
+    } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        setAuth('needed')
+        return null
+      }
+      setOnboardingError(errorText(error, t))
+      return null
+    } finally {
+      setOnboardingBusy(false)
+    }
+  }
+
+  async function updateAccount(id: string, patch: AccountPatch) {
+    setSettingsBusyId(id)
+    setSettingsError(null)
+    try {
+      const response = await api.updateAccount(id, patch)
+      setAccounts((current) => current.map((item) => (item.id === id ? response.account : item)))
+      setNotice(t('app.accountUpdated'))
+      setRefreshKey((key) => key + 1)
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    } finally {
+      setSettingsBusyId(null)
+    }
+  }
+
+  async function testAccount(id: string) {
+    setSettingsBusyId(id)
+    setSettingsError(null)
+    try {
+      const response = await api.testAccount(id)
+      const checks = response.checks
+        ? Object.entries(response.checks).map(([key, value]) => `${key}: ${value}`)
+        : []
+      setNotice(
+        checks.length > 0
+          ? t('app.connectionOk', { checks: checks.join(' · ') })
+          : t('app.connectionOk', { checks: 'OK' }),
+      )
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    } finally {
+      setSettingsBusyId(null)
+    }
+  }
+
+  async function deleteAccount(id: string) {
+    const account = accounts.find((item) => item.id === id)
+    if (!window.confirm(t('settings.deleteConfirm', { email: account?.email ?? '' }))) {
+      return
+    }
+    setSettingsBusyId(id)
+    setSettingsError(null)
+    try {
+      await api.deleteAccount(id)
+      setAccounts((current) => current.filter((item) => item.id !== id))
+      if (selectedAccountId === id) {
+        setSelectedAccountId('all')
+      }
+      setRefreshKey((key) => key + 1)
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    } finally {
+      setSettingsBusyId(null)
+    }
+  }
+
+  async function logout() {
+    try {
+      await api.logout()
+    } finally {
+      setAccounts([])
+      setMessages([])
+      setDetail(null)
+      setSelectedMessageId(null)
+      setAuth('needed')
+    }
+  }
+
+  function openFolder(next: Folder) {
+    setFolder(next)
+    setView('mail')
+    setSelectedMessageId(null)
+    setDetail(null)
+    setQuery('')
+  }
+
+  function changeReadingPane(value: boolean) {
+    setReadingPane(value)
+    try {
+      localStorage.setItem('mc_reading_pane', value ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  if (auth === 'loading') {
+    return (
+      <div className="flex min-h-full items-center justify-center text-sm text-muted">
+        {t('common.loading')}
+      </div>
+    )
+  }
+
+  if (fatal) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 px-4 text-center">
+        <AlertCircle size={32} className="text-brand" />
+        <p className="text-sm text-slate-700">{fatal}</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="rounded-lg bg-brand px-4 py-2 text-sm text-white hover:bg-brand-strong"
+        >
+          {t('common.retry')}
+        </button>
+      </div>
+    )
+  }
+
+  if (auth === 'needed') {
+    return <Login onSuccess={() => void load()} />
+  }
+
+  if (accounts.length === 0 || addingAccount) {
+    return (
+      <Onboarding
+        storage={storage}
+        health={health}
+        busy={onboardingBusy}
+        error={onboardingError}
+        onCancel={
+          accounts.length > 0
+            ? () => {
+                setAddingAccount(false)
+                setOnboardingError(null)
+              }
+            : undefined
+        }
+        onCreate={createAccount}
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-full">
+      <Sidebar
+        account={selectedAccount}
+        view={view}
+        folder={folder}
+        onCompose={() => openCompose(null)}
+        onFolder={openFolder}
+        onSettings={() => setView('settings')}
+        onAddAccount={() => {
+          setOnboardingError(null)
+          setAddingAccount(true)
+        }}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar
+          accounts={accounts}
+          selectedAccountId={selectedAccountId}
+          query={query}
+          onSelectAccount={(id) => {
+            setSelectedAccountId(id)
+            setSelectedMessageId(null)
+            setDetail(null)
+          }}
+          onQuery={setQuery}
+          onOpenSettings={() => setView('settings')}
+          onLogout={() => void logout()}
+        />
+
+        {view === 'mail' && accounts.length > 1 ? (
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-4 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAccountId('all')
+                setSelectedMessageId(null)
+                setDetail(null)
+              }}
+              className={cn(
+                'rounded-full border px-3 py-1 text-[11px]',
+                selectedAccountId === 'all'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-line bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              {t('labels.all')}
+            </button>
+            {accounts.map((account) => {
+              const count = unreadByAccount.get(account.id) ?? 0
+              const active = selectedAccountId === account.id
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  title={account.email}
+                  onClick={() => {
+                    setSelectedAccountId(account.id)
+                    setSelectedMessageId(null)
+                    setDetail(null)
+                  }}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium',
+                    accountLabelStyle(account.id),
+                    active ? 'border-slate-900' : 'border-transparent hover:border-slate-300',
+                  )}
+                >
+                  <span className="max-w-44 truncate">{account.displayName || account.email}</span>
+                  {count > 0 ? (
+                    <span className="rounded-full bg-white/70 px-1.5 text-[10px]">{count}</span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+
+        {view === 'mail' && listErrors.length > 0 ? (
+          <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+            {listErrors.map((error) => (
+              <p key={error.accountId}>
+                {error.email}: {error.message}
+              </p>
+            ))}
+          </div>
+        ) : null}
+
+        {view === 'mail' &&
+        selectedAccount?.kind === 'relay' &&
+        selectedAccount.storageDriver === 'drive' &&
+        !selectedAccount.driveConnected ? (
+          <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+            <span className="flex items-center gap-2">
+              <CloudOff size={15} />
+              {t('compose.driveNotConnected')}
+            </span>
+            <a
+              href={api.driveConnectUrl(selectedAccount.id)}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white hover:bg-slate-700"
+            >
+              {t('settings.connectDrive')}
+            </a>
+          </div>
+        ) : null}
+
+        {view === 'settings' ? (
+          <Settings
+            accounts={accounts}
+            storage={storage}
+            health={health}
+            busyId={settingsBusyId}
+            error={settingsError}
+            onUpdate={updateAccount}
+            onTest={testAccount}
+            onDelete={deleteAccount}
+            onConnectDrive={(id) => {
+              window.location.href = api.driveConnectUrl(id)
+            }}
+            onConnectOAuth={(id, provider) => {
+              window.location.href =
+                provider === 'google'
+                  ? api.googleConnectUrl(id)
+                  : api.microsoftConnectUrl(id)
+            }}
+            onAddAccount={() => {
+              setOnboardingError(null)
+              setAddingAccount(true)
+            }}
+            readingPane={readingPane}
+            onReadingPaneChange={changeReadingPane}
+            onLogout={() => void logout()}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {readingPane ? (
+              <>
+                <MailList
+                  messages={visibleMessages}
+                  selectedId={selectedMessageId}
+                  loading={loadingMessages}
+                  folder={folder}
+                  showAccount={showAccount}
+                  onSelect={(id) => void selectMessage(id)}
+                />
+                <ReadingPane
+                  message={detail}
+                  loading={detailLoading}
+                  error={detailError}
+                  rawUrl={selectedMessageId ? api.rawUrl(selectedMessageId) : null}
+                  attachmentUrl={(index) =>
+                    selectedMessageId ? api.attachmentUrl(selectedMessageId, index) : '#'
+                  }
+                />
+              </>
+            ) : selectedMessageId ? (
+              <ReadingPane
+                message={detail}
+                loading={detailLoading}
+                error={detailError}
+                rawUrl={api.rawUrl(selectedMessageId)}
+                attachmentUrl={(index) => api.attachmentUrl(selectedMessageId, index)}
+                onBack={() => {
+                  setSelectedMessageId(null)
+                  setDetail(null)
+                }}
+              />
+            ) : (
+              <MailList
+                messages={visibleMessages}
+                selectedId={selectedMessageId}
+                loading={loadingMessages}
+                folder={folder}
+                showAccount={showAccount}
+                fullWidth
+                onSelect={(id) => void selectMessage(id)}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {composeOpen ? (
+        <Compose
+          key={composeKey}
+          accounts={accounts}
+          defaultAccountId={selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id ?? null}
+          maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
+          initialDraft={composeDraft}
+          onClose={() => {
+            setComposeOpen(false)
+            setComposeDraft(null)
+            setRefreshKey((key) => key + 1)
+          }}
+          onSent={(warning) => {
+            setComposeOpen(false)
+            setComposeDraft(null)
+            setFolder('sent')
+            setView('mail')
+            setQuery('')
+            setSelectedMessageId(null)
+            setRefreshKey((key) => key + 1)
+            setNotice(warning ?? t('app.emailSent'))
+          }}
+          onSaved={() => {
+            setComposeOpen(false)
+            setComposeDraft(null)
+            setFolder('draft')
+            setView('mail')
+            setQuery('')
+            setSelectedMessageId(null)
+            setRefreshKey((key) => key + 1)
+            setNotice(t('app.draftSaved'))
+          }}
+          onDeleted={() => {
+            setComposeOpen(false)
+            setComposeDraft(null)
+            setFolder('draft')
+            setView('mail')
+            setSelectedMessageId(null)
+            setRefreshKey((key) => key + 1)
+            setNotice(t('app.draftDeleted'))
+          }}
+        />
+      ) : null}
+
+      {notice ? (
+        <div className="fixed bottom-6 left-1/2 z-[60] max-w-lg -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-center text-xs text-white shadow-lg">
+          {notice}
+        </div>
+      ) : null}
+    </div>
+  )
+}

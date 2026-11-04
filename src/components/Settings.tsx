@@ -1,0 +1,571 @@
+import { useState } from 'react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  Cloud,
+  HardDrive,
+  LogOut,
+  PlugZap,
+  Plus,
+  Server,
+  Trash2,
+} from 'lucide-react'
+import { RELAY_PROVIDERS, findRelayProvider } from '../../shared/presets'
+import type {
+  Account,
+  AccountPatch,
+  HealthStatus,
+  MailSecurity,
+  StorageOptions,
+} from '../../shared/types'
+import { LOCALES, useI18n, type Locale } from '../i18n'
+import { cn, formatBytes } from '../lib/utils'
+
+interface SettingsProps {
+  accounts: Account[]
+  storage: StorageOptions
+  health: HealthStatus | null
+  busyId: string | null
+  error: string | null
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
+  onTest: (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onConnectDrive: (id: string) => void
+  onConnectOAuth: (id: string, provider: 'google' | 'microsoft') => void
+  onAddAccount: () => void
+  readingPane: boolean
+  onReadingPaneChange: (value: boolean) => void
+  onLogout: () => void
+}
+
+function ConfigBadge({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]',
+        ok ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800',
+      )}
+    >
+      {ok ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+      {label}
+    </span>
+  )
+}
+
+interface AccountCardProps {
+  account: Account
+  storage: StorageOptions
+  busy: boolean
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
+  onTest: (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onConnectDrive: (id: string) => void
+  onConnectOAuth: (id: string, provider: 'google' | 'microsoft') => void
+}
+
+function AccountCard({
+  account,
+  storage,
+  busy,
+  onUpdate,
+  onTest,
+  onDelete,
+  onConnectDrive,
+  onConnectOAuth,
+}: AccountCardProps) {
+  const { t } = useI18n()
+  const [password, setPassword] = useState('')
+  const [sentFolder, setSentFolder] = useState(account.sentFolder)
+  const [imapHost, setImapHost] = useState(account.imapHost ?? '')
+  const [imapPort, setImapPort] = useState(String(account.imapPort ?? 993))
+  const [imapSecurity, setImapSecurity] = useState<MailSecurity>(account.imapSecurity ?? 'tls')
+  const [smtpHost, setSmtpHost] = useState(account.smtpHost ?? '')
+  const [smtpPort, setSmtpPort] = useState(String(account.smtpPort ?? 465))
+  const [smtpSecurity, setSmtpSecurity] = useState<MailSecurity>(account.smtpSecurity ?? 'tls')
+  const [username, setUsername] = useState(account.username)
+  const [relayProvider, setRelayProvider] = useState(account.relayProvider ?? 'smtp2go')
+  const [relayApiKey, setRelayApiKey] = useState('')
+  const [relayApiSecret, setRelayApiSecret] = useState('')
+  const [relayDomain, setRelayDomain] = useState('')
+  const [relayRegion, setRelayRegion] = useState('us')
+  const isImap = account.kind === 'imap'
+  const relayMeta = findRelayProvider(relayProvider)
+
+  async function saveConnection() {
+    await onUpdate(account.id, {
+      imapHost: imapHost.trim(),
+      imapPort: Number(imapPort),
+      imapSecurity,
+      smtpHost: smtpHost.trim(),
+      smtpPort: Number(smtpPort),
+      smtpSecurity,
+      username: username.trim(),
+    })
+  }
+
+  async function saveRelay() {
+    await onUpdate(account.id, {
+      relayProvider,
+      relayApiKey: relayApiKey.trim() || undefined,
+      relayApiSecret: relayApiSecret.trim() || undefined,
+      relayDomain: relayDomain.trim() || undefined,
+      relayRegion: relayRegion === 'eu' ? 'eu' : 'us',
+    })
+    setRelayApiKey('')
+    setRelayApiSecret('')
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-medium">{account.displayName}</p>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted">
+              {isImap ? t('settings.kindImap') : t('settings.kindRelay')}
+            </span>
+            {isImap ? (
+              <span
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-[10px]',
+                  account.connected ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-brand-strong',
+                )}
+              >
+                {account.connected ? t('settings.connected') : t('settings.notConnected')}
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-[10px]',
+                  account.relayConfigured ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800',
+                )}
+              >
+                {account.relayConfigured ? t('settings.relayConfigured') : t('settings.relayNotConfigured')}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted">{account.email}</p>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onDelete(account.id)}
+          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted hover:border-red-200 hover:text-brand-strong disabled:opacity-50"
+        >
+          <Trash2 size={14} /> {t('settings.delete')}
+        </button>
+      </div>
+
+      {isImap ? (
+        <>
+          <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="mb-1 font-medium text-slate-700">{t('settings.imap')}</p>
+              <p className="text-muted">
+                {account.imapHost}:{account.imapPort} · {account.imapSecurity}
+              </p>
+              <p className="text-muted">{t('settings.user', { value: account.username })}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="mb-1 font-medium text-slate-700">{t('settings.smtp')}</p>
+              <p className="text-muted">
+                {account.smtpHost}:{account.smtpPort} · {account.smtpSecurity}
+              </p>
+              <p className="text-muted">
+                {t('settings.maxAttachments', { value: formatBytes(account.maxAttachmentBytes) })}
+              </p>
+            </div>
+          </div>
+
+          <details className="mt-4 rounded-xl border border-line p-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">
+              {t('settings.connection')}
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted">IMAP</p>
+                <input
+                  value={imapHost}
+                  onChange={(event) => setImapHost(event.target.value)}
+                  placeholder="imap.esempio.it"
+                  className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+                <div className="flex gap-2">
+                  <input
+                    value={imapPort}
+                    onChange={(event) => setImapPort(event.target.value)}
+                    inputMode="numeric"
+                    className="w-20 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                  <select
+                    value={imapSecurity}
+                    onChange={(event) => setImapSecurity(event.target.value as MailSecurity)}
+                    className="flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
+                  >
+                    <option value="tls">TLS (993)</option>
+                    <option value="starttls">STARTTLS (143)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted">SMTP</p>
+                <input
+                  value={smtpHost}
+                  onChange={(event) => setSmtpHost(event.target.value)}
+                  placeholder="smtp.esempio.it"
+                  className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+                <div className="flex gap-2">
+                  <input
+                    value={smtpPort}
+                    onChange={(event) => setSmtpPort(event.target.value)}
+                    inputMode="numeric"
+                    className="w-20 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                  <select
+                    value={smtpSecurity}
+                    onChange={(event) => setSmtpSecurity(event.target.value as MailSecurity)}
+                    className="flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
+                  >
+                    <option value="tls">TLS (465)</option>
+                    <option value="starttls">STARTTLS (587)</option>
+                  </select>
+                </div>
+              </div>
+              <label className="block text-xs sm:col-span-2">
+                <span className="mb-1 block font-medium text-muted">{t('settings.username')}</span>
+                <input
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+              </label>
+            </div>
+            {account.authType === 'oauth2' ? (
+              <p className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+                {t('settings.oauthHostWarning')}
+              </p>
+            ) : null}
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void saveConnection()}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                {t('settings.saveConnection')}
+              </button>
+            </div>
+          </details>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-muted">{t('settings.sentFolder')}</span>
+              <div className="flex gap-2">
+                <input
+                  value={sentFolder}
+                  onChange={(event) => setSentFolder(event.target.value)}
+                  className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+                <button
+                  type="button"
+                  disabled={busy || sentFolder === account.sentFolder}
+                  onClick={() => void onUpdate(account.id, { sentFolder })}
+                  className="rounded-lg border border-line px-2 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </label>
+            <label className="flex items-center gap-2 self-end text-xs text-slate-700">
+              <input
+                type="checkbox"
+                checked={account.autoSavesSent}
+                disabled={busy}
+                onChange={(event) => void onUpdate(account.id, { autoSavesSent: event.target.checked })}
+                className="h-4 w-4"
+              />
+              {t('settings.autoSaveSent')}
+            </label>
+          </div>
+
+          {account.authType === 'password' ? (
+            <div className="mt-4 flex flex-wrap items-end gap-2">
+              <label className="block flex-1 text-xs">
+                <span className="mb-1 block font-medium text-muted">{t('settings.updatePassword')}</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy || !password}
+                onClick={async () => {
+                  await onUpdate(account.id, { password })
+                  setPassword('')
+                }}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                {t('settings.savePassword')}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onTest(account.id)}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+            >
+              <PlugZap size={14} /> {t('settings.testConnection')}
+            </button>
+            {account.authType === 'oauth2' ? (
+              <button
+                type="button"
+                onClick={() => onConnectOAuth(account.id, account.oauthProvider ?? 'microsoft')}
+                className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700"
+              >
+                <Server size={14} />
+                {account.oauthProvider === 'google'
+                  ? account.connected
+                    ? t('settings.reconnectGoogle')
+                    : t('settings.connectGoogle')
+                  : account.connected
+                    ? t('settings.reconnectMicrosoft')
+                    : t('settings.connectMicrosoft')}
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-muted">{t('settings.storage')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onUpdate(account.id, { storageDriver: 'drive' })}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                  account.storageDriver === 'drive'
+                    ? 'border-brand bg-brand-soft text-brand-strong'
+                    : 'border-line hover:border-slate-300',
+                )}
+              >
+                <Cloud size={14} /> {t('settings.drive')}
+              </button>
+              <button
+                type="button"
+                disabled={busy || !storage.r2}
+                onClick={() => void onUpdate(account.id, { storageDriver: 'r2' })}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                  account.storageDriver === 'r2'
+                    ? 'border-brand bg-brand-soft text-brand-strong'
+                    : 'border-line hover:border-slate-300',
+                  !storage.r2 && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                <HardDrive size={14} /> {t('settings.r2')}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-line p-3">
+            <p className="mb-2 text-xs font-medium text-muted">{t('settings.relayProvider')}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select
+                value={relayProvider}
+                onChange={(event) => setRelayProvider(event.target.value)}
+                className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
+              >
+                {RELAY_PROVIDERS.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="password"
+                value={relayApiKey}
+                onChange={(event) => setRelayApiKey(event.target.value)}
+                placeholder={t('settings.relayApiKeyPlaceholder')}
+                className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+              />
+              {relayMeta?.needsSecret ? (
+                <input
+                  type="password"
+                  value={relayApiSecret}
+                  onChange={(event) => setRelayApiSecret(event.target.value)}
+                  placeholder={t('settings.relayApiSecret')}
+                  className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                />
+              ) : null}
+              {relayMeta?.needsDomain ? (
+                <div className="flex gap-2">
+                  <input
+                    value={relayDomain}
+                    onChange={(event) => setRelayDomain(event.target.value)}
+                    placeholder={t('settings.relayDomain')}
+                    className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+                  />
+                  <select
+                    value={relayRegion}
+                    onChange={(event) => setRelayRegion(event.target.value)}
+                    className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
+                  >
+                    <option value="us">US</option>
+                    <option value="eu">EU</option>
+                  </select>
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted">
+                {account.relayConfigured ? t('settings.relayConfigured') : t('settings.relayNotConfigured')}
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void saveRelay()}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                {t('settings.saveRelay')}
+              </button>
+            </div>
+          </div>
+
+          {account.storageDriver === 'drive' ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+              <div className="text-xs">
+                <p className="font-medium text-slate-700">
+                  {account.driveConnected ? t('settings.driveConnected') : t('settings.driveNotConnected')}
+                </p>
+                <p className="text-muted">
+                  {account.driveConnected ? t('settings.driveFolderReady') : t('settings.driveAuthNeeded')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onConnectDrive(account.id)}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+              >
+                {account.driveConnected ? t('settings.reconnectDrive') : t('settings.connectDrive')}
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  )
+}
+
+export function Settings({
+  accounts,
+  storage,
+  health,
+  busyId,
+  error,
+  onUpdate,
+  onTest,
+  onDelete,
+  onConnectDrive,
+  onConnectOAuth,
+  onAddAccount,
+  readingPane,
+  onReadingPaneChange,
+  onLogout,
+}: SettingsProps) {
+  const { t, locale, setLocale } = useI18n()
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-medium">{t('settings.title')}</h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onAddAccount}
+              className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-strong"
+            >
+              <Plus size={14} /> {t('settings.addAccount')}
+            </button>
+            <label className="flex items-center gap-2 text-xs text-muted">
+              {t('settings.language')}
+              <select
+                value={locale}
+                onChange={(event) => setLocale(event.target.value as Locale)}
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none"
+              >
+                {LOCALES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {error ? <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-brand-strong">{error}</p> : null}
+
+        <div className="space-y-3">
+          {accounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              storage={storage}
+              busy={busyId === account.id}
+              onUpdate={onUpdate}
+              onTest={onTest}
+              onDelete={onDelete}
+              onConnectDrive={onConnectDrive}
+              onConnectOAuth={onConnectOAuth}
+            />
+          ))}
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+          <p className="mb-3 text-sm font-medium">{t('settings.layout')}</p>
+          <label className="flex items-center gap-2 text-xs text-slate-700">
+            <input
+              type="checkbox"
+              checked={readingPane}
+              onChange={(event) => onReadingPaneChange(event.target.checked)}
+              className="h-4 w-4"
+            />
+            {t('settings.readingPane')}
+          </label>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+          <p className="mb-3 text-sm font-medium">{t('settings.serverConfig')}</p>
+          <div className="flex flex-wrap gap-2">
+            <ConfigBadge
+              ok={Boolean(health?.relayConfigured)}
+              label={`${t('settings.relayProvider')} ${health?.relayLabel ?? ''}`.trim()}
+            />
+            <ConfigBadge ok={Boolean(health?.driveConfigured)} label={t('settings.googleOAuth')} />
+            <ConfigBadge ok={Boolean(health?.googleMailConfigured)} label={t('settings.googleMailOAuth')} />
+            <ConfigBadge ok={Boolean(health?.microsoftConfigured)} label={t('settings.microsoftOAuth')} />
+            <ConfigBadge ok={Boolean(health?.r2Configured)} label={t('settings.r2')} />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-6 flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm text-muted hover:text-slate-800"
+        >
+          <LogOut size={16} /> {t('common.logout')}
+        </button>
+      </div>
+    </div>
+  )
+}
