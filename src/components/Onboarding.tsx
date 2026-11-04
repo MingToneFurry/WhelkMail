@@ -32,6 +32,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
   const [mode, setMode] = useState<'imap' | 'relay'>('imap')
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
   const [presetId, setPresetId] = useState(initial.id)
   const [password, setPassword] = useState('')
   const [imapHost, setImapHost] = useState(initial.imapHost)
@@ -108,6 +109,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
         smtpHost,
         smtpPort: Number(smtpPort),
         smtpSecurity,
+        username: username.trim() || undefined,
         authType: oauth ? 'oauth2' : 'password',
         oauthProvider: oauth ? oauthProvider : undefined,
         password: oauth ? undefined : password,
@@ -223,6 +225,20 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
 
           {mode === 'imap' ? (
             <>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-muted">{t('onboarding.username')}</span>
+                <input
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder={email || 'nomeutente'}
+                  autoComplete="username"
+                  className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
+                />
+                <span className="mt-1 block text-[11px] text-muted">
+                  {t('onboarding.usernameHint')}
+                </span>
+              </label>
+
               <label className="block text-sm">
                 <span className="mb-1 block font-medium text-muted">{t('onboarding.provider')}</span>
                 <select
