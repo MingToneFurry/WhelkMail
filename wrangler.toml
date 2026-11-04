@@ -8,5 +8,5 @@ RELAY_PROVIDER = "smtp2go"
 [[d1_databases]]
 binding = "DB"
 database_name = "mail-client"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "6f8c477d-277c-446d-bc9e-40cd1d56dc69"
 
