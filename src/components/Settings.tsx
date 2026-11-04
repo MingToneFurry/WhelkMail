@@ -277,16 +277,33 @@ function AccountCard({
                 </button>
               </div>
             </label>
-            <label className="flex items-center gap-2 self-end text-xs text-slate-700">
+          </div>
+
+          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs">
+            <p className="mb-2 font-medium text-slate-700">{t('settings.sentCopy')}</p>
+            <label className="flex items-start gap-2">
               <input
-                type="checkbox"
+                type="radio"
+                name={`sent-mode-${account.id}`}
                 checked={account.autoSavesSent}
                 disabled={busy}
-                onChange={(event) => void onUpdate(account.id, { autoSavesSent: event.target.checked })}
-                className="h-4 w-4"
+                onChange={() => void onUpdate(account.id, { autoSavesSent: true })}
+                className="mt-0.5 h-3.5 w-3.5"
               />
-              {t('settings.autoSaveSent')}
+              <span>{t('settings.sentProvider')}</span>
             </label>
+            <label className="mt-1 flex items-start gap-2">
+              <input
+                type="radio"
+                name={`sent-mode-${account.id}`}
+                checked={!account.autoSavesSent}
+                disabled={busy}
+                onChange={() => void onUpdate(account.id, { autoSavesSent: false })}
+                className="mt-0.5 h-3.5 w-3.5"
+              />
+              <span>{t('settings.sentClient')}</span>
+            </label>
+            <p className="mt-2 text-[11px] text-muted">{t('settings.sentHint')}</p>
           </div>
 
           {account.authType === 'password' ? (

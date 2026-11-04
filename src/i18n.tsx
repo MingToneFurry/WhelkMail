@@ -106,6 +106,11 @@ const en: Record<string, string> = {
   'settings.maxAttachments': 'Max attachments: {value}',
   'settings.sentFolder': 'Sent folder',
   'settings.autoSaveSent': 'Provider already saves sent mail (no APPEND)',
+  'settings.sentCopy': 'Sent copy',
+  'settings.sentProvider': 'The provider saves it automatically (Google/Microsoft)',
+  'settings.sentClient': 'The client saves it via IMAP (recommended for other providers)',
+  'settings.sentHint':
+    'Choose “provider” only if your mail service already stores sent messages in Sent. If unsure, choose “client”.',
   'settings.updatePassword': 'Update password / app password',
   'settings.savePassword': 'Save password',
   'settings.testConnection': 'Test connection',
@@ -354,6 +359,11 @@ const it: Record<string, string> = {
   'settings.maxAttachments': 'Allegati max: {value}',
   'settings.sentFolder': 'Cartella inviate',
   'settings.autoSaveSent': 'Il provider salva già le inviate (nessun APPEND)',
+  'settings.sentCopy': 'Copia inviata',
+  'settings.sentProvider': 'La salva il provider automaticamente (Google/Microsoft)',
+  'settings.sentClient': 'La salva il client via IMAP (consigliato per gli altri provider)',
+  'settings.sentHint':
+    'Scegli “provider” solo se il servizio mette già le email inviate in Sent. Se non sei sicuro, scegli “client”.',
   'settings.updatePassword': 'Aggiorna password / app password',
   'settings.savePassword': 'Salva password',
   'settings.testConnection': 'Verifica connessione',

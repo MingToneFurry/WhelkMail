@@ -363,15 +363,30 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
                     </div>
                   </div>
                 </div>
-                <label className="mt-4 flex items-center gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={autoSavesSent}
-                    onChange={(event) => setAutoSavesSent(event.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  {t('onboarding.autoSave')}
-                </label>
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-medium text-muted">{t('settings.sentCopy')}</p>
+                  <label className="flex items-start gap-2 text-xs text-slate-700">
+                    <input
+                      type="radio"
+                      name="onboarding-sent-mode"
+                      checked={autoSavesSent}
+                      onChange={() => setAutoSavesSent(true)}
+                      className="mt-0.5 h-3.5 w-3.5"
+                    />
+                    <span>{t('settings.sentProvider')}</span>
+                  </label>
+                  <label className="mt-1 flex items-start gap-2 text-xs text-slate-700">
+                    <input
+                      type="radio"
+                      name="onboarding-sent-mode"
+                      checked={!autoSavesSent}
+                      onChange={() => setAutoSavesSent(false)}
+                      className="mt-0.5 h-3.5 w-3.5"
+                    />
+                    <span>{t('settings.sentClient')}</span>
+                  </label>
+                  <p className="mt-2 text-[11px] text-muted">{t('settings.sentHint')}</p>
+                </div>
               </details>
 
               {oauth && oauthProvider === 'microsoft' && !microsoftReady ? (
