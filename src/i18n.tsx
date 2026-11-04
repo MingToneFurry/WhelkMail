@@ -151,6 +151,10 @@ const en: Record<string, string> = {
   'settings.microsoftOAuth': 'Microsoft OAuth',
   'settings.language': 'Language',
   'settings.addAccount': 'Add account',
+  'settings.defaultSender': 'Default sender',
+  'settings.defaultSenderAuto': 'Automatic (selected account; replies use the receiving account)',
+  'settings.defaultSenderHint':
+    'Used for new messages. Replies always use the account that received the message.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'connected',
@@ -404,6 +408,11 @@ const it: Record<string, string> = {
   'settings.microsoftOAuth': 'Microsoft OAuth',
   'settings.language': 'Lingua',
   'settings.addAccount': 'Aggiungi account',
+  'settings.defaultSender': 'Mittente predefinito',
+  'settings.defaultSenderAuto':
+    'Automatico (account selezionato; le risposte usano l’account che ha ricevuto il messaggio)',
+  'settings.defaultSenderHint':
+    'Usato per i nuovi messaggi. Le risposte usano sempre l’account che ha ricevuto il messaggio.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'collegato',

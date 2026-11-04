@@ -35,6 +35,8 @@ interface SettingsProps {
   onAddAccount: () => void
   readingPane: boolean
   onReadingPaneChange: (value: boolean) => void
+  defaultSender: string
+  onDefaultSenderChange: (value: string) => void
   onLogout: () => void
 }
 
@@ -496,6 +498,8 @@ export function Settings({
   onAddAccount,
   readingPane,
   onReadingPaneChange,
+  defaultSender,
+  onDefaultSenderChange,
   onLogout,
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
@@ -559,6 +563,23 @@ export function Settings({
             />
             {t('settings.readingPane')}
           </label>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+          <p className="mb-3 text-sm font-medium">{t('settings.defaultSender')}</p>
+          <select
+            value={defaultSender}
+            onChange={(event) => onDefaultSenderChange(event.target.value)}
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none"
+          >
+            <option value="auto">{t('settings.defaultSenderAuto')}</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.displayName} &lt;{account.email}&gt;
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] text-muted">{t('settings.defaultSenderHint')}</p>
         </div>
 
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">

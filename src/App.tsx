@@ -58,6 +58,13 @@ export default function App() {
       return false
     }
   })
+  const [defaultSender, setDefaultSender] = useState<string>(() => {
+    try {
+      return localStorage.getItem('mc_default_sender') || 'auto'
+    } catch {
+      return 'auto'
+    }
+  })
   const [composeDraft, setComposeDraft] = useState<DraftPayload | null>(null)
   const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null)
   const [composeKey, setComposeKey] = useState(0)
@@ -173,6 +180,21 @@ export default function App() {
     const timer = window.setTimeout(() => setNotice(null), 6000)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (
+      defaultSender !== 'auto' &&
+      accounts.length > 0 &&
+      !accounts.some((account) => account.id === defaultSender)
+    ) {
+      setDefaultSender('auto')
+      try {
+        localStorage.setItem('mc_default_sender', 'auto')
+      } catch {
+        // ignore
+      }
+    }
+  }, [accounts, defaultSender])
 
   useEffect(() => {
     if (!selectedMessageId || auth !== 'ok') {
@@ -416,6 +438,22 @@ export default function App() {
     }
   }
 
+  function changeDefaultSender(value: string) {
+    setDefaultSender(value)
+    try {
+      localStorage.setItem('mc_default_sender', value)
+    } catch {
+      // ignore
+    }
+  }
+
+  const composeAccountId =
+    defaultSender !== 'auto' && accounts.some((account) => account.id === defaultSender)
+      ? defaultSender
+      : selectedAccountId !== 'all'
+        ? selectedAccountId
+        : accounts[0]?.id ?? null
+
   if (auth === 'loading') {
     return (
       <div className="flex min-h-full items-center justify-center text-sm text-muted">
@@ -594,6 +632,8 @@ export default function App() {
             }}
             readingPane={readingPane}
             onReadingPaneChange={changeReadingPane}
+            defaultSender={defaultSender}
+            onDefaultSenderChange={changeDefaultSender}
             onLogout={() => void logout()}
           />
         ) : (
@@ -659,7 +699,7 @@ export default function App() {
         <Compose
           key={composeKey}
           accounts={accounts}
-          defaultAccountId={selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id ?? null}
+          defaultAccountId={composeAccountId}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
           initialDraft={composeDraft}
           seed={composeSeed}
