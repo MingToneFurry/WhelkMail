@@ -22,6 +22,7 @@ export interface MimeInput {
   attachments: MimeAttachment[]
   messageId: string
   date: Date
+  includeBcc?: boolean
 }
 
 const encoder = new TextEncoder()
@@ -78,7 +79,7 @@ export function buildMime(input: MimeInput): Uint8Array {
   if (input.cc.length > 0) {
     headers.push(`Cc: ${input.cc.map(formatAddress).join(', ')}`)
   }
-  if (input.bcc.length > 0) {
+  if (input.includeBcc !== false && input.bcc.length > 0) {
     headers.push(`Bcc: ${input.bcc.map(formatAddress).join(', ')}`)
   }
   headers.push(

@@ -125,7 +125,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (!account.secret_enc) {
       return fail('Account is not connected', 400, undefined, 'imap_not_connected')
     }
-    const mime = buildMime({
+    const mimeBase = {
       from: { name: account.display_name, email: account.email },
       to,
       cc,
@@ -136,9 +136,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       attachments,
       messageId,
       date: now,
-    })
+    }
+    const mime = buildMime(mimeBase)
+    const transportMime = buildMime({ ...mimeBase, includeBcc: false })
     try {
-      await sendWithAccount(context.env, account, mime, [...input.to, ...input.cc, ...input.bcc])
+      await sendWithAccount(context.env, account, transportMime, [
+        ...input.to,
+        ...input.cc,
+        ...input.bcc,
+      ])
     } catch (error) {
       return fail(
         'SMTP send failed',
