@@ -58,9 +58,24 @@ export default function App() {
       return false
     }
   })
-  const [defaultSender, setDefaultSender] = useState<string>(() => {
+  const [defaultSenderNew, setDefaultSenderNew] = useState<string>(() => {
     try {
-      return localStorage.getItem('mc_default_sender') || 'auto'
+      return (
+        localStorage.getItem('mc_default_sender_new') ||
+        localStorage.getItem('mc_default_sender') ||
+        'auto'
+      )
+    } catch {
+      return 'auto'
+    }
+  })
+  const [defaultSenderReply, setDefaultSenderReply] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem('mc_default_sender_reply') ||
+        localStorage.getItem('mc_default_sender') ||
+        'auto'
+      )
     } catch {
       return 'auto'
     }
@@ -182,19 +197,27 @@ export default function App() {
   }, [notice])
 
   useEffect(() => {
-    if (
-      defaultSender !== 'auto' &&
-      accounts.length > 0 &&
-      !accounts.some((account) => account.id === defaultSender)
-    ) {
-      setDefaultSender('auto')
+    if (accounts.length === 0) {
+      return
+    }
+    const ids = new Set(accounts.map((account) => account.id))
+    if (defaultSenderNew !== 'auto' && !ids.has(defaultSenderNew)) {
+      setDefaultSenderNew('auto')
       try {
-        localStorage.setItem('mc_default_sender', 'auto')
+        localStorage.setItem('mc_default_sender_new', 'auto')
       } catch {
         // ignore
       }
     }
-  }, [accounts, defaultSender])
+    if (defaultSenderReply !== 'auto' && !ids.has(defaultSenderReply)) {
+      setDefaultSenderReply('auto')
+      try {
+        localStorage.setItem('mc_default_sender_reply', 'auto')
+      } catch {
+        // ignore
+      }
+    }
+  }, [accounts, defaultSenderNew, defaultSenderReply])
 
   useEffect(() => {
     if (!selectedMessageId || auth !== 'ok') {
@@ -271,8 +294,9 @@ export default function App() {
 
   function replyTo(message: MessageDetail, all: boolean) {
     const sendingAccountId =
-      defaultSender !== 'auto' && accounts.some((account) => account.id === defaultSender)
-        ? defaultSender
+      defaultSenderReply !== 'auto' &&
+      accounts.some((account) => account.id === defaultSenderReply)
+        ? defaultSenderReply
         : message.accountId
     const sendingAccount = accounts.find((account) => account.id === sendingAccountId)
     const ownAddresses = new Set(
@@ -447,18 +471,28 @@ export default function App() {
     }
   }
 
-  function changeDefaultSender(value: string) {
-    setDefaultSender(value)
+  function changeDefaultSenderNew(value: string) {
+    setDefaultSenderNew(value)
     try {
-      localStorage.setItem('mc_default_sender', value)
+      localStorage.setItem('mc_default_sender_new', value)
+    } catch {
+      // ignore
+    }
+  }
+
+  function changeDefaultSenderReply(value: string) {
+    setDefaultSenderReply(value)
+    try {
+      localStorage.setItem('mc_default_sender_reply', value)
     } catch {
       // ignore
     }
   }
 
   const composeAccountId =
-    defaultSender !== 'auto' && accounts.some((account) => account.id === defaultSender)
-      ? defaultSender
+    defaultSenderNew !== 'auto' &&
+    accounts.some((account) => account.id === defaultSenderNew)
+      ? defaultSenderNew
       : selectedAccountId !== 'all'
         ? selectedAccountId
         : accounts[0]?.id ?? null
@@ -641,8 +675,10 @@ export default function App() {
             }}
             readingPane={readingPane}
             onReadingPaneChange={changeReadingPane}
-            defaultSender={defaultSender}
-            onDefaultSenderChange={changeDefaultSender}
+            defaultSenderNew={defaultSenderNew}
+            onDefaultSenderNewChange={changeDefaultSenderNew}
+            defaultSenderReply={defaultSenderReply}
+            onDefaultSenderReplyChange={changeDefaultSenderReply}
             onLogout={() => void logout()}
           />
         ) : (

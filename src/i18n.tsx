@@ -152,10 +152,12 @@ const en: Record<string, string> = {
   'settings.language': 'Language',
   'settings.addAccount': 'Add account',
   'settings.defaultSender': 'Default sender',
-  'settings.defaultSenderAuto':
-    'Automatic (new messages use the selected account; replies use the receiving account)',
+  'settings.defaultSenderNew': 'Default sender for new messages',
+  'settings.defaultSenderNewAuto': 'Automatic (selected account)',
+  'settings.defaultSenderReply': 'Default sender for replies',
+  'settings.defaultSenderReplyAuto': 'Automatic (account that received the message)',
   'settings.defaultSenderHint':
-    'Applies to new messages and replies. Automatic mode replies from the account that received the message.',
+    'You can override the sender in the composer for a single message.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'connected',
@@ -410,10 +412,12 @@ const it: Record<string, string> = {
   'settings.language': 'Lingua',
   'settings.addAccount': 'Aggiungi account',
   'settings.defaultSender': 'Mittente predefinito',
-  'settings.defaultSenderAuto':
-    'Automatico (i nuovi messaggi usano l’account selezionato; le risposte usano l’account che ha ricevuto il messaggio)',
+  'settings.defaultSenderNew': 'Mittente predefinito per nuove email',
+  'settings.defaultSenderNewAuto': 'Automatico (account selezionato)',
+  'settings.defaultSenderReply': 'Mittente predefinito per le risposte',
+  'settings.defaultSenderReplyAuto': 'Automatico (account che ha ricevuto il messaggio)',
   'settings.defaultSenderHint':
-    'Si applica ai nuovi messaggi e alle risposte. In modalità automatica, le risposte usano l’account che ha ricevuto il messaggio.',
+    'Puoi cambiare il mittente nel composer per il singolo messaggio.',
   'settings.kindImap': 'IMAP',
   'settings.kindRelay': 'relay',
   'settings.connected': 'collegato',
