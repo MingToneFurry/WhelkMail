@@ -90,7 +90,7 @@ export const api = {
   message(id: string): Promise<{ message: MessageDetail }> {
     return request(`/api/messages/${encodeURIComponent(id)}`)
   },
-  send(payload: SendPayload): Promise<{ ok: boolean; warning?: string }> {
+  send(payload: SendPayload): Promise<{ ok: boolean; warning?: string; sentFolder?: string }> {
     return request('/api/messages/send', { method: 'POST', body: JSON.stringify(payload) })
   },
   draft(id: string): Promise<{ draft: DraftPayload }> {

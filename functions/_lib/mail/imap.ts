@@ -64,6 +64,9 @@ export async function resolveSentFolder(
   connection: ImapConnection,
   account: AccountRow,
 ): Promise<string> {
+  if (account.sent_folder && account.sent_folder !== 'Sent') {
+    return account.sent_folder
+  }
   return resolveSpecialFolder(
     connection,
     '\\Sent',
@@ -264,10 +267,11 @@ export async function appendToSent(
   env: Env,
   account: AccountRow,
   message: Uint8Array,
-): Promise<void> {
-  await withImap(env, account, async (connection) => {
+): Promise<{ folder: string }> {
+  return withImap(env, account, async (connection) => {
     const folder = await resolveSentFolder(connection, account)
-    await appendWithCreate(connection, folder, message, '(\\Seen)', 'sent')
+    const result = await appendWithCreate(connection, folder, message, '(\\Seen)', 'sent')
+    return { folder: result.folder }
   })
 }
 

@@ -669,7 +669,7 @@ export default function App() {
             setComposeSeed(null)
             setRefreshKey((key) => key + 1)
           }}
-          onSent={(warning) => {
+          onSent={(warning, sentFolder) => {
             setComposeOpen(false)
             setComposeDraft(null)
             setComposeSeed(null)
@@ -678,7 +678,12 @@ export default function App() {
             setQuery('')
             setSelectedMessageId(null)
             setRefreshKey((key) => key + 1)
-            setNotice(warning ?? t('app.emailSent'))
+            setNotice(
+              warning ??
+                (sentFolder
+                  ? t('app.emailSentInFolder', { folder: sentFolder })
+                  : t('app.emailSent')),
+            )
           }}
           onSaved={() => {
             setComposeOpen(false)

@@ -148,9 +148,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       )
     }
     let warning: string | undefined
+    let sentFolder: string | undefined
     if (!account.auto_saves_sent) {
       try {
-        await appendToSent(context.env, account, mime)
+        const appended = await appendToSent(context.env, account, mime)
+        sentFolder = appended.folder
+        if (appended.folder !== account.sent_folder) {
+          await context.env.DB.prepare('UPDATE accounts SET sent_folder = ? WHERE id = ?')
+            .bind(appended.folder, account.id)
+            .run()
+          account.sent_folder = appended.folder
+        }
       } catch (error) {
         warning = `Messaggio inviato, ma la copia in ${account.sent_folder} non è stata salvata: ${
           error instanceof Error ? error.message : 'errore IMAP'
@@ -160,7 +168,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (input.draftId) {
       await deleteDraftById(context.env, input.draftId).catch(() => undefined)
     }
-    return json({ ok: true, warning })
+    return json({ ok: true, warning, sentFolder })
   }
 
   if (account.storage_driver === 'r2' && !context.env.BUCKET) {
