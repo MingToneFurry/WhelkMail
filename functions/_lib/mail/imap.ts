@@ -191,6 +191,36 @@ async function targetFolder(
   return resolveDraftsFolder(connection)
 }
 
+async function selectForRead(
+  connection: ImapConnection,
+  folder: string,
+  allowCreate: boolean,
+): Promise<boolean> {
+  try {
+    await connection.select(folder)
+    return true
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (!MISSING_FOLDER.test(detail)) {
+      throw error
+    }
+    if (!allowCreate) {
+      throw error
+    }
+    try {
+      await connection.create(folder)
+    } catch {
+      // ignore; try selecting again in case it already exists
+    }
+    try {
+      await connection.select(folder)
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
 export async function listFolder(
   env: Env,
   account: AccountRow,
@@ -199,7 +229,10 @@ export async function listFolder(
 ): Promise<ImapHeader[]> {
   return withImap(env, account, async (connection) => {
     const target = await targetFolder(connection, account, folder)
-    await connection.select(target)
+    const selected = await selectForRead(connection, target, folder !== 'inbox')
+    if (!selected) {
+      return []
+    }
     const uids = await connection.searchAll()
     return connection.fetchHeaders(uids.slice(-limit))
   })

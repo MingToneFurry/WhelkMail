@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { Account, DraftPayload, DraftSavePayload } from '../../shared/types'
+import type { Account, ComposeSeed, DraftPayload, DraftSavePayload } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
@@ -30,6 +30,7 @@ interface ComposeProps {
   defaultAccountId: string | null
   maxAttachmentBytes: number
   initialDraft: DraftPayload | null
+  seed: ComposeSeed | null
   onClose: () => void
   onSent: (warning?: string) => void
   onSaved: () => void
@@ -45,22 +46,26 @@ export function Compose({
   defaultAccountId,
   maxAttachmentBytes,
   initialDraft,
+  seed,
   onClose,
   onSent,
   onSaved,
   onDeleted,
 }: ComposeProps) {
   const { t } = useI18n()
+  const initialTo = initialDraft?.to ?? seed?.to ?? []
+  const initialCc = initialDraft?.cc ?? seed?.cc ?? []
+  const initialBcc = initialDraft?.bcc ?? seed?.bcc ?? []
   const [accountId, setAccountId] = useState(
-    initialDraft?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? '',
+    initialDraft?.accountId ?? seed?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? '',
   )
-  const [to, setTo] = useState(initialDraft?.to.join(', ') ?? '')
-  const [cc, setCc] = useState(initialDraft?.cc.join(', ') ?? '')
-  const [bcc, setBcc] = useState(initialDraft?.bcc.join(', ') ?? '')
-  const [showCc, setShowCc] = useState(Boolean(initialDraft?.cc.length))
-  const [showBcc, setShowBcc] = useState(Boolean(initialDraft?.bcc.length))
-  const [subject, setSubject] = useState(initialDraft?.subject ?? '')
-  const [text, setText] = useState(initialDraft?.text ?? '')
+  const [to, setTo] = useState(initialTo.join(', '))
+  const [cc, setCc] = useState(initialCc.join(', '))
+  const [bcc, setBcc] = useState(initialBcc.join(', '))
+  const [showCc, setShowCc] = useState(Boolean(initialCc.length))
+  const [showBcc, setShowBcc] = useState(Boolean(initialBcc.length))
+  const [subject, setSubject] = useState(initialDraft?.subject ?? seed?.subject ?? '')
+  const [text, setText] = useState(initialDraft?.text ?? seed?.text ?? '')
   const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null)
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialDraft?.attachments ?? []).map((attachment) => ({

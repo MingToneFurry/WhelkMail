@@ -4,6 +4,7 @@ import type {
   Account,
   AccountCreateInput,
   AccountPatch,
+  ComposeSeed,
   DraftPayload,
   Folder,
   HealthStatus,
@@ -14,7 +15,7 @@ import type {
 import { useI18n } from './i18n'
 import { api, ApiError, type AccountError } from './lib/api'
 import { errorText } from './lib/errors'
-import { accountLabelStyle, cn } from './lib/utils'
+import { accountLabelStyle, cn, displayAddress } from './lib/utils'
 import { Compose } from './components/Compose'
 import { Login } from './components/Login'
 import { MailList } from './components/MailList'
@@ -58,6 +59,7 @@ export default function App() {
     }
   })
   const [composeDraft, setComposeDraft] = useState<DraftPayload | null>(null)
+  const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null)
   const [composeKey, setComposeKey] = useState(0)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -238,10 +240,57 @@ export default function App() {
     })
   }, [messages, query])
 
-  function openCompose(draft: DraftPayload | null) {
+  function openCompose(draft: DraftPayload | null, seed: ComposeSeed | null = null) {
     setComposeDraft(draft)
+    setComposeSeed(seed)
     setComposeKey((key) => key + 1)
     setComposeOpen(true)
+  }
+
+  function replyTo(message: MessageDetail, all: boolean) {
+    const own = message.accountEmail.toLowerCase()
+    const normalize = (values: string[]): string[] => {
+      const seen = new Set<string>()
+      const result: string[] = []
+      for (const value of values) {
+        const email = value.trim()
+        const key = email.toLowerCase()
+        if (!email || key === own || seen.has(key)) {
+          continue
+        }
+        seen.add(key)
+        result.push(email)
+      }
+      return result
+    }
+    const baseTargets =
+      message.folder === 'sent'
+        ? message.to.map((item) => item.email)
+        : [message.from.email]
+    const to = normalize(
+      all ? [...baseTargets, ...message.to.map((item) => item.email)] : baseTargets,
+    )
+    const cc = all
+      ? normalize(message.cc.map((item) => item.email)).filter(
+          (email) => !to.some((item) => item.toLowerCase() === email.toLowerCase()),
+        )
+      : []
+    const subject = /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`
+    const quoted = message.text
+      .split(/\r?\n/)
+      .map((line) => `> ${line}`)
+      .join('\n')
+    const text = `\n\nOn ${new Date(message.date).toLocaleString()}, ${displayAddress(
+      message.from,
+    )} wrote:\n${quoted}`
+    openCompose(null, {
+      accountId: message.accountId,
+      to,
+      cc,
+      bcc: [],
+      subject,
+      text,
+    })
   }
 
   async function selectMessage(id: string) {
@@ -567,6 +616,11 @@ export default function App() {
                   attachmentUrl={(index) =>
                     selectedMessageId ? api.attachmentUrl(selectedMessageId, index) : '#'
                   }
+                  onReply={(all) => {
+                    if (detail) {
+                      replyTo(detail, all)
+                    }
+                  }}
                 />
               </>
             ) : selectedMessageId ? (
@@ -579,6 +633,11 @@ export default function App() {
                 onBack={() => {
                   setSelectedMessageId(null)
                   setDetail(null)
+                }}
+                onReply={(all) => {
+                  if (detail) {
+                    replyTo(detail, all)
+                  }
                 }}
               />
             ) : (
@@ -603,14 +662,17 @@ export default function App() {
           defaultAccountId={selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id ?? null}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
           initialDraft={composeDraft}
+          seed={composeSeed}
           onClose={() => {
             setComposeOpen(false)
             setComposeDraft(null)
+            setComposeSeed(null)
             setRefreshKey((key) => key + 1)
           }}
           onSent={(warning) => {
             setComposeOpen(false)
             setComposeDraft(null)
+            setComposeSeed(null)
             setFolder('sent')
             setView('mail')
             setQuery('')
@@ -621,6 +683,7 @@ export default function App() {
           onSaved={() => {
             setComposeOpen(false)
             setComposeDraft(null)
+            setComposeSeed(null)
             setFolder('draft')
             setView('mail')
             setQuery('')
@@ -631,6 +694,7 @@ export default function App() {
           onDeleted={() => {
             setComposeOpen(false)
             setComposeDraft(null)
+            setComposeSeed(null)
             setFolder('draft')
             setView('mail')
             setSelectedMessageId(null)

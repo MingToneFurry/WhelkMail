@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, Download, FileText, Mail } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Download, FileText, Mail, Reply, ReplyAll } from 'lucide-react'
 import type { MessageDetail } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { displayAddress, formatBytes, formatDate } from '../lib/utils'
@@ -10,6 +10,7 @@ interface ReadingPaneProps {
   rawUrl: string | null
   attachmentUrl: (index: number) => string
   onBack?: () => void
+  onReply: (all: boolean) => void
 }
 
 export function ReadingPane({
@@ -19,6 +20,7 @@ export function ReadingPane({
   rawUrl,
   attachmentUrl,
   onBack,
+  onReply,
 }: ReadingPaneProps) {
   const { t, locale } = useI18n()
 
@@ -116,15 +118,33 @@ export function ReadingPane({
           </div>
           </div>
         </div>
-        {rawUrl ? (
-          <a
-            href={rawUrl}
-            className="flex shrink-0 items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onReply(false)}
+            className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            <Download size={14} />
-            {t('reading.downloadEml')}
-          </a>
-        ) : null}
+            <Reply size={14} />
+            {t('reading.reply')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onReply(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <ReplyAll size={14} />
+            {t('reading.replyAll')}
+          </button>
+          {rawUrl ? (
+            <a
+              href={rawUrl}
+              className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Download size={14} />
+              {t('reading.downloadEml')}
+            </a>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">

@@ -70,6 +70,8 @@ const en: Record<string, string> = {
   'reading.download': 'Download',
   'reading.loadFailed': 'Failed to read message',
   'reading.back': 'Back',
+  'reading.reply': 'Reply',
+  'reading.replyAll': 'Reply all',
 
   'compose.title': 'New message',
   'compose.from': 'From',
@@ -315,6 +317,8 @@ const it: Record<string, string> = {
   'reading.download': 'Scarica',
   'reading.loadFailed': 'Lettura fallita',
   'reading.back': 'Indietro',
+  'reading.reply': 'Rispondi',
+  'reading.replyAll': 'Rispondi a tutti',
 
   'compose.title': 'Nuovo messaggio',
   'compose.from': 'Da',

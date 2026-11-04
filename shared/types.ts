@@ -91,6 +91,15 @@ export interface SendPayload {
   attachments: AttachmentInput[]
 }
 
+export interface ComposeSeed {
+  accountId: string
+  to: string[]
+  cc: string[]
+  bcc: string[]
+  subject: string
+  text: string
+}
+
 export interface DraftPayload {
   id: string
   accountId: string
