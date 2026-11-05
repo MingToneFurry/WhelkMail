@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   ArrowLeft,
+  ChevronDown,
   Download,
   FileText,
   Mail,
@@ -10,7 +11,14 @@ import {
 } from 'lucide-react'
 import type { Label, MessageDetail } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { cn, displayAddress, formatBytes, formatDate, labelStyle } from '../lib/utils'
+import {
+  cn,
+  displayAddress,
+  formatBytes,
+  formatDate,
+  initials,
+  labelStyle,
+} from '../lib/utils'
 
 interface ReadingPaneProps {
   message: MessageDetail | null
@@ -96,11 +104,20 @@ export function ReadingPane({
   }
 
   const availableLabels = labels
+  const senderName = message.from.name?.trim() || message.from.email || t('list.unknownSender')
+  const toMe = message.to.some(
+    (item) => item.email.toLowerCase() === message.accountEmail.toLowerCase(),
+  )
+  const recipientSummary = toMe
+    ? t('reading.toMe')
+    : message.to.length > 0
+      ? `${t('reading.toShort')} ${message.to.map(displayAddress).join(', ')}`
+      : t('reading.toMe')
 
   return (
     <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-2xl border-t border-l border-line bg-white">
-      <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
-        <div className="flex min-w-0 items-start gap-3">
+      <div className="border-b border-line px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-start gap-2">
           {onBack ? (
             <button
               type="button"
@@ -110,8 +127,16 @@ export function ReadingPane({
               <ArrowLeft size={16} /> {t('reading.back')}
             </button>
           ) : null}
-          <div className="min-w-0">
-            <h2 className="truncate text-xl font-medium">{message.subject || t('list.noSubject')}</h2>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+              <h2 className="min-w-0 flex-1 truncate text-lg font-medium sm:text-xl">
+                {message.subject || t('list.noSubject')}
+              </h2>
+              <span className="shrink-0 pt-1 text-xs text-muted">
+                {formatDate(message.date, locale)}
+              </span>
+            </div>
+
             {message.labelIds.length > 0 ? (
               <div className="mt-1 flex flex-wrap gap-1">
                 {message.labelIds.map((id) => {
@@ -130,95 +155,116 @@ export function ReadingPane({
                 })}
               </div>
             ) : null}
-            <div className="mt-2 space-y-0.5 text-xs text-muted">
-            <p>
-              <span className="font-medium text-slate-600">{t('reading.from')}</span>{' '}
-              {displayAddress(message.from)}
-            </p>
-            <p>
-              <span className="font-medium text-slate-600">{t('reading.to')}</span>{' '}
-              {message.to.map((item) => displayAddress(item)).join(', ')}
-            </p>
-            {message.cc.length > 0 ? (
-              <p>
-                <span className="font-medium text-slate-600">{t('reading.cc')}</span>{' '}
-                {message.cc.map((item) => displayAddress(item)).join(', ')}
-              </p>
-            ) : null}
-            <p>
-              {formatDate(message.date, locale)} · {formatBytes(message.size)} · {message.accountEmail}
-            </p>
-          </div>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onReply(false)}
-            className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Reply size={14} />
-            {t('reading.reply')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onReply(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ReplyAll size={14} />
-            {t('reading.replyAll')}
-          </button>
-          <details className="relative">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
-              <Tag size={14} />
-              {t('reading.labels')}
-            </summary>
-            <div className="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-line bg-white p-2 shadow-lg">
-              {availableLabels.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-muted">{t('reading.noLabels')}</p>
-              ) : (
-                availableLabels.map((label) => {
-                  const checked = message.labelIds.includes(label.id)
-                  return (
-                    <label
-                      key={label.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-slate-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() =>
-                          onSetLabels(
-                            checked
-                              ? message.labelIds.filter((id) => id !== label.id)
-                              : [...message.labelIds, label.id],
-                          )
-                        }
-                        className="h-3.5 w-3.5"
-                      />
-                      <span
-                        className={cn(
-                          'rounded px-1.5 py-0.5 text-[10px] font-medium',
-                          labelStyle(label.color),
-                        )}
-                      >
-                        {label.name}
-                      </span>
-                    </label>
-                  )
-                })
-              )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-strong">
+                {initials(senderName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-800">{senderName}</p>
+                <details className="relative">
+                  <summary className="flex w-fit max-w-full cursor-pointer list-none items-center gap-1 text-xs text-muted hover:text-slate-700">
+                    <span className="truncate">{recipientSummary}</span>
+                    <ChevronDown size={12} className="shrink-0" />
+                  </summary>
+                  <div className="absolute left-0 z-30 mt-1 w-80 max-w-[calc(100vw-3rem)] rounded-xl border border-line bg-white p-3 text-xs shadow-lg">
+                    <p>
+                      <span className="font-medium text-slate-600">{t('reading.from')}</span>{' '}
+                      {displayAddress(message.from)}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-medium text-slate-600">{t('reading.to')}</span>{' '}
+                      {message.to.map((item) => displayAddress(item)).join(', ') || '—'}
+                    </p>
+                    {message.cc.length > 0 ? (
+                      <p className="mt-1">
+                        <span className="font-medium text-slate-600">{t('reading.cc')}</span>{' '}
+                        {message.cc.map((item) => displayAddress(item)).join(', ')}
+                      </p>
+                    ) : null}
+                    <p className="mt-1">
+                      <span className="font-medium text-slate-600">{t('reading.date')}</span>{' '}
+                      {formatDate(message.date, locale)}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-medium text-slate-600">{t('reading.size')}</span>{' '}
+                      {formatBytes(message.size)}
+                    </p>
+                  </div>
+                </details>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => onReply(false)}
+                  className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:px-3 sm:py-2"
+                >
+                  <Reply size={14} />
+                  {t('reading.reply')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReply(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:px-3 sm:py-2"
+                >
+                  <ReplyAll size={14} />
+                  {t('reading.replyAll')}
+                </button>
+                <details className="relative">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:px-3 sm:py-2">
+                    <Tag size={14} />
+                    {t('reading.labels')}
+                  </summary>
+                  <div className="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-line bg-white p-2 shadow-lg">
+                    {availableLabels.length === 0 ? (
+                      <p className="px-2 py-1 text-xs text-muted">{t('reading.noLabels')}</p>
+                    ) : (
+                      availableLabels.map((label) => {
+                        const checked = message.labelIds.includes(label.id)
+                        return (
+                          <label
+                            key={label.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                onSetLabels(
+                                  checked
+                                    ? message.labelIds.filter((id) => id !== label.id)
+                                    : [...message.labelIds, label.id],
+                                )
+                              }
+                              className="h-3.5 w-3.5"
+                            />
+                            <span
+                              className={cn(
+                                'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                                labelStyle(label.color),
+                              )}
+                            >
+                              {label.name}
+                            </span>
+                          </label>
+                        )
+                      })
+                    )}
+                  </div>
+                </details>
+                {rawUrl ? (
+                  <a
+                    href={rawUrl}
+                    className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:px-3 sm:py-2"
+                  >
+                    <Download size={14} />
+                    {t('reading.downloadEml')}
+                  </a>
+                ) : null}
+              </div>
             </div>
-          </details>
-          {rawUrl ? (
-            <a
-              href={rawUrl}
-              className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Download size={14} />
-              {t('reading.downloadEml')}
-            </a>
-          ) : null}
+          </div>
         </div>
       </div>
 
