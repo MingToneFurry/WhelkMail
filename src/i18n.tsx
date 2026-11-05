@@ -60,6 +60,8 @@ const en: Record<string, string> = {
   'list.emptyInboxHint': 'IMAP accounts are read directly from the provider.',
   'list.emptySentHint': 'Use Compose to get started.',
   'list.emptyDraftsHint': 'Save a draft while composing.',
+  'list.emptyLabel': 'No messages with this label.',
+  'list.emptyLabelHint': 'Apply the label from a message in your inbox, sent items or drafts.',
   'list.noRecipients': '(no recipients)',
   'list.unknownSender': '(unknown sender)',
   'list.to': 'To: {value}',
@@ -169,9 +171,12 @@ const en: Record<string, string> = {
   'settings.defaultSenderHint':
     'You can override the sender in the composer for a single message.',
   'settings.signature': 'Signature',
-  'settings.defaultSignature': 'Default signature',
-  'settings.defaultSignatureHint':
-    'Used for every account that does not define its own signature. Inserted automatically in new messages and replies.',
+  'settings.signatureShared': 'Same signature for all accounts',
+  'settings.signatureSharedHint': 'One signature applied to every account.',
+  'settings.signaturePerAccount': 'Different signature for each account',
+  'settings.signaturePerAccountHint': 'Set a signature for each account individually.',
+  'settings.defaultSignature': 'Signature',
+  'settings.defaultSignatureHint': 'Inserted automatically in new messages and replies.',
   'settings.signaturePlaceholder': 'Name, phone, links…',
   'settings.accountSignature': 'Signature for this account',
   'settings.accountSignatureHint':
@@ -342,6 +347,8 @@ const it: Record<string, string> = {
   'list.emptyInboxHint': 'Gli account IMAP vengono letti dal provider.',
   'list.emptySentHint': 'Usa il pulsante Scrivi per iniziare.',
   'list.emptyDraftsHint': 'Salva una bozza mentre scrivi.',
+  'list.emptyLabel': 'Nessun messaggio con questa etichetta.',
+  'list.emptyLabelHint': 'Applica l’etichetta da un messaggio in arrivo, inviato o in bozza.',
   'list.noRecipients': '(nessun destinatario)',
   'list.unknownSender': '(mittente sconosciuto)',
   'list.to': 'A: {value}',
@@ -451,9 +458,12 @@ const it: Record<string, string> = {
   'settings.defaultSenderHint':
     'Puoi cambiare il mittente nel composer per il singolo messaggio.',
   'settings.signature': 'Firma',
-  'settings.defaultSignature': 'Firma predefinita',
-  'settings.defaultSignatureHint':
-    'Usata per tutti gli account che non hanno una firma propria. Inserita automaticamente nelle nuove email e nelle risposte.',
+  'settings.signatureShared': 'Stessa firma per tutti gli account',
+  'settings.signatureSharedHint': 'Una sola firma applicata a ogni account.',
+  'settings.signaturePerAccount': 'Firma diversa per ogni account',
+  'settings.signaturePerAccountHint': 'Imposta una firma per ciascun account.',
+  'settings.defaultSignature': 'Firma',
+  'settings.defaultSignatureHint': 'Inserita automaticamente nelle nuove email e nelle risposte.',
   'settings.signaturePlaceholder': 'Nome, telefono, link…',
   'settings.accountSignature': 'Firma per questo account',
   'settings.accountSignatureHint':

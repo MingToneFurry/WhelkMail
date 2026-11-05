@@ -12,7 +12,13 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { Account, ComposeSeed, DraftPayload, DraftSavePayload } from '../../shared/types'
+import type {
+  Account,
+  ComposeSeed,
+  DraftPayload,
+  DraftSavePayload,
+  SignatureMode,
+} from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
@@ -30,6 +36,7 @@ interface ComposeProps {
   defaultAccountId: string | null
   maxAttachmentBytes: number
   defaultSignature: string
+  signatureMode: SignatureMode
   initialDraft: DraftPayload | null
   seed: ComposeSeed | null
   onClose: () => void
@@ -42,8 +49,15 @@ function base64Size(value: string): number {
   return Math.floor((value.length * 3) / 4)
 }
 
-function signatureOf(account: Account | undefined, fallback: string): string {
-  return (account?.signature?.trim() || fallback).trim()
+function signatureOf(
+  account: Account | undefined,
+  fallback: string,
+  mode: SignatureMode,
+): string {
+  if (mode === 'shared') {
+    return fallback.trim()
+  }
+  return account?.signature?.trim() ?? ''
 }
 
 export function Compose({
@@ -51,6 +65,7 @@ export function Compose({
   defaultAccountId,
   maxAttachmentBytes,
   defaultSignature,
+  signatureMode,
   initialDraft,
   seed,
   onClose,
@@ -67,6 +82,7 @@ export function Compose({
   const initialSignature = signatureOf(
     accounts.find((item) => item.id === initialAccountId),
     defaultSignature,
+    signatureMode,
   )
   const initialText = initialDraft
     ? initialDraft.text
@@ -231,6 +247,7 @@ export function Compose({
     const next = signatureOf(
       accounts.find((item) => item.id === accountId),
       defaultSignature,
+      signatureMode,
     )
     if (next === signatureRef.current) {
       return
@@ -243,7 +260,7 @@ export function Compose({
       return current
     })
     signatureRef.current = next
-  }, [accountId, accounts, defaultSignature])
+  }, [accountId, accounts, defaultSignature, signatureMode])
 
   async function saveDraftManually() {
     const saved = await persistDraft(false)

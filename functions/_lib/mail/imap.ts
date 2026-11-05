@@ -241,6 +241,25 @@ export async function listFolder(
   })
 }
 
+export async function listFolderByUids(
+  env: Env,
+  account: AccountRow,
+  folder: Folder,
+  uids: number[],
+): Promise<ImapHeader[]> {
+  if (uids.length === 0) {
+    return []
+  }
+  return withImap(env, account, async (connection) => {
+    const target = await targetFolder(connection, account, folder)
+    const selected = await selectForRead(connection, target, false)
+    if (!selected) {
+      return []
+    }
+    return connection.fetchHeaders(uids)
+  })
+}
+
 export async function fetchMessage(
   env: Env,
   account: AccountRow,

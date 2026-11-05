@@ -8,8 +8,9 @@ import {
 } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
-import { listFolder } from '../../_lib/mail/imap'
-import { imapMessageId } from '../../_lib/mail/ids'
+import type { ImapHeader } from '../../_lib/imap/client'
+import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
+import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
 
 interface AccountError {
@@ -18,18 +19,21 @@ interface AccountError {
   message: string
 }
 
-async function summariesFromImap(
-  env: Env,
+interface LabelAssignment {
+  message_id: string
+  account_id: string
+  folder: string
+}
+
+async function summariesFromHeaders(
   account: AccountRow,
   folder: Folder,
+  headers: ImapHeader[],
 ): Promise<MessageSummary[]> {
-  const headers = await listFolder(env, account, folder, 30)
   const summaries: MessageSummary[] = []
   for (const header of headers) {
     const email = await parseHeaders(header.header)
-    const from: Mailbox = email.from
-      ? toMailbox(email.from)
-      : { name: null, email: '' }
+    const from: Mailbox = email.from ? toMailbox(email.from) : { name: null, email: '' }
     summaries.push({
       id: imapMessageId(account.id, folder, header.uid),
       accountId: account.id,
@@ -43,13 +47,23 @@ async function summariesFromImap(
       subject: email.subject ?? '',
       snippet: '',
       date: dateOf(email),
-      unread: folder === 'draft' ? false : !header.flags.some((flag) => flag.toLowerCase() === '\\seen'),
+      unread:
+        folder === 'draft' ? false : !header.flags.some((flag) => flag.toLowerCase() === '\\seen'),
       hasAttachments: header.hasAttachments,
       status: folder === 'draft' ? 'draft' : 'sent',
       labelIds: [],
     })
   }
   return summaries
+}
+
+async function summariesFromImap(
+  env: Env,
+  account: AccountRow,
+  folder: Folder,
+): Promise<MessageSummary[]> {
+  const headers = await listFolder(env, account, folder, 30)
+  return summariesFromHeaders(account, folder, headers)
 }
 
 async function applyLabels(
@@ -90,10 +104,113 @@ async function summariesFromRelay(
   return result.results.map((row) => relayMessageSummary(row, account))
 }
 
+async function summariesFromImapLabel(
+  env: Env,
+  account: AccountRow,
+  assignments: LabelAssignment[],
+): Promise<MessageSummary[]> {
+  const byFolder = new Map<Folder, number[]>()
+  for (const assignment of assignments) {
+    const parsed = parseImapMessageId(assignment.message_id)
+    if (!parsed || parsed.accountId !== account.id) {
+      continue
+    }
+    const uids = byFolder.get(parsed.folder) ?? []
+    uids.push(parsed.uid)
+    byFolder.set(parsed.folder, uids)
+  }
+  const summaries: MessageSummary[] = []
+  for (const [folder, uids] of byFolder) {
+    const headers = await listFolderByUids(env, account, folder, [...new Set(uids)])
+    summaries.push(...(await summariesFromHeaders(account, folder, headers)))
+  }
+  return summaries
+}
+
+async function summariesFromRelayLabel(
+  env: Env,
+  account: AccountRow,
+  assignments: LabelAssignment[],
+): Promise<MessageSummary[]> {
+  const ids = [
+    ...new Set(
+      assignments
+        .map((assignment) => parseRelayMessageId(assignment.message_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ]
+  const rows: MessageRow[] = []
+  for (let index = 0; index < ids.length; index += 50) {
+    const chunk = ids.slice(index, index + 50)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const result = await env.DB.prepare(
+      `SELECT * FROM messages WHERE id IN (${placeholders})`,
+    )
+      .bind(...chunk)
+      .all<MessageRow>()
+    rows.push(...result.results)
+  }
+  return rows.map((row) => relayMessageSummary(row, account))
+}
+
+async function loadByLabel(
+  env: Env,
+  accounts: AccountRow[],
+  labelId: string,
+): Promise<{ messages: MessageSummary[]; errors: AccountError[] }> {
+  const result = await env.DB.prepare(
+    'SELECT message_id, account_id, folder FROM message_labels WHERE label_id = ?',
+  )
+    .bind(labelId)
+    .all<LabelAssignment>()
+  const byAccount = new Map<string, LabelAssignment[]>()
+  for (const assignment of result.results) {
+    const current = byAccount.get(assignment.account_id) ?? []
+    current.push(assignment)
+    byAccount.set(assignment.account_id, current)
+  }
+
+  const messages: MessageSummary[] = []
+  const errors: AccountError[] = []
+  for (const account of accounts) {
+    const assignments = byAccount.get(account.id)
+    if (!assignments || assignments.length === 0) {
+      continue
+    }
+    if (account.kind === 'imap' && !account.secret_enc) {
+      continue
+    }
+    try {
+      const loaded =
+        account.kind === 'imap'
+          ? await summariesFromImapLabel(env, account, assignments)
+          : await summariesFromRelayLabel(env, account, assignments)
+      const folders = new Set(loaded.map((message) => message.folder))
+      for (const folder of folders) {
+        await applyLabels(
+          env,
+          account.id,
+          folder,
+          loaded.filter((message) => message.folder === folder),
+        )
+      }
+      messages.push(...loaded)
+    } catch (error) {
+      errors.push({
+        accountId: account.id,
+        email: account.email,
+        message: error instanceof Error ? error.message : 'Errore IMAP',
+      })
+    }
+  }
+  return { messages, errors }
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url)
   const accountId = url.searchParams.get('accountId') ?? 'all'
   const folderParam = url.searchParams.get('folder')
+  const labelId = url.searchParams.get('labelId')
   const folder: Folder =
     folderParam === 'sent' ? 'sent' : folderParam === 'draft' ? 'draft' : 'inbox'
 
@@ -106,6 +223,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return fail('Account not found', 404, undefined, 'account_not_found')
     }
     accounts = [row]
+  }
+
+  if (labelId) {
+    const { messages, errors } = await loadByLabel(context.env, accounts, labelId)
+    messages.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    return json({ messages: messages.slice(0, 100), errors })
   }
 
   const messages: MessageSummary[] = []

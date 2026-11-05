@@ -105,7 +105,7 @@ Important fields:
 - `access_token_enc`, `access_token_expires_at`
 - `oauth_provider`: currently `microsoft`
 - `sent_folder`, `auto_saves_sent`
-- `signature`: optional per-account signature; empty means use the global default
+- `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `storage_driver`: `provider`, `drive` or `r2`
 - `relay_provider`, `relay_api_key_enc`, `relay_api_secret_enc`, `relay_domain`, `relay_region`
 - `drive_*` fields for the optional Drive archive
@@ -122,7 +122,12 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 ### `app_settings`
 
-Key/value store for deployment-wide preferences. Currently used for `default_signature`. Per-account signatures live in `accounts.signature` and override the default.
+Key/value store for deployment-wide preferences. Currently used for `default_signature` and `signature_mode`.
+
+`signature_mode` is `shared` (default) or `per_account`:
+
+- `shared`: `default_signature` is used for every account and `accounts.signature` is ignored.
+- `per_account`: every account uses its own `accounts.signature`; an empty value means no signature.
 
 ## 6. Security model
 
@@ -166,7 +171,9 @@ IMAP accounts never use external storage: attachments, Sent copies and drafts st
 
 Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the account bar filters by address. This is address-level labeling, not alias-level labeling.
 
-Custom labels are separate and user-defined. Create them from the sidebar, then apply them from the reading pane. The sidebar lists every label and filters the currently loaded folder client-side. Because IMAP messages are not mirrored, a label view only covers messages already fetched for the active folder; a global label inbox would require mirroring message metadata into D1.
+Custom labels are separate and user-defined. Create them from the sidebar, then apply them from the reading pane. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
+
+When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
 
 ## 10. Internationalization
 

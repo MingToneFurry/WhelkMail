@@ -9,14 +9,15 @@ interface MailListProps {
   selectedId: string | null
   loading: boolean
   folder: Folder
+  labelName?: string | null
   showAccount: boolean
   fullWidth?: boolean
   className?: string
   onSelect: (id: string) => void
 }
 
-function primaryLabel(message: MessageSummary, folder: Folder, fallback: string): string {
-  if (folder === 'inbox') {
+function primaryLabel(message: MessageSummary, fallback: string): string {
+  if (message.folder === 'inbox') {
     return message.from.name ?? message.from.email ?? fallback
   }
   const recipients = message.to.map((item) => item.name ?? item.email).join(', ')
@@ -29,22 +30,31 @@ export function MailList({
   selectedId,
   loading,
   folder,
+  labelName,
   showAccount,
   fullWidth = false,
   className,
   onSelect,
 }: MailListProps) {
   const { t, locale } = useI18n()
-  const title = folder === 'inbox' ? t('list.inbox') : folder === 'sent' ? t('list.sent') : t('list.drafts')
-  const empty =
-    folder === 'inbox' ? t('list.emptyInbox') : folder === 'sent' ? t('list.emptySent') : t('list.emptyDrafts')
-  const emptyHint =
-    folder === 'inbox'
+  const folderTitle =
+    folder === 'inbox' ? t('list.inbox') : folder === 'sent' ? t('list.sent') : t('list.drafts')
+  const title = labelName ?? folderTitle
+  const empty = labelName
+    ? t('list.emptyLabel')
+    : folder === 'inbox'
+      ? t('list.emptyInbox')
+      : folder === 'sent'
+        ? t('list.emptySent')
+        : t('list.emptyDrafts')
+  const emptyHint = labelName
+    ? t('list.emptyLabelHint')
+    : folder === 'inbox'
       ? t('list.emptyInboxHint')
       : folder === 'sent'
         ? t('list.emptySentHint')
         : t('list.emptyDraftsHint')
-  const fallback = folder === 'inbox' ? t('list.unknownSender') : t('list.noRecipients')
+  const fallback = t('list.noRecipients')
 
   return (
     <section
@@ -77,7 +87,7 @@ export function MailList({
           </div>
         ) : (
           messages.map((message) => {
-            const label = primaryLabel(message, folder, fallback)
+            const label = primaryLabel(message, fallback)
             const messageLabels = message.labelIds
               .map((id) => labels.find((item) => item.id === id))
               .filter((item): item is Label => Boolean(item))
@@ -99,8 +109,17 @@ export function MailList({
                   <div className="flex items-center gap-2">
                     {message.unread ? <span className="h-2 w-2 shrink-0 rounded-full bg-brand" /> : null}
                     <p className={cn('truncate text-sm', message.unread ? 'font-semibold' : 'font-medium')}>
-                      {folder === 'inbox' ? label : t('list.to', { value: label })}
+                      {message.folder === 'inbox' ? label : t('list.to', { value: label })}
                     </p>
+                    {labelName ? (
+                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                        {message.folder === 'inbox'
+                          ? t('list.inbox')
+                          : message.folder === 'sent'
+                            ? t('list.sent')
+                            : t('list.drafts')}
+                      </span>
+                    ) : null}
                     {showAccount ? (
                       <span
                         title={message.accountEmail}

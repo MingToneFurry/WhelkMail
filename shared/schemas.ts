@@ -117,5 +117,6 @@ export const messageLabelsSchema = z.object({
 
 export const appSettingsSchema = z.object({
   defaultSignature: z.string().max(5000).optional(),
+  signatureMode: z.enum(['shared', 'per_account']).optional(),
 })
 

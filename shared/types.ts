@@ -13,8 +13,11 @@ export interface Label {
   createdAt: string
 }
 
+export type SignatureMode = 'shared' | 'per_account'
+
 export interface AppSettings {
   defaultSignature: string
+  signatureMode: SignatureMode
 }
 
 export interface Mailbox {

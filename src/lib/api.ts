@@ -113,8 +113,12 @@ export const api = {
   messages(
     accountId: string,
     folder: Folder,
+    labelId?: string | null,
   ): Promise<{ messages: MessageSummary[]; errors: AccountError[] }> {
     const search = new URLSearchParams({ accountId, folder })
+    if (labelId) {
+      search.set('labelId', labelId)
+    }
     return request(`/api/messages?${search.toString()}`)
   },
   message(id: string): Promise<{ message: MessageDetail }> {

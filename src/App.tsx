@@ -12,6 +12,7 @@ import type {
   LabelColor,
   MessageDetail,
   MessageSummary,
+  SignatureMode,
   StorageOptions,
 } from '../shared/types'
 import { useI18n } from './i18n'
@@ -41,6 +42,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [labels, setLabels] = useState<Label[]>([])
   const [defaultSignature, setDefaultSignature] = useState('')
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
@@ -98,6 +100,7 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null)
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
+  const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
   const showAccount = selectedAccountId === 'all' && accounts.length > 1
 
   const load = useCallback(async () => {
@@ -123,6 +126,7 @@ export default function App() {
       try {
         const settingsResponse = await api.settings()
         setDefaultSignature(settingsResponse.defaultSignature)
+        setSignatureMode(settingsResponse.signatureMode)
       } catch (error) {
         if (error instanceof ApiError && error.isUnauthorized) {
           throw error
@@ -179,7 +183,7 @@ export default function App() {
     let cancelled = false
     setLoadingMessages(true)
     api
-      .messages(selectedAccountId, folder)
+      .messages(selectedAccountId, folder, selectedLabelId)
       .then((response) => {
         if (cancelled) {
           return
@@ -208,7 +212,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [auth, selectedAccountId, folder, refreshKey])
+  }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey])
 
   useEffect(() => {
     if (!notice) {
@@ -375,7 +379,8 @@ export default function App() {
   }
 
   async function selectMessage(id: string) {
-    if (folder === 'draft') {
+    const summary = messages.find((item) => item.id === id)
+    if ((summary?.folder ?? folder) === 'draft') {
       try {
         const response = await api.draft(id)
         openCompose(response.draft)
@@ -523,6 +528,15 @@ export default function App() {
     setDefaultSignature(value)
     try {
       await api.updateSettings({ defaultSignature: value })
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    }
+  }
+
+  async function changeSignatureMode(value: SignatureMode) {
+    setSignatureMode(value)
+    try {
+      await api.updateSettings({ signatureMode: value })
     } catch (error) {
       setSettingsError(errorText(error, t))
     }
@@ -784,6 +798,8 @@ export default function App() {
             onDefaultSenderReplyChange={changeDefaultSenderReply}
             defaultSignature={defaultSignature}
             onDefaultSignatureChange={(value) => void changeDefaultSignature(value)}
+            signatureMode={signatureMode}
+            onSignatureModeChange={(value) => void changeSignatureMode(value)}
             onLogout={() => void logout()}
           />
         ) : (
@@ -796,6 +812,7 @@ export default function App() {
                   selectedId={selectedMessageId}
                   loading={loadingMessages}
                   folder={folder}
+                  labelName={selectedLabel?.name ?? null}
                   showAccount={showAccount}
                   className={selectedMessageId ? 'hidden md:flex' : ''}
                   onSelect={(id) => void selectMessage(id)}
@@ -855,6 +872,7 @@ export default function App() {
                 selectedId={selectedMessageId}
                 loading={loadingMessages}
                 folder={folder}
+                labelName={selectedLabel?.name ?? null}
                 showAccount={showAccount}
                 fullWidth
                 onSelect={(id) => void selectMessage(id)}
@@ -870,6 +888,7 @@ export default function App() {
           accounts={accounts}
           defaultAccountId={composeAccountId}
           defaultSignature={defaultSignature}
+          signatureMode={signatureMode}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
           initialDraft={composeDraft}
           seed={composeSeed}

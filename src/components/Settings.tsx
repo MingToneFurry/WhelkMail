@@ -16,6 +16,7 @@ import type {
   AccountPatch,
   HealthStatus,
   MailSecurity,
+  SignatureMode,
   StorageOptions,
 } from '../../shared/types'
 import { LOCALES, useI18n, type Locale } from '../i18n'
@@ -41,6 +42,8 @@ interface SettingsProps {
   onDefaultSenderReplyChange: (value: string) => void
   defaultSignature: string
   onDefaultSignatureChange: (value: string) => void
+  signatureMode: SignatureMode
+  onSignatureModeChange: (value: SignatureMode) => void
   onLogout: () => void
 }
 
@@ -81,7 +84,6 @@ function AccountCard({
 }: AccountCardProps) {
   const { t } = useI18n()
   const [password, setPassword] = useState('')
-  const [signature, setSignature] = useState(account.signature)
   const [sentFolder, setSentFolder] = useState(account.sentFolder)
   const [imapHost, setImapHost] = useState(account.imapHost ?? '')
   const [imapPort, setImapPort] = useState(String(account.imapPort ?? 993))
@@ -313,28 +315,6 @@ function AccountCard({
             <p className="mt-2 text-[11px] text-muted">{t('settings.sentHint')}</p>
           </div>
 
-          <div className="mt-4 rounded-xl border border-line p-3">
-            <p className="mb-1 text-xs font-medium text-muted">{t('settings.accountSignature')}</p>
-            <textarea
-              value={signature}
-              onChange={(event) => setSignature(event.target.value)}
-              rows={3}
-              placeholder={t('settings.signaturePlaceholder')}
-              className="w-full resize-y rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
-            />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-muted">{t('settings.accountSignatureHint')}</p>
-              <button
-                type="button"
-                disabled={busy || signature === account.signature}
-                onClick={() => void onUpdate(account.id, { signature })}
-                className="rounded-lg border border-line px-2 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
-              >
-                {t('common.save')}
-              </button>
-            </div>
-          </div>
-
           {account.authType === 'password' ? (
             <div className="mt-4 flex flex-wrap items-end gap-2">
               <label className="block flex-1 text-xs">
@@ -511,6 +491,41 @@ function AccountCard({
   )
 }
 
+interface AccountSignatureEditorProps {
+  account: Account
+  busy: boolean
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
+}
+
+function AccountSignatureEditor({ account, busy, onUpdate }: AccountSignatureEditorProps) {
+  const { t } = useI18n()
+  const [value, setValue] = useState(account.signature)
+  return (
+    <div className="rounded-xl border border-line p-3">
+      <p className="mb-1 text-xs font-medium text-slate-700">
+        {account.displayName} <span className="font-normal text-muted">&lt;{account.email}&gt;</span>
+      </p>
+      <textarea
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        rows={3}
+        placeholder={t('settings.signaturePlaceholder')}
+        className="w-full resize-y rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+      />
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          disabled={busy || value === account.signature}
+          onClick={() => void onUpdate(account.id, { signature: value })}
+          className="rounded-lg border border-line px-2 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+        >
+          {t('common.save')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Settings({
   accounts,
   storage,
@@ -531,6 +546,8 @@ export function Settings({
   onDefaultSenderReplyChange,
   defaultSignature,
   onDefaultSignatureChange,
+  signatureMode,
+  onSignatureModeChange,
   onLogout,
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
@@ -636,27 +653,73 @@ export function Settings({
 
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">
           <p className="mb-3 text-sm font-medium">{t('settings.signature')}</p>
-          <label className="block text-xs">
-            <span className="mb-1 block font-medium text-muted">{t('settings.defaultSignature')}</span>
-            <textarea
-              value={signatureDraft}
-              onChange={(event) => setSignatureDraft(event.target.value)}
-              rows={4}
-              placeholder={t('settings.signaturePlaceholder')}
-              className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-muted">{t('settings.defaultSignatureHint')}</p>
-            <button
-              type="button"
-              disabled={signatureDraft === defaultSignature}
-              onClick={() => onDefaultSignatureChange(signatureDraft)}
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {t('common.save')}
-            </button>
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+              <input
+                type="radio"
+                name="signature-mode"
+                checked={signatureMode === 'shared'}
+                onChange={() => onSignatureModeChange('shared')}
+                className="mt-0.5 h-3.5 w-3.5"
+              />
+              <span>
+                <span className="block font-medium">{t('settings.signatureShared')}</span>
+                <span className="text-muted">{t('settings.signatureSharedHint')}</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+              <input
+                type="radio"
+                name="signature-mode"
+                checked={signatureMode === 'per_account'}
+                onChange={() => onSignatureModeChange('per_account')}
+                className="mt-0.5 h-3.5 w-3.5"
+              />
+              <span>
+                <span className="block font-medium">{t('settings.signaturePerAccount')}</span>
+                <span className="text-muted">{t('settings.signaturePerAccountHint')}</span>
+              </span>
+            </label>
           </div>
+
+          {signatureMode === 'shared' ? (
+            <div className="mt-4">
+              <label className="block text-xs">
+                <span className="mb-1 block font-medium text-muted">
+                  {t('settings.defaultSignature')}
+                </span>
+                <textarea
+                  value={signatureDraft}
+                  onChange={(event) => setSignatureDraft(event.target.value)}
+                  rows={4}
+                  placeholder={t('settings.signaturePlaceholder')}
+                  className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-muted">{t('settings.defaultSignatureHint')}</p>
+                <button
+                  type="button"
+                  disabled={signatureDraft === defaultSignature}
+                  onClick={() => onDefaultSignatureChange(signatureDraft)}
+                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {accounts.map((account) => (
+                <AccountSignatureEditor
+                  key={account.id}
+                  account={account}
+                  busy={busyId === account.id}
+                  onUpdate={onUpdate}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">
