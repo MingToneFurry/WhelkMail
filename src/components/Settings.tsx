@@ -205,6 +205,77 @@ function AccountCard({
       {isImap ? <SyncPanel account={account} onSynced={onSyncComplete} /> : null}
 
       {isImap ? (
+        <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs">
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              checked={account.archiveImapBodies}
+              disabled={busy || (!storage.r2 && !account.driveConnected)}
+              onChange={(event) =>
+                void onUpdate(account.id, { archiveImapBodies: event.target.checked })
+              }
+              className="mt-0.5 h-3.5 w-3.5"
+            />
+            <span>
+              <span className="block font-medium text-slate-700">
+                {t('settings.archiveBodies')}
+              </span>
+              <span className="text-muted">
+                {storage.r2 || account.driveConnected
+                  ? t('settings.archiveBodiesHint')
+                  : t('settings.archiveBodiesUnavailable')}
+              </span>
+            </span>
+          </label>
+
+          {account.archiveImapBodies ? (
+            <div className="mt-3">
+              <p className="mb-1.5 font-medium text-muted">{t('settings.archiveDestination')}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy || !storage.r2}
+                  onClick={() => void onUpdate(account.id, { imapArchiveDriver: 'r2' })}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1.5',
+                    account.imapArchiveDriver === 'r2'
+                      ? 'border-brand bg-brand-soft text-brand-strong'
+                      : 'border-line bg-white hover:border-slate-300',
+                    !storage.r2 && 'cursor-not-allowed opacity-50',
+                  )}
+                >
+                  {t('settings.r2')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !account.driveConnected}
+                  onClick={() => void onUpdate(account.id, { imapArchiveDriver: 'drive' })}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1.5',
+                    account.imapArchiveDriver === 'drive'
+                      ? 'border-brand bg-brand-soft text-brand-strong'
+                      : 'border-line bg-white hover:border-slate-300',
+                    !account.driveConnected && 'cursor-not-allowed opacity-50',
+                  )}
+                >
+                  {t('settings.drive')}
+                </button>
+                {!account.driveConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => onConnectDrive(account.id)}
+                    className="rounded-lg border border-line bg-white px-2.5 py-1.5 hover:border-slate-300"
+                  >
+                    {t('settings.connectDrive')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isImap ? (
         <>
           <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
             <div className="rounded-xl bg-slate-50 p-3">

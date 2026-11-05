@@ -2,6 +2,7 @@ export type AccountKind = 'imap' | 'relay'
 export type StorageDriver = 'provider' | 'drive' | 'r2'
 export type AuthType = 'password' | 'oauth2'
 export type MailSecurity = 'tls' | 'starttls'
+export type ImapArchiveDriver = 'r2' | 'drive'
 export type Folder = 'inbox' | 'sent' | 'draft'
 export type MessageStatus = 'sent' | 'failed' | 'draft'
 export type LabelColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'cyan' | 'lime'
@@ -109,6 +110,8 @@ export interface Account {
   connected: boolean
   signature: string
   incomingLabelId: string | null
+  archiveImapBodies: boolean
+  imapArchiveDriver: ImapArchiveDriver
   sentFolder: string
   autoSavesSent: boolean
   maxAttachmentBytes: number
@@ -248,6 +251,8 @@ export interface AccountPatch {
   displayName?: string
   signature?: string
   incomingLabelId?: string | null
+  archiveImapBodies?: boolean
+  imapArchiveDriver?: ImapArchiveDriver
   sentFolder?: string
   autoSavesSent?: boolean
   storageDriver?: StorageDriver

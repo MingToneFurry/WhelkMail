@@ -42,6 +42,8 @@ export interface AccountRow {
   drive_token_expires_at: number | null
   signature: string | null
   incoming_label_id: string | null
+  archive_imap_bodies: number
+  imap_archive_driver: string
   created_at: string
 }
 
@@ -100,6 +102,8 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     connected,
     signature: row.signature ?? '',
     incomingLabelId: row.incoming_label_id ?? null,
+    archiveImapBodies: Boolean(row.archive_imap_bodies),
+    imapArchiveDriver: row.imap_archive_driver === 'drive' ? 'drive' : 'r2',
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     maxAttachmentBytes: row.max_attachment_bytes,

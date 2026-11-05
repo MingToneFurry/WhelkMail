@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import type { Account, Folder, MailboxSyncState } from '../../shared/types'
 import { useI18n } from '../i18n'
@@ -24,6 +24,7 @@ export function SyncPanel({ account, onSynced }: SyncPanelProps) {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const autoResumed = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -80,9 +81,27 @@ export function SyncPanel({ account, onSynced }: SyncPanelProps) {
     }
   }
 
+  useEffect(() => {
+    if (loading || autoResumed.current) {
+      return
+    }
+    if (states.some((state) => state.status === 'partial')) {
+      autoResumed.current = true
+      const timer = window.setTimeout(() => {
+        void runSync()
+      }, 0)
+      return () => window.clearTimeout(timer)
+    }
+  })
+
   if (loading) {
     return <p className="mt-4 text-xs text-muted">{t('common.loading')}</p>
   }
+
+  const totalMessages = states.reduce((sum, state) => sum + state.total, 0)
+  const syncedMessages = states.reduce((sum, state) => sum + state.synced, 0)
+  const percent =
+    totalMessages > 0 ? Math.min(100, Math.round((syncedMessages / totalMessages) * 100)) : 0
 
   return (
     <div className="mt-4 rounded-xl border border-line p-3">
@@ -140,6 +159,20 @@ export function SyncPanel({ account, onSynced }: SyncPanelProps) {
           )
         })}
       </div>
+
+      {totalMessages > 0 ? (
+        <div className="mt-2">
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={cn('h-full rounded-full bg-brand transition-all', running && 'animate-pulse')}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <p className="mt-1 text-[10px] text-muted">
+            {t('sync.progress', { synced: syncedMessages, total: totalMessages })}
+          </p>
+        </div>
+      ) : null}
 
       {error ? <p className="mt-2 text-[11px] text-brand-strong">{error}</p> : null}
       {message ? <p className="mt-2 text-[11px] text-emerald-700">{message}</p> : null}

@@ -84,7 +84,7 @@ export async function fetchUserEmail(accessToken: string): Promise<string | null
   return data.email ?? null
 }
 
-export async function createDriveFolder(accessToken: string, name = 'MailClient'): Promise<string> {
+export async function createDriveFolder(accessToken: string, name = 'WhelkMail'): Promise<string> {
   const response = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
     method: 'POST',
     headers: {

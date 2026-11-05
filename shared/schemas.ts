@@ -44,6 +44,8 @@ export const accountUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   signature: z.string().max(5000).optional(),
   incomingLabelId: z.string().min(1).nullable().optional(),
+  archiveImapBodies: z.boolean().optional(),
+  imapArchiveDriver: z.enum(['r2', 'drive']).optional(),
   sentFolder: z.string().trim().min(1).max(255).optional(),
   autoSavesSent: z.boolean().optional(),
   storageDriver: z.enum(['provider', 'drive', 'r2']).optional(),

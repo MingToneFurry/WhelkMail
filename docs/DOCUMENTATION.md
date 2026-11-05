@@ -1,4 +1,4 @@
-# whelkmail — Technical Documentation
+# WhelkMail — Technical Documentation
 
 This document covers the architecture, security model, mailbox behavior and storage.
 
@@ -6,7 +6,7 @@ This document covers the architecture, security model, mailbox behavior and stor
 
 ## 1. Scope
 
-whelkmail is a **webmail client**, not a mail server.
+WhelkMail is a **webmail client**, not a mail server.
 
 - It connects to existing mailboxes through IMAP and SMTP.
 - It does not receive mail directly, does not run an MTA, and does not listen on ports 25/143/993/465/587.
@@ -133,7 +133,9 @@ Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index
 
 `imap_messages` mirrors IMAP message metadata (headers, flags, size, attachment flag) in D1. `imap_sync` stores the per-account/per-folder cursor: `uid_validity`, `max_uid`, `min_uid`, `backfill_done`, status, error, counts and last sync time.
 
-The sync is resumable and chunked (40 messages per request). The first pass fetches the newest chunk, then backfills older messages; later passes fetch new UIDs above `max_uid`. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned when a folder finishes backfilling. Bodies and attachments are not archived: opening a mirrored message still fetches the raw message from the provider.
+The sync is resumable and chunked (40 metadata messages per request, 8 when body archiving is enabled). The first pass fetches the newest chunk, then backfills older messages; later passes fetch new UIDs above `max_uid`. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned when a folder finishes backfilling, and their archived R2 objects are removed.
+
+`accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the archive when present and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
 
 ### `app_settings`
 
@@ -212,7 +214,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels, contacts and IMAP-sync migrations to an existing local database.
+- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels, contacts, IMAP-sync, IMAP-archive and archive-driver migrations to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

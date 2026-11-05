@@ -1,8 +1,8 @@
-# whelkmail
+# WhelkMail
 
 A self-hosted webmail client for mailboxes you already own.
 
-whelkmail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server: it connects to your providers over IMAP and SMTP, so your messages, sent copies, drafts and attachments stay on your mail provider. A separate "send-only" account type supports domains that have no SMTP, using an HTTP relay and an optional Google Drive or Cloudflare R2 archive.
+WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server: it connects to your providers over IMAP and SMTP, so your messages, sent copies, drafts and attachments stay on your mail provider. A separate "send-only" account type supports domains that have no SMTP, using an HTTP relay and an optional Google Drive or Cloudflare R2 archive.
 
 ## Features
 
@@ -12,7 +12,8 @@ whelkmail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Per-account incoming label: choose it while adding an account (or in Settings) so every incoming message of that account is labeled automatically
 - Gmail-style filters in Settings: shared across accounts, match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
 - Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
-- IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings and label transfer when messages move between folders. Bodies and attachments remain on the provider.
+- IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings, automatic resume of partial syncs, and label transfer when messages move between folders.
+- Optional archive of IMAP bodies and attachments on R2 or Google Drive: when enabled per account, the sync stores the raw EML and opening/downloading messages can use the archive instead of the provider.
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
@@ -50,7 +51,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If earlier migrations were already applied and you only need the IMAP sync tables, run `npm run db:migrate:local:5`.
+If earlier migrations were already applied and you only need the IMAP archive/sync columns, run `npm run db:migrate:local:7`.
 
 Create `.dev.vars` in the project root:
 
@@ -132,7 +133,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
 - Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
-- Email forwarding rules, push notifications and R2 archival of IMAP bodies/attachments are not implemented yet.
+- Email forwarding rules and push notifications are not implemented yet. Sync of custom folders and background/scheduled sync are still TODO; the current sync is manual and resumes automatically when Settings is open.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.

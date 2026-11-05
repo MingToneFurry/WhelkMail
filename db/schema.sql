@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   drive_token_expires_at INTEGER,
   signature TEXT,
   incoming_label_id TEXT,
+  archive_imap_bodies INTEGER NOT NULL DEFAULT 0,
+  imap_archive_driver TEXT NOT NULL DEFAULT 'r2',
   created_at TEXT NOT NULL
 );
 
@@ -150,6 +152,8 @@ CREATE TABLE IF NOT EXISTS imap_messages (
   size INTEGER NOT NULL DEFAULT 0,
   unread INTEGER NOT NULL DEFAULT 0,
   has_attachments INTEGER NOT NULL DEFAULT 0,
+  archived INTEGER NOT NULL DEFAULT 0,
+  archive_key TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

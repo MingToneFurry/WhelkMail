@@ -290,6 +290,19 @@ export async function fetchMessage(
   })
 }
 
+export async function markMessageSeen(
+  env: Env,
+  account: AccountRow,
+  folder: Folder,
+  uid: number,
+): Promise<void> {
+  await withImap(env, account, async (connection) => {
+    const target = await targetFolder(connection, account, folder)
+    await connection.select(target)
+    await connection.markSeen(uid)
+  })
+}
+
 export async function appendToSent(
   env: Env,
   account: AccountRow,

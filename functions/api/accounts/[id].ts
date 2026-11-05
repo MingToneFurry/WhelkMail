@@ -37,6 +37,16 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   const signature = input.signature === undefined ? row.signature : input.signature
   const incomingLabelId =
     input.incomingLabelId === undefined ? row.incoming_label_id : input.incomingLabelId
+  const archiveImapBodies =
+    input.archiveImapBodies === undefined ? row.archive_imap_bodies : input.archiveImapBodies ? 1 : 0
+  const imapArchiveDriver =
+    input.imapArchiveDriver ?? (row.imap_archive_driver === 'drive' ? 'drive' : 'r2')
+  if (archiveImapBodies && imapArchiveDriver === 'r2' && !context.env.BUCKET) {
+    return fail('R2 is not configured on this deployment', 400, undefined, 'r2_not_configured')
+  }
+  if (archiveImapBodies && imapArchiveDriver === 'drive' && !row.drive_refresh_token_enc) {
+    return fail('Google Drive is not connected for this account', 400, undefined, 'drive_not_connected')
+  }
   if (incomingLabelId) {
     const label = await context.env.DB.prepare('SELECT id FROM labels WHERE id = ?')
       .bind(incomingLabelId)
@@ -88,12 +98,14 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   await context.env.DB.prepare(
-    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
+    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
   )
     .bind(
       displayName,
       signature,
       incomingLabelId,
+      archiveImapBodies,
+      imapArchiveDriver,
       sentFolder,
       autoSavesSent,
       storageDriver,

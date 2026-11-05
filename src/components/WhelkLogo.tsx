@@ -15,7 +15,7 @@ export function WhelkLogo({ size = 24, className }: WhelkLogoProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       role="img"
-      aria-label="whelkmail"
+      aria-label="WhelkMail"
     >
       <path
         strokeWidth="4.5"

@@ -11,4 +11,14 @@ export async function getStorage(env: Env, row: AccountRow): Promise<StorageAdap
   return new DriveStorage(env, row)
 }
 
+export function getImapArchiveStorage(env: Env, row: AccountRow): StorageAdapter | null {
+  if (!row.archive_imap_bodies) {
+    return null
+  }
+  if (row.imap_archive_driver === 'drive') {
+    return row.drive_refresh_token_enc ? new DriveStorage(env, row) : null
+  }
+  return env.BUCKET ? new R2Storage(env) : null
+}
+
 export type { StorageAdapter } from './types'

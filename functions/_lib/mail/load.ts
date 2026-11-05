@@ -1,8 +1,9 @@
 import type { Folder } from '../../../shared/types'
 import { getAccountRow, type AccountRow, type MessageRow } from '../db'
 import type { Env } from '../env'
-import { getStorage } from '../storage'
-import { fetchMessage } from './imap'
+import { isSchemaError } from '../schema'
+import { getImapArchiveStorage, getStorage } from '../storage'
+import { fetchMessage, markMessageSeen } from './imap'
 import { parseImapMessageId, parseRelayMessageId } from './ids'
 
 export interface LoadedRaw {
@@ -21,6 +22,34 @@ export async function loadRaw(
     const account = await getAccountRow(env, imapId.accountId)
     if (!account || account.kind !== 'imap') {
       return null
+    }
+    const archiveStorage = getImapArchiveStorage(env, account)
+    if (archiveStorage) {
+      try {
+        const mirror = await env.DB.prepare(
+          'SELECT archive_key FROM imap_messages WHERE id = ?',
+        )
+          .bind(id)
+          .first<{ archive_key: string | null }>()
+        if (mirror?.archive_key) {
+          const object = await archiveStorage.get(mirror.archive_key)
+          if (object) {
+            const bytes = new Uint8Array(await new Response(object.body).arrayBuffer())
+            if (markRead && imapId.folder === 'inbox') {
+              try {
+                await markMessageSeen(env, account, imapId.folder, imapId.uid)
+              } catch {
+                // non-blocking
+              }
+            }
+            return { bytes, account, folder: imapId.folder }
+          }
+        }
+      } catch (error) {
+        if (!isSchemaError(error)) {
+          throw error
+        }
+      }
     }
     const bytes = await fetchMessage(env, account, imapId.folder, imapId.uid, markRead)
     return { bytes, account, folder: imapId.folder }

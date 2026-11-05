@@ -1,6 +1,6 @@
 {
   "name": "whelkmail",
-  "description": "whelkmail — Gmail-style webmail client for IMAP/SMTP mailboxes on Cloudflare",
+  "description": "WhelkMail — Gmail-style webmail client for IMAP/SMTP mailboxes on Cloudflare",
   "author": "mlzog",
   "license": "MIT",
   "private": true,
@@ -15,8 +15,8 @@
     "preview": "vite preview",
     "db:local": "wrangler d1 execute mail-client --local --file=./db/schema.sql",
     "db:remote": "wrangler d1 execute mail-client --remote --file=./db/schema.sql",
-    "db:migrate:local": "wrangler d1 execute mail-client --local --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --local --file=./db/migrations/002_label_accounts_filters.sql && wrangler d1 execute mail-client --local --file=./db/migrations/003_unified_labels_account_label.sql && wrangler d1 execute mail-client --local --file=./db/migrations/004_contacts.sql && wrangler d1 execute mail-client --local --file=./db/migrations/005_imap_sync.sql",
-    "db:migrate:remote": "wrangler d1 execute mail-client --remote --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/002_label_accounts_filters.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/003_unified_labels_account_label.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/004_contacts.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/005_imap_sync.sql",
+    "db:migrate:local": "wrangler d1 execute mail-client --local --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --local --file=./db/migrations/002_label_accounts_filters.sql && wrangler d1 execute mail-client --local --file=./db/migrations/003_unified_labels_account_label.sql && wrangler d1 execute mail-client --local --file=./db/migrations/004_contacts.sql && wrangler d1 execute mail-client --local --file=./db/migrations/005_imap_sync.sql && wrangler d1 execute mail-client --local --file=./db/migrations/006_imap_archive.sql && wrangler d1 execute mail-client --local --file=./db/migrations/007_imap_archive_driver.sql",
+    "db:migrate:remote": "wrangler d1 execute mail-client --remote --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/002_label_accounts_filters.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/003_unified_labels_account_label.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/004_contacts.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/005_imap_sync.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/006_imap_archive.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/007_imap_archive_driver.sql",
     "db:migrate:local:2": "wrangler d1 execute mail-client --local --file=./db/migrations/002_label_accounts_filters.sql",
     "db:migrate:remote:2": "wrangler d1 execute mail-client --remote --file=./db/migrations/002_label_accounts_filters.sql",
     "db:migrate:local:3": "wrangler d1 execute mail-client --local --file=./db/migrations/003_unified_labels_account_label.sql",
@@ -25,6 +25,10 @@
     "db:migrate:remote:4": "wrangler d1 execute mail-client --remote --file=./db/migrations/004_contacts.sql",
     "db:migrate:local:5": "wrangler d1 execute mail-client --local --file=./db/migrations/005_imap_sync.sql",
     "db:migrate:remote:5": "wrangler d1 execute mail-client --remote --file=./db/migrations/005_imap_sync.sql",
+    "db:migrate:local:6": "wrangler d1 execute mail-client --local --file=./db/migrations/006_imap_archive.sql",
+    "db:migrate:remote:6": "wrangler d1 execute mail-client --remote --file=./db/migrations/006_imap_archive.sql",
+    "db:migrate:local:7": "wrangler d1 execute mail-client --local --file=./db/migrations/007_imap_archive_driver.sql",
+    "db:migrate:remote:7": "wrangler d1 execute mail-client --remote --file=./db/migrations/007_imap_archive_driver.sql",
     "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {

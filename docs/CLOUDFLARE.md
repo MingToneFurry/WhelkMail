@@ -1,6 +1,6 @@
-# Deploying whelkmail on Cloudflare
+# Deploying WhelkMail on Cloudflare
 
-This is the complete, step-by-step guide to run whelkmail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
+This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
 
 > **Important:** this is not a static site. Deploy it as a **Pages project with Functions**. The `functions/` directory is the API (IMAP/SMTP over `cloudflare:sockets`). Uploading only `dist` without Functions will break every API call.
 
@@ -157,12 +157,12 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/005_imap_sync.sql`, which add the `signature` column, create the `labels`, `message_labels`, `app_settings`, `filters`, `contacts`, `imap_sync` and `imap_messages` tables, make labels shared across accounts, add the per-account incoming label, and enable IMAP metadata sync.
+That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/007_imap_archive_driver.sql`, which add the `signature` column, create the `labels`, `message_labels`, `app_settings`, `filters`, `contacts`, `imap_sync` and `imap_messages` tables, make labels shared across accounts, add the per-account incoming label, enable IMAP metadata sync, and add the optional R2/Drive archive columns.
 
 If earlier migrations were already applied, run only the missing one:
 
 ```bash
-npm run db:migrate:remote:5
+npm run db:migrate:remote:7
 ```
 
 If the database already existed before relay support was added, apply the additive migration:
@@ -343,7 +343,8 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:5` |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:7` |
+| `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` | Run `npm run db:migrate:remote:6`, then `npm run db:migrate:remote:7` |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |
 | Relay 503 | Relay provider not configured for the account and no deployment fallback |

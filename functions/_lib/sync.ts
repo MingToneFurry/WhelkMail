@@ -9,6 +9,7 @@ import type { AccountRow } from './db'
 import type { Env } from './env'
 import type { ImapHeader } from './imap/client'
 import { withImap, resolveFolderName } from './mail/imap'
+import { getImapArchiveStorage, type StorageAdapter } from './storage'
 import { imapMessageId } from './mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from './mail/parse'
 
@@ -49,6 +50,8 @@ export interface ImapMessageRow {
   size: number
   unread: number
   has_attachments: number
+  archived: number
+  archive_key: string | null
   created_at: string
   updated_at: string
 }
@@ -290,16 +293,28 @@ async function pruneFolder(
   accountId: string,
   folder: Folder,
   allUids: number[],
+  storage: StorageAdapter | null,
 ): Promise<void> {
   const rows = await env.DB.prepare(
-    'SELECT id, uid FROM imap_messages WHERE account_id = ? AND folder = ?',
+    'SELECT id, uid, archive_key FROM imap_messages WHERE account_id = ? AND folder = ?',
   )
     .bind(accountId, folder)
-    .all<{ id: string; uid: number }>()
+    .all<{ id: string; uid: number; archive_key: string | null }>()
   const present = new Set(allUids)
   const stale = rows.results.filter((row) => !present.has(row.uid))
   if (stale.length === 0) {
     return
+  }
+  if (storage) {
+    for (const row of stale) {
+      if (row.archive_key) {
+        try {
+          await storage.remove(row.archive_key)
+        } catch {
+          // best effort
+        }
+      }
+    }
   }
   const statements: D1PreparedStatement[] = []
   for (const row of stale) {
@@ -326,6 +341,10 @@ export async function runSyncChunk(
   let maxUid = row?.max_uid ?? 0
   let minUid = row?.min_uid ?? 0
   let backfillDone = Boolean(row?.backfill_done)
+  const archiveStorage = getImapArchiveStorage(env, account)
+  const archiveBodies = Boolean(archiveStorage)
+  const chunkSize = archiveBodies ? 8 : CHUNK_SIZE
+  let archiveMore = false
 
   await withImap(env, account, async (connection) => {
     const target = await resolveFolderName(connection, account, folder)
@@ -353,12 +372,12 @@ export async function runSyncChunk(
     let uidsToFetch: number[] = []
     let phase: 'new' | 'backfill' | 'idle' = 'idle'
     if (newUids.length > 0) {
-      uidsToFetch = maxUid === 0 ? newUids.slice(-CHUNK_SIZE) : newUids.slice(0, CHUNK_SIZE)
+      uidsToFetch = maxUid === 0 ? newUids.slice(-chunkSize) : newUids.slice(0, chunkSize)
       phase = 'new'
     } else if (!backfillDone) {
       const older = allUids.filter((uid) => minUid === 0 || uid < minUid)
       if (older.length > 0) {
-        uidsToFetch = older.slice(-CHUNK_SIZE)
+        uidsToFetch = older.slice(-chunkSize)
         phase = 'backfill'
       } else {
         backfillDone = true
@@ -409,6 +428,8 @@ export async function runSyncChunk(
                   ? 0
                   : 1,
             has_attachments: header.hasAttachments ? 1 : 0,
+            archived: 0,
+            archive_key: null,
             created_at: now,
             updated_at: now,
           },
@@ -453,6 +474,28 @@ export async function runSyncChunk(
         )
       }
 
+      if (archiveStorage && parsed.length > 0) {
+        const updates: D1PreparedStatement[] = []
+        for (const item of parsed) {
+          try {
+            const bytes = await connection.fetchFull(item.header.uid)
+            const key = `imap/${account.id}/${folder}/${details.uidValidity ?? 0}/${folder}-${item.header.uid}.eml`
+            const stored = await archiveStorage.put(key, bytes, 'message/rfc822')
+            updates.push(
+              env.DB.prepare('UPDATE imap_messages SET archived = 1, archive_key = ? WHERE id = ?').bind(
+                stored.key,
+                item.id,
+              ),
+            )
+          } catch {
+            // Keep the message on the provider if the archive write fails.
+          }
+        }
+        if (updates.length > 0) {
+          await env.DB.batch(updates)
+        }
+      }
+
       const fetchedMin = Math.min(...uidsToFetch)
       const fetchedMax = Math.max(...uidsToFetch)
       if (phase === 'new') {
@@ -463,15 +506,49 @@ export async function runSyncChunk(
       }
     }
 
+    if (archiveStorage) {
+      const pending = await env.DB.prepare(
+        'SELECT id, uid FROM imap_messages WHERE account_id = ? AND folder = ? AND archived = 0 ORDER BY uid ASC LIMIT ?',
+      )
+        .bind(account.id, folder, chunkSize)
+        .all<{ id: string; uid: number }>()
+      const updates: D1PreparedStatement[] = []
+      for (const item of pending.results) {
+        try {
+          const bytes = await connection.fetchFull(item.uid)
+          const key = `imap/${account.id}/${folder}/${details.uidValidity ?? 0}/${folder}-${item.uid}.eml`
+          const stored = await archiveStorage.put(key, bytes, 'message/rfc822')
+          updates.push(
+            env.DB.prepare('UPDATE imap_messages SET archived = 1, archive_key = ? WHERE id = ?').bind(
+              stored.key,
+              item.id,
+            ),
+          )
+        } catch {
+          // Retry on the next sync.
+        }
+      }
+      if (updates.length > 0) {
+        await env.DB.batch(updates)
+      }
+      const remaining = await env.DB.prepare(
+        'SELECT COUNT(*) AS count FROM imap_messages WHERE account_id = ? AND folder = ? AND archived = 0',
+      )
+        .bind(account.id, folder)
+        .first<{ count: number }>()
+      archiveMore = (remaining?.count ?? 0) > 0
+    }
+
     if (!backfillDone && !allUids.some((uid) => uid < minUid)) {
       backfillDone = true
     }
     const hasMore =
       allUids.some((uid) => uid > maxUid) ||
-      (!backfillDone && allUids.some((uid) => uid < minUid))
+      (!backfillDone && allUids.some((uid) => uid < minUid)) ||
+      archiveMore
 
     if (!hasMore) {
-      await pruneFolder(env, account.id, folder, allUids)
+      await pruneFolder(env, account.id, folder, allUids, archiveStorage)
     }
 
     const synced = await countMessages(env, account.id, folder)

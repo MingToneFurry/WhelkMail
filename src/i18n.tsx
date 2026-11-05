@@ -8,7 +8,7 @@ export const LOCALES: { id: Locale; label: string }[] = [
 ]
 
 const en: Record<string, string> = {
-  'app.name': 'whelkmail',
+  'app.name': 'WhelkMail',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
   'common.save': 'Save',
@@ -160,7 +160,7 @@ const en: Record<string, string> = {
   'settings.r2': 'Cloudflare R2',
   'settings.driveConnected': 'Google Drive connected',
   'settings.driveNotConnected': 'Google Drive not connected',
-  'settings.driveFolderReady': 'whelkmail folder ready',
+  'settings.driveFolderReady': 'WhelkMail folder ready',
   'settings.driveAuthNeeded': 'OAuth authorization required.',
   'settings.reconnectDrive': 'Reconnect',
   'settings.connectDrive': 'Connect Drive',
@@ -178,6 +178,11 @@ const en: Record<string, string> = {
   'sync.status.partial': 'Partial',
   'sync.status.done': 'Completed',
   'sync.status.error': 'Error',
+  'settings.archiveBodies': 'Archive bodies and attachments',
+  'settings.archiveBodiesHint':
+    'The sync also stores the raw EML in the selected storage. Opening and downloading messages can then use the archive.',
+  'settings.archiveBodiesUnavailable': 'Bind R2 or connect Google Drive to enable the archive.',
+  'settings.archiveDestination': 'Archive destination',
 
   'contacts.title': 'Contacts',
   'contacts.search': 'Search contacts',
@@ -382,7 +387,7 @@ const en: Record<string, string> = {
 }
 
 const it: Record<string, string> = {
-  'app.name': 'whelkmail',
+  'app.name': 'WhelkMail',
   'common.cancel': 'Annulla',
   'common.close': 'Chiudi',
   'common.save': 'Salva',
@@ -534,7 +539,7 @@ const it: Record<string, string> = {
   'settings.r2': 'Cloudflare R2',
   'settings.driveConnected': 'Google Drive collegato',
   'settings.driveNotConnected': 'Google Drive non collegato',
-  'settings.driveFolderReady': 'Cartella whelkmail pronta',
+  'settings.driveFolderReady': 'Cartella WhelkMail pronta',
   'settings.driveAuthNeeded': 'Serve l’autorizzazione OAuth.',
   'settings.reconnectDrive': 'Ricollega',
   'settings.connectDrive': 'Collega Drive',
@@ -552,6 +557,12 @@ const it: Record<string, string> = {
   'sync.status.partial': 'Parziale',
   'sync.status.done': 'Completata',
   'sync.status.error': 'Errore',
+  'settings.archiveBodies': 'Archivia corpi e allegati',
+  'settings.archiveBodiesHint':
+    'La sync salva anche l’EML originale nello storage selezionato. Apertura e download dei messaggi possono usare l’archivio.',
+  'settings.archiveBodiesUnavailable':
+    'Configura R2 oppure collega Google Drive per abilitare l’archivio.',
+  'settings.archiveDestination': 'Destinazione archivio',
 
   'contacts.title': 'Rubrica',
   'contacts.search': 'Cerca contatti',

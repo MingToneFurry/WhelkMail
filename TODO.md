@@ -11,17 +11,16 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Vista mobile: sidebar a scomparsa, topbar responsive, pannello di lettura a schermo intero.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).
 - [x] Rubrica contatti: tabella `contacts`, API CRUD, vista Rubrica con ricerca, autocomplete destinatari in To/Cc/Bcc, import/export CSV e deduplica per email.
-- [x] Rebrand completo in `whelkmail`: nome prodotto, titolo pagina, package, documentazione, logo e favicon con conchiglia di buccina.
+- [x] Rebrand completo in WhelkMail: nome prodotto, titolo pagina, package, documentazione, logo e favicon con conchiglia di buccina.
 - [x] Sync metadati IMAP in D1: incrementale, chunked/resumable, `UIDVALIDITY`, cartelle speciali, trasferimento etichette sui movimenti e stato/errore in Impostazioni.
+- [x] Rifiniture sync: archiviazione opzionale di corpi/allegati su R2 o Google Drive, ripresa automatica delle sync parziali e barra di avanzamento.
 
 ## Da fare
 
 ### 1. Rifiniture sync
 
-- [ ] Archiviazione di corpi e allegati IMAP su R2 (opzionale ma consigliata).
 - [ ] Sincronizzazione di cartelle personalizzate oltre Inbox/Inviate/Bozze.
 - [ ] Sync automatica in background (dipende dal Worker schedulato).
-- [ ] Avanzamento in tempo reale e ripresa automatica della sync parziale.
 
 Prerequisito per notifiche push e forward automatico.
 
@@ -90,7 +89,7 @@ Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico
 
 ## Ordine consigliato
 
-1. Rifiniture sync (R2 e background).
+1. Cartelle personalizzate e sync in background.
 2. PWA e notifiche push.
 3. Forward automatico.
 4. Eliminazione dal provider.
