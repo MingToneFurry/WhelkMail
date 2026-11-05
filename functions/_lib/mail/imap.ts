@@ -84,6 +84,15 @@ export async function resolveDraftsFolder(connection: ImapConnection): Promise<s
   )
 }
 
+export async function resolveTrashFolder(connection: ImapConnection): Promise<string> {
+  return resolveSpecialFolder(
+    connection,
+    '\\Trash',
+    'Trash',
+    /(^|[./])(trash|deleted items|deleted messages|bin|cestino|posta eliminata|eliminati)$/i,
+  )
+}
+
 const MISSING_FOLDER = /TRYCREATE|NONEXISTENT|doesn't exist|does not exist|Mailbox doesn't exist/i
 
 function uniqueFolders(values: string[]): string[] {
@@ -344,5 +353,37 @@ export async function deleteDraft(
     const folder = await resolveDraftsFolder(connection)
     await connection.select(folder)
     await connection.deleteMessage(uid)
+  })
+}
+
+export async function moveToTrash(
+  env: Env,
+  account: AccountRow,
+  folder: Folder,
+  uid: number,
+): Promise<string> {
+  return withImap(env, account, async (connection) => {
+    const source = await targetFolder(connection, account, folder)
+    await connection.select(source)
+    const trash = await resolveTrashFolder(connection)
+    if (trash === source) {
+      throw new Error('La cartella Trash coincide con la cartella di origine')
+    }
+    try {
+      await connection.copy(uid, trash)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      if (!MISSING_FOLDER.test(detail)) {
+        throw error
+      }
+      try {
+        await connection.create(trash)
+      } catch {
+        // It may already exist.
+      }
+      await connection.copy(uid, trash)
+    }
+    await connection.deleteMessage(uid)
+    return trash
   })
 }

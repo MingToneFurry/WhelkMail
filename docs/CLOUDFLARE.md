@@ -161,12 +161,12 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/008_push.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive and push subscriptions/preferences.
+That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/009_forward_and_delete.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive, push, forwarding rules and provider deletion logs.
 
 If earlier migrations were already applied, run only the missing one:
 
 ```bash
-npm run db:migrate:remote:8
+npm run db:migrate:remote:9
 ```
 
 ### 1.6 Web Push notifications (optional)
@@ -194,7 +194,7 @@ npx wrangler secret put CRON_SECRET -c worker/wrangler.toml
 npm run cron:deploy
 ```
 
-The worker runs every 5 minutes and calls `POST /api/cron/notifications` on the Pages app. Enable notifications from **Settings → Push notifications** and allow the browser permission.
+The worker runs every 5 minutes and calls `POST /api/cron/notifications` on the Pages app. In the same run it also applies automatic forwarding rules and the optional provider cleanup. Enable notifications from **Settings → Push notifications** and allow the browser permission; forwarding and deletion are configured in the account/filter sections.
 
 If the database already existed before relay support was added, apply the additive migration:
 
@@ -374,7 +374,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:8` |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_rules` / `forward_log` / `deletion_log` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:9` |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` | Run `npm run db:migrate:remote:6`, then `npm run db:migrate:remote:7` |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |

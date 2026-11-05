@@ -25,7 +25,9 @@ import type {
 } from '../../shared/types'
 import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
+import { DeletionPanel } from './DeletionPanel'
 import { FiltersSettings } from './FiltersSettings'
+import { ForwardRulesSettings } from './ForwardRulesSettings'
 import { PushSettings } from './PushSettings'
 import { SyncPanel } from './SyncPanel'
 
@@ -274,6 +276,10 @@ function AccountCard({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {isImap ? (
+        <DeletionPanel account={account} busy={busy} onUpdate={onUpdate} />
       ) : null}
 
       {isImap ? (
@@ -850,6 +856,8 @@ export function Settings({
           onDeleteFilter={onDeleteFilter}
           onCreateLabel={onCreateLabel}
         />
+
+        <ForwardRulesSettings accounts={accounts} labels={labels} />
 
         <PushSettings />
 

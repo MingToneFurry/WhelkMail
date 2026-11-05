@@ -1,9 +1,17 @@
 import type { Folder } from '../../../shared/types'
 import { listAccountRows } from '../../_lib/db'
+import { deleteArchivedMessage } from '../../_lib/deletion'
 import type { Env } from '../../_lib/env'
+import { applyAccountLabel, applyFilters } from '../../_lib/filters'
+import { forwardMessage, type ForwardRuleRow } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
 import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
-import { markSyncError, runSyncChunk, type ImapMessageRow } from '../../_lib/sync'
+import {
+  imapMessageSummary,
+  markSyncError,
+  runSyncChunk,
+  type ImapMessageRow,
+} from '../../_lib/sync'
 
 interface PushPrefsRow {
   account_id: string
@@ -31,33 +39,47 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!secret || authorization !== `Bearer ${secret}`) {
     return fail('Unauthorized', 401, undefined, 'unauthorized')
   }
-  if (!pushConfigured(context.env)) {
-    return json({ ok: false, reason: 'push_not_configured', sent: 0 })
-  }
 
-  const subscriptions = await context.env.DB.prepare(
-    'SELECT id, endpoint, p256dh, auth FROM push_subscriptions',
-  ).all<PushSubscriptionRecord>()
-  if (subscriptions.results.length === 0) {
-    return json({ ok: true, sent: 0, reason: 'no_subscriptions' })
-  }
+  const canNotify = pushConfigured(context.env)
+  const subscriptions = canNotify
+    ? await context.env.DB.prepare(
+        'SELECT id, endpoint, p256dh, auth FROM push_subscriptions',
+      ).all<PushSubscriptionRecord>()
+    : { results: [] as PushSubscriptionRecord[] }
+  const notify = canNotify && subscriptions.results.length > 0
 
   const prefRows = await context.env.DB.prepare('SELECT * FROM push_prefs').all<PushPrefsRow>()
   const prefs = new Map(prefRows.results.map((row) => [row.account_id, row]))
   const accounts = await listAccountRows(context.env)
   const gone = new Set<string>()
   let sent = 0
+  let forwarded = 0
+  let deleted = 0
 
   for (const account of accounts) {
     if (account.kind !== 'imap' || !account.secret_enc) {
       continue
     }
+    const ruleRows = await context.env.DB.prepare(
+      'SELECT * FROM forward_rules WHERE account_id = ? AND enabled = 1',
+    )
+      .bind(account.id)
+      .all<ForwardRuleRow>()
     const pref = prefs.get(account.id)
-    const enabled = pref ? Boolean(pref.enabled) : true
-    if (!enabled) {
+    const notifyEnabled = pref ? Boolean(pref.enabled) : true
+    const pushFolders = new Set<Folder>(pref ? parseFolders(pref.folders_json) : ['inbox'])
+    const folders = new Set<Folder>()
+    if (notifyEnabled) {
+      for (const folder of pushFolders) {
+        folders.add(folder)
+      }
+    }
+    if (ruleRows.results.length > 0 || account.delete_after_archive) {
+      folders.add('inbox')
+    }
+    if (folders.size === 0) {
       continue
     }
-    const folders = pref ? parseFolders(pref.folders_json) : (['inbox'] as Folder[])
 
     for (const folder of folders) {
       const previous = await context.env.DB.prepare(
@@ -84,34 +106,87 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       }
 
       const fresh = await context.env.DB.prepare(
-        'SELECT * FROM imap_messages WHERE account_id = ? AND folder = ? AND uid > ? ORDER BY uid ASC LIMIT 10',
+        'SELECT * FROM imap_messages WHERE account_id = ? AND folder = ? AND uid > ? ORDER BY uid ASC LIMIT 20',
       )
         .bind(account.id, folder, previousMax)
         .all<ImapMessageRow>()
 
-      for (const message of fresh.results) {
-        const title = message.from_name || message.from_email || account.display_name
-        const payload = {
-          title,
-          body: message.subject || '(nessun oggetto)',
-          url: `/?message=${encodeURIComponent(message.id)}`,
-          tag: message.id,
+      for (const row of fresh.results) {
+        if (folder === 'inbox') {
+          const summary = imapMessageSummary(row, account)
+          const existingLabels = await context.env.DB.prepare(
+            'SELECT label_id FROM message_labels WHERE message_id = ?',
+          )
+            .bind(row.id)
+            .all<{ label_id: string }>()
+          summary.labelIds = existingLabels.results.map((item) => item.label_id)
+          await applyFilters(context.env, account.id, [summary])
+          await applyAccountLabel(
+            context.env,
+            account.id,
+            account.incoming_label_id,
+            [summary],
+          )
+
+          for (const rule of ruleRows.results) {
+            if (!summary.labelIds.includes(rule.label_id)) {
+              continue
+            }
+            const result = await forwardMessage(context.env, account, rule, row)
+            if (result === 'sent') {
+              forwarded += 1
+            }
+          }
+
+          if (account.delete_after_archive) {
+            const result = await deleteArchivedMessage(context.env, account, row)
+            if (result === 'done') {
+              deleted += 1
+            }
+          }
         }
-        for (const subscription of subscriptions.results) {
-          if (gone.has(subscription.endpoint)) {
-            continue
+
+        if (notify && notifyEnabled && pushFolders.has(folder)) {
+          const title = row.from_name || row.from_email || account.display_name
+          const payload = {
+            title,
+            body: row.subject || '(nessun oggetto)',
+            url: `/?message=${encodeURIComponent(row.id)}`,
+            tag: row.id,
           }
-          try {
-            const result = await sendWebPush(context.env, subscription, payload)
-            if (result.ok) {
-              sent += 1
+          for (const subscription of subscriptions.results) {
+            if (gone.has(subscription.endpoint)) {
+              continue
             }
-            if (result.gone) {
-              gone.add(subscription.endpoint)
+            try {
+              const result = await sendWebPush(context.env, subscription, payload)
+              if (result.ok) {
+                sent += 1
+              }
+              if (result.gone) {
+                gone.add(subscription.endpoint)
+              }
+            } catch {
+              // Keep processing the remaining subscriptions.
             }
-          } catch {
-            // Keep the loop alive if a single subscription fails.
           }
+        }
+      }
+    }
+
+    if (account.delete_after_archive) {
+      const pending = await context.env.DB.prepare(
+        `SELECT m.* FROM imap_messages m
+         LEFT JOIN deletion_log d ON d.message_id = m.id AND d.status = 'done'
+         WHERE m.account_id = ? AND m.folder = 'inbox' AND m.archived = 1 AND m.archive_key IS NOT NULL AND d.id IS NULL
+         ORDER BY m.uid ASC LIMIT 10`,
+      )
+        .bind(account.id)
+        .all<ImapMessageRow>()
+      for (const row of pending.results) {
+        const result = await deleteArchivedMessage(context.env, account, row)
+        if (result === 'done') {
+          deleted += 1
         }
       }
     }
@@ -125,5 +200,5 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
 
-  return json({ ok: true, sent })
+  return json({ ok: true, sent, forwarded, deleted })
 }

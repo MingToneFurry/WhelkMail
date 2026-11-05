@@ -186,6 +186,35 @@ const en: Record<string, string> = {
   'settings.archiveBodiesUnavailable': 'Bind R2 or connect Google Drive to enable the archive.',
   'settings.archiveDestination': 'Archive destination',
 
+  'forward.title': 'Automatic forwarding',
+  'forward.hint':
+    'When a new incoming message gets this label, WhelkMail forwards it to the recipients. The original EML is attached.',
+  'forward.requirements': 'You need an IMAP account and at least one label.',
+  'forward.empty': 'No forwarding rules yet.',
+  'forward.new': 'New forwarding rule',
+  'forward.edit': 'Edit forwarding rule',
+  'forward.delete': 'Delete rule',
+  'forward.deleteConfirm': 'Delete this forwarding rule?',
+  'forward.recipients': 'Recipients, comma-separated',
+  'forward.recipientsRequired': 'Add at least one recipient',
+  'forward.accountRequired': 'Select an account and a label',
+  'forward.invalidRecipient': 'One or more recipients are not valid email addresses',
+  'forward.enabled': 'Enabled',
+  'forward.disabled': 'Disabled',
+  'forward.lastStatus': 'Last run',
+  'forward.neverRun': 'Never run',
+  'forward.created': 'Forwarding rule created',
+  'forward.updated': 'Forwarding rule updated',
+  'forward.deleted': 'Forwarding rule deleted',
+  'forward.create': 'Create rule',
+
+  'deletion.title': 'Delete from the provider after archiving',
+  'deletion.hint':
+    'When a message is archived, it is moved to the provider Trash instead of being permanently deleted. The archive copy remains available.',
+  'deletion.requiresArchive': 'Enable body archiving first.',
+  'deletion.confirm':
+    'Enable deletion from the provider? Archived incoming messages will be moved to the provider Trash.',
+
   'push.title': 'Push notifications',
   'push.hint':
     'Get a browser notification when a new message arrives. The scheduled worker checks the selected folders and sends the notification.',
@@ -587,6 +616,35 @@ const it: Record<string, string> = {
   'settings.archiveBodiesUnavailable':
     'Configura R2 oppure collega Google Drive per abilitare l’archivio.',
   'settings.archiveDestination': 'Destinazione archivio',
+
+  'forward.title': 'Inoltro automatico',
+  'forward.hint':
+    'Quando un nuovo messaggio in arrivo riceve questa etichetta, WhelkMail lo inoltra ai destinatari. L’EML originale viene allegato.',
+  'forward.requirements': 'Serve un account IMAP e almeno un’etichetta.',
+  'forward.empty': 'Nessuna regola di inoltro.',
+  'forward.new': 'Nuova regola di inoltro',
+  'forward.edit': 'Modifica regola di inoltro',
+  'forward.delete': 'Elimina regola',
+  'forward.deleteConfirm': 'Eliminare questa regola di inoltro?',
+  'forward.recipients': 'Destinatari, separati da virgola',
+  'forward.recipientsRequired': 'Aggiungi almeno un destinatario',
+  'forward.accountRequired': 'Seleziona account ed etichetta',
+  'forward.invalidRecipient': 'Uno o più destinatari non sono email valide',
+  'forward.enabled': 'Attiva',
+  'forward.disabled': 'Disattivata',
+  'forward.lastStatus': 'Ultima esecuzione',
+  'forward.neverRun': 'Mai eseguita',
+  'forward.created': 'Regola di inoltro creata',
+  'forward.updated': 'Regola di inoltro aggiornata',
+  'forward.deleted': 'Regola di inoltro eliminata',
+  'forward.create': 'Crea regola',
+
+  'deletion.title': 'Elimina dal provider dopo l’archiviazione',
+  'deletion.hint':
+    'Quando un messaggio è archiviato, viene spostato nel Cestino del provider invece di essere eliminato definitivamente. La copia archiviata resta disponibile.',
+  'deletion.requiresArchive': 'Abilita prima l’archiviazione dei corpi.',
+  'deletion.confirm':
+    'Abilitare l’eliminazione dal provider? I messaggi in arrivo archiviati verranno spostati nel Cestino del provider.',
 
   'push.title': 'Notifiche push',
   'push.hint':

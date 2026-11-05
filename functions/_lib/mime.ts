@@ -23,6 +23,7 @@ export interface MimeInput {
   messageId: string
   date: Date
   includeBcc?: boolean
+  headers?: string[]
 }
 
 const encoder = new TextEncoder()
@@ -86,9 +87,14 @@ export function buildMime(input: MimeInput): Uint8Array {
     `Subject: ${encodeWord(clean(input.subject))}`,
     `Date: ${formatDate(input.date)}`,
     `Message-ID: ${clean(input.messageId)}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${mixed}"`,
   )
+  for (const header of input.headers ?? []) {
+    const safe = clean(header)
+    if (safe) {
+      headers.push(safe)
+    }
+  }
+  headers.push('MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${mixed}"`)
 
   const parts: string[] = []
   const textPart = [

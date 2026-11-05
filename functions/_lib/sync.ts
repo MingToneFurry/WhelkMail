@@ -294,6 +294,7 @@ async function pruneFolder(
   folder: Folder,
   allUids: number[],
   storage: StorageAdapter | null,
+  keepArchive: boolean,
 ): Promise<void> {
   const rows = await env.DB.prepare(
     'SELECT id, uid, archive_key FROM imap_messages WHERE account_id = ? AND folder = ?',
@@ -305,7 +306,7 @@ async function pruneFolder(
   if (stale.length === 0) {
     return
   }
-  if (storage) {
+  if (storage && !keepArchive) {
     for (const row of stale) {
       if (row.archive_key) {
         try {
@@ -548,7 +549,14 @@ export async function runSyncChunk(
       archiveMore
 
     if (!hasMore) {
-      await pruneFolder(env, account.id, folder, allUids, archiveStorage)
+      await pruneFolder(
+        env,
+        account.id,
+        folder,
+        allUids,
+        archiveStorage,
+        Boolean(account.delete_after_archive),
+      )
     }
 
     const synced = await countMessages(env, account.id, folder)

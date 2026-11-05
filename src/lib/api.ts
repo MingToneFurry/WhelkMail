@@ -5,7 +5,10 @@ import type {
   AppSettings,
   Contact,
   ContactInput,
+  DeletionLog,
   DraftPayload,
+  ForwardRule,
+  ForwardRuleInput,
   DraftSavePayload,
   FilterInput,
   Folder,
@@ -165,6 +168,24 @@ export const api = {
     folders?: string[]
   }): Promise<{ ok: boolean; prefs: PushPrefs[] }> {
     return request('/api/push/prefs', { method: 'PATCH', body: JSON.stringify(input) })
+  },
+  forwardRules(): Promise<{ rules: ForwardRule[] }> {
+    return request('/api/forward-rules')
+  },
+  createForwardRule(input: ForwardRuleInput): Promise<{ rule: ForwardRule }> {
+    return request('/api/forward-rules', { method: 'POST', body: JSON.stringify(input) })
+  },
+  updateForwardRule(id: string, input: Partial<ForwardRuleInput>): Promise<{ rule: ForwardRule }> {
+    return request(`/api/forward-rules/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  },
+  deleteForwardRule(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/forward-rules/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  deletionLogs(accountId: string): Promise<{ logs: DeletionLog[] }> {
+    return request(`/api/accounts/${encodeURIComponent(accountId)}/deletions`)
   },
   filters(): Promise<{ filters: MailFilter[] }> {
     return request('/api/filters')

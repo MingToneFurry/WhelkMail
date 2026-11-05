@@ -47,6 +47,17 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   if (archiveImapBodies && imapArchiveDriver === 'drive' && !row.drive_refresh_token_enc) {
     return fail('Google Drive is not connected for this account', 400, undefined, 'drive_not_connected')
   }
+  const requestedDelete =
+    input.deleteAfterArchive === undefined ? Boolean(row.delete_after_archive) : input.deleteAfterArchive
+  if (requestedDelete && !archiveImapBodies) {
+    return fail(
+      'Enable body archiving before deleting messages from the provider',
+      400,
+      undefined,
+      'delete_requires_archive',
+    )
+  }
+  const deleteAfterArchive = requestedDelete && archiveImapBodies ? 1 : 0
   if (incomingLabelId) {
     const label = await context.env.DB.prepare('SELECT id FROM labels WHERE id = ?')
       .bind(incomingLabelId)
@@ -98,7 +109,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   await context.env.DB.prepare(
-    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
+    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, delete_after_archive = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
   )
     .bind(
       displayName,
@@ -106,6 +117,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       incomingLabelId,
       archiveImapBodies,
       imapArchiveDriver,
+      deleteAfterArchive,
       sentFolder,
       autoSavesSent,
       storageDriver,
@@ -143,6 +155,10 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     context.env.DB.prepare('DELETE FROM message_labels WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM imap_messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM imap_sync WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM forward_log WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM forward_rules WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM deletion_log WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM push_prefs WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ])

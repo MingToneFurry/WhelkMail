@@ -15,6 +15,8 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Sync metadati IMAP in D1: incrementale, chunked/resumable, `UIDVALIDITY`, cartelle speciali, trasferimento etichette sui movimenti e stato/errore in Impostazioni.
 - [x] Rifiniture sync: archiviazione opzionale di corpi/allegati su R2 o Google Drive, ripresa automatica delle sync parziali e barra di avanzamento.
 - [x] PWA e Web Push: manifest, service worker, sottoscrizioni push in D1, VAPID, worker cron schedulato, preferenze per account/cartella e gestione permessi/revoca.
+- [x] Inoltro automatico per etichetta: regole in D1, worker cron, applicazione etichette, inoltro SMTP con EML originale, anti-loop, log per regola e UI in Impostazioni.
+- [x] Eliminazione dal provider dopo archiviazione: flag opt-in per account, verifica archivio, spostamento nel Cestino del provider, conferma esplicita, log e disattivazione.
 
 ## Da fare
 
@@ -25,29 +27,7 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 
 Prerequisito per notifiche push e forward automatico.
 
-### 2. Forward automatico con etichetta
-
-- [ ] Tabella D1 `forward_rules` (account, etichetta, destinatari, enabled, created_at).
-- [ ] Worker schedulato che processa solo i nuovi UID.
-- [ ] Applicazione delle etichette ai nuovi messaggi in arrivo.
-- [ ] Inoltro via SMTP dell'account o relay configurato.
-- [ ] Anti-loop (non inoltrare messaggi generati dall'app, header dedicato).
-- [ ] Log delle esecuzioni e stato per regola.
-- [ ] UI di gestione regole nelle impostazioni.
-
-Dipende dalla sync completa e dal worker schedulato.
-
-### 3. Elimina email dal provider originale
-
-- [ ] Flag account `delete_after_archive`, default disattivato.
-- [ ] Attivazione solo dopo archivio locale verificato.
-- [ ] Spostamento nel cestino del provider invece di cancellazione definitiva.
-- [ ] Conferma esplicita e avviso irreversibilità.
-- [ ] Log delle operazioni e possibilità di disattivare in ogni momento.
-
-Da non abilitare finché la sync/archiviazione non è stabile.
-
-### 4. Login, utenti e installer
+### 2. Login, utenti e installer
 
 - [ ] Decisione architetturale: single-admin attuale oppure multi-utente reale.
 - [ ] Tabella `users` con password hashata (PBKDF2/scrypt via WebCrypto).
@@ -60,7 +40,7 @@ Da non abilitare finché la sync/archiviazione non è stabile.
 
 Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutte le caselle. Aggiungere solo il campo email sarebbe cosmetico senza isolamento lato API.
 
-### 5. Pulsante “Deploy to Cloudflare”
+### 3. Pulsante “Deploy to Cloudflare”
 
 - [ ] Valutare conversione a Worker con asset statici oppure template Pages dedicato.
 - [ ] Configurazione guidata dei binding D1 (`DB`) e R2 (`BUCKET`).
@@ -69,7 +49,7 @@ Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutt
 
 Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico: oggi la Git integration resta il percorso più affidabile.
 
-### 6. Miglioramenti successivi
+### 4. Miglioramenti successivi
 
 - [ ] Notifiche in-app per nuovi messaggi mentre l'app è aperta.
 - [ ] Firma HTML oltre al testo semplice.
@@ -80,7 +60,5 @@ Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico
 ## Ordine consigliato
 
 1. Cartelle personalizzate e sync in background.
-2. Forward automatico.
-3. Eliminazione dal provider.
-4. Login multi-utente/installer.
-5. Deploy button.
+2. Login multi-utente/installer.
+3. Deploy button.

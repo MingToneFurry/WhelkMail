@@ -14,6 +14,8 @@ WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
 - IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings, automatic resume of partial syncs, and label transfer when messages move between folders.
 - Optional archive of IMAP bodies and attachments on R2 or Google Drive: when enabled per account, the sync stores the raw EML and opening/downloading messages can use the archive instead of the provider.
+- Automatic forwarding rules by label, managed in Settings: the cron worker forwards new labeled messages with the original EML attached, with anti-loop headers and per-rule logs.
+- Optional provider cleanup after archiving: archived incoming messages are moved to the provider Trash instead of being permanently deleted, with explicit opt-in and logs.
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Installable PWA with an app-shell service worker and Web Push notifications, including per-account/folder preferences
 - Mobile layout with a collapsible sidebar drawer
@@ -52,7 +54,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If earlier migrations were already applied and you only need the IMAP archive/sync columns, run `npm run db:migrate:local:7`.
+If earlier migrations were already applied and you only need the forwarding/deletion tables, run `npm run db:migrate:local:9`.
 
 Create `.dev.vars` in the project root:
 
@@ -140,7 +142,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
 - Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
-- Email forwarding rules are not implemented yet. Sync of custom folders and background/scheduled metadata sync are still TODO; the current sync is manual and resumes automatically when Settings is open.
+- Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync; sync of custom folders and background/scheduled metadata sync are still TODO.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.

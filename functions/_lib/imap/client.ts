@@ -302,7 +302,15 @@ export class ImapConnection {
 
   async deleteMessage(uid: number): Promise<void> {
     await this.command(`UID STORE ${uid} +FLAGS (\\Deleted)`)
-    await this.command('EXPUNGE')
+    try {
+      await this.command(`UID EXPUNGE ${uid}`)
+    } catch {
+      await this.command('EXPUNGE')
+    }
+  }
+
+  async copy(uid: number, folder: string): Promise<void> {
+    await this.command(`UID COPY ${uid} ${quote(folder)}`)
   }
 
   async create(folder: string): Promise<void> {
