@@ -2,8 +2,20 @@ import { labelUpdateSchema } from '../../../shared/schemas'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { toLabel, type LabelRow } from '../../_lib/labels'
+import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
+  try {
+    return await updateLabel(context)
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
+}
+
+async function updateLabel(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const id = context.params.id as string
   const row = await context.env.DB.prepare('SELECT * FROM labels WHERE id = ?')
     .bind(id)
@@ -46,6 +58,17 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
 }
 
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
+  try {
+    return await deleteLabel(context)
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
+}
+
+async function deleteLabel(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const id = context.params.id as string
   const row = await context.env.DB.prepare('SELECT id FROM labels WHERE id = ?')
     .bind(id)

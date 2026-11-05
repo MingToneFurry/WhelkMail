@@ -1,5 +1,3 @@
-ALTER TABLE accounts ADD COLUMN signature TEXT;
-
 CREATE TABLE IF NOT EXISTS labels (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -23,3 +21,5 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+ALTER TABLE accounts ADD COLUMN signature TEXT;

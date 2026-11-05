@@ -3,6 +3,7 @@ import type { Env } from '../../../_lib/env'
 import { fail, json, readJson } from '../../../_lib/http'
 import { parseImapMessageId, parseRelayMessageId } from '../../../_lib/mail/ids'
 import type { MessageRow } from '../../../_lib/db'
+import { isSchemaError, schemaOutdated } from '../../../_lib/schema'
 
 async function resolveTarget(
   env: Env,
@@ -26,6 +27,17 @@ async function resolveTarget(
 }
 
 export const onRequestPut: PagesFunction<Env> = async (context) => {
+  try {
+    return await putLabels(context)
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
+}
+
+async function putLabels(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const id = context.params.id as string
   const target = await resolveTarget(context.env, id)
   if (!target) {

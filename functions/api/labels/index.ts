@@ -3,6 +3,7 @@ import type { Label } from '../../../shared/types'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { toLabel, type LabelRow } from '../../_lib/labels'
+import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
 async function listLabels(env: Env): Promise<Label[]> {
   const result = await env.DB.prepare('SELECT * FROM labels ORDER BY name COLLATE NOCASE ASC').all<LabelRow>()
@@ -10,10 +11,28 @@ async function listLabels(env: Env): Promise<Label[]> {
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  return json({ labels: await listLabels(context.env) })
+  try {
+    return json({ labels: await listLabels(context.env) })
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  try {
+    return await createLabel(context)
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
+}
+
+async function createLabel(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const body = await readJson<unknown>(context.request)
   const parsed = labelCreateSchema.safeParse(body)
   if (!parsed.success) {

@@ -12,6 +12,7 @@ import type { ImapHeader } from '../../_lib/imap/client'
 import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
+import { isSchemaError } from '../../_lib/schema'
 
 interface AccountError {
   accountId: string
@@ -75,19 +76,29 @@ async function applyLabels(
   if (messages.length === 0) {
     return
   }
-  const result = await env.DB.prepare(
-    'SELECT message_id, label_id FROM message_labels WHERE account_id = ? AND folder = ?',
-  )
-    .bind(accountId, folder)
-    .all<{ message_id: string; label_id: string }>()
-  const assignments = new Map<string, string[]>()
-  for (const row of result.results) {
-    const current = assignments.get(row.message_id) ?? []
-    current.push(row.label_id)
-    assignments.set(row.message_id, current)
-  }
-  for (const message of messages) {
-    message.labelIds = assignments.get(message.id) ?? []
+  try {
+    const result = await env.DB.prepare(
+      'SELECT message_id, label_id FROM message_labels WHERE account_id = ? AND folder = ?',
+    )
+      .bind(accountId, folder)
+      .all<{ message_id: string; label_id: string }>()
+    const assignments = new Map<string, string[]>()
+    for (const row of result.results) {
+      const current = assignments.get(row.message_id) ?? []
+      current.push(row.label_id)
+      assignments.set(row.message_id, current)
+    }
+    for (const message of messages) {
+      message.labelIds = assignments.get(message.id) ?? []
+    }
+  } catch (error) {
+    if (isSchemaError(error)) {
+      for (const message of messages) {
+        message.labelIds = []
+      }
+      return
+    }
+    throw error
   }
 }
 

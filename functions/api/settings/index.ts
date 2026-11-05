@@ -2,6 +2,7 @@ import { appSettingsSchema } from '../../../shared/schemas'
 import type { AppSettings } from '../../../shared/types'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
+import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
 const DEFAULT_SIGNATURE_KEY = 'default_signature'
 const SIGNATURE_MODE_KEY = 'signature_mode'
@@ -21,10 +22,28 @@ export async function getSettings(env: Env): Promise<AppSettings> {
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  return json(await getSettings(context.env))
+  try {
+    return json(await getSettings(context.env))
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
 }
 
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
+  try {
+    return await updateSettings(context)
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return schemaOutdated()
+    }
+    throw error
+  }
+}
+
+async function updateSettings(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const body = await readJson<unknown>(context.request)
   const parsed = appSettingsSchema.safeParse(body)
   if (!parsed.success) {

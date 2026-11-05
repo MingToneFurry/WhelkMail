@@ -1,6 +1,7 @@
 import type { MessageDetail } from '../../../../shared/types'
 import type { Env } from '../../../_lib/env'
 import { fail, json } from '../../../_lib/http'
+import { isSchemaError } from '../../../_lib/schema'
 import { loadRaw } from '../../../_lib/mail/load'
 import {
   attachmentMeta,
@@ -20,11 +21,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const email = await parseFull(loaded.bytes)
   const text = bodyText(email)
   const attachments = attachmentMeta(email)
-  const labels = await context.env.DB.prepare(
-    'SELECT label_id FROM message_labels WHERE message_id = ?',
-  )
-    .bind(id)
-    .all<{ label_id: string }>()
+  let labelIds: string[] = []
+  try {
+    const labels = await context.env.DB.prepare(
+      'SELECT label_id FROM message_labels WHERE message_id = ?',
+    )
+      .bind(id)
+      .all<{ label_id: string }>()
+    labelIds = labels.results.map((row) => row.label_id)
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+  }
   const detail: MessageDetail = {
     id,
     accountId: loaded.account.id,
@@ -45,7 +54,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     html: email.html ?? null,
     attachments,
     size: loaded.bytes.byteLength,
-    labelIds: labels.results.map((row) => row.label_id),
+    labelIds,
   }
   return json({ message: detail })
 }
