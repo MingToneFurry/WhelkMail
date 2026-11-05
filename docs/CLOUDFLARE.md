@@ -125,6 +125,10 @@ Optional:
 | `RELAY_API_SECRET` | Secret | Mailjet fallback secret |
 | `MAILGUN_DOMAIN` | Variable | Mailgun fallback domain |
 | `MAILGUN_REGION` | Variable | `us` or `eu` |
+| `VAPID_PUBLIC_KEY` | Variable/Secret | Web Push public key |
+| `VAPID_PRIVATE_KEY` | Secret | Web Push private key |
+| `VAPID_SUBJECT` | Variable | `mailto:` contact for VAPID |
+| `CRON_SECRET` | Secret | shared secret for the cron worker |
 
 Relay credentials entered per account in the UI take precedence over the deployment fallbacks.
 
@@ -157,13 +161,40 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/007_imap_archive_driver.sql`, which add the `signature` column, create the `labels`, `message_labels`, `app_settings`, `filters`, `contacts`, `imap_sync` and `imap_messages` tables, make labels shared across accounts, add the per-account incoming label, enable IMAP metadata sync, and add the optional R2/Drive archive columns.
+That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/008_push.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive and push subscriptions/preferences.
 
 If earlier migrations were already applied, run only the missing one:
 
 ```bash
-npm run db:migrate:remote:7
+npm run db:migrate:remote:8
 ```
+
+### 1.6 Web Push notifications (optional)
+
+Generate a VAPID key pair:
+
+```bash
+npm run vapid
+```
+
+Add to the Pages project:
+
+```bash
+npx wrangler pages secret put VAPID_PUBLIC_KEY --project-name whelkmail
+npx wrangler pages secret put VAPID_PRIVATE_KEY --project-name whelkmail
+npx wrangler pages secret put CRON_SECRET --project-name whelkmail
+```
+
+`VAPID_SUBJECT` can be a plain variable such as `mailto:you@example.com`.
+
+Set `APP_URL` in `worker/wrangler.toml` to the Pages URL, then set the same `CRON_SECRET` on the cron worker and deploy it:
+
+```bash
+npx wrangler secret put CRON_SECRET -c worker/wrangler.toml
+npm run cron:deploy
+```
+
+The worker runs every 5 minutes and calls `POST /api/cron/notifications` on the Pages app. Enable notifications from **Settings → Push notifications** and allow the browser permission.
 
 If the database already existed before relay support was added, apply the additive migration:
 
@@ -343,7 +374,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:7` |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:8` |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` | Run `npm run db:migrate:remote:6`, then `npm run db:migrate:remote:7` |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |

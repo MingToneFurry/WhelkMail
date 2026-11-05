@@ -16,5 +16,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     maxAttachmentBytes: relay.maxAttachmentBytes,
     microsoftConfigured: microsoftConfigured(context.env),
     googleMailConfigured: googleMailConfigured(context.env),
+    pushConfigured: Boolean(context.env.VAPID_PUBLIC_KEY && context.env.VAPID_PRIVATE_KEY),
+    cronConfigured: Boolean(context.env.CRON_SECRET),
   })
 }

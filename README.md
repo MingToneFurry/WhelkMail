@@ -15,6 +15,7 @@ WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings, automatic resume of partial syncs, and label transfer when messages move between folders.
 - Optional archive of IMAP bodies and attachments on R2 or Google Drive: when enabled per account, the sync stores the raw EML and opening/downloading messages can use the archive instead of the provider.
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
+- Installable PWA with an app-shell service worker and Web Push notifications, including per-account/folder preferences
 - Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
 - Sending through each account's own SMTP server
@@ -96,11 +97,16 @@ Short version:
    ```bash
    npm run db:remote
    ```
-   If the database already existed before labels and signatures were added, also run the additive migration:
+   If the database already existed before labels and signatures were added, also run the additive migrations:
    ```bash
    npm run db:migrate:remote
    ```
-5. Deploy and open the Pages URL.
+5. Optional Web Push:
+   ```bash
+   npm run vapid
+   ```
+   Add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` and a random `CRON_SECRET` to the Pages project, then set the same `CRON_SECRET` on the cron worker and deploy it with `npm run cron:deploy`.
+6. Deploy and open the Pages URL.
 
 A Workers Paid plan is recommended: IMAP/SMTP TLS handshakes exceed the free plan CPU budget.
 
@@ -128,12 +134,13 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 
 ## Limitations
 
-- No IMAP IDLE / push: the list refreshes on navigation, after sending, or on manual reload. The full sync is started manually from Settings and resumes in chunks.
+- No IMAP IDLE: the list refreshes on navigation, after sending, or on manual reload. The full sync is started manually from Settings and resumes in chunks; new-mail notifications come from a scheduled worker that polls the selected folders.
+- Web Push requires VAPID keys, the separate cron worker under `worker/`, and the `CRON_SECRET` secret shared by Pages and the worker.
 - HTML bodies are displayed as extracted text; remote content is never loaded.
 - The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
 - Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
-- Email forwarding rules and push notifications are not implemented yet. Sync of custom folders and background/scheduled sync are still TODO; the current sync is manual and resumes automatically when Settings is open.
+- Email forwarding rules are not implemented yet. Sync of custom folders and background/scheduled metadata sync are still TODO; the current sync is manual and resumes automatically when Settings is open.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.

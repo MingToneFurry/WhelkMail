@@ -2,7 +2,11 @@ import { readCookie, verifySession } from '../_lib/crypto'
 import type { Env } from '../_lib/env'
 import { fail, HttpError } from '../_lib/http'
 
-const PUBLIC_PATHS = new Set(['/api/auth/login', '/api/health'])
+const PUBLIC_PATHS = new Set([
+  '/api/auth/login',
+  '/api/health',
+  '/api/cron/notifications',
+])
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   try {

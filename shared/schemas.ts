@@ -144,6 +144,25 @@ export const contactCreateSchema = z.object({
 
 export const contactUpdateSchema = contactCreateSchema.partial()
 
+export const pushSubscribeSchema = z.object({
+  endpoint: z.string().url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(100),
+  }),
+  userAgent: z.string().max(300).optional(),
+})
+
+export const pushUnsubscribeSchema = z.object({
+  endpoint: z.string().url().max(2000),
+})
+
+export const pushPrefsSchema = z.object({
+  accountId: z.string().min(1),
+  enabled: z.boolean().optional(),
+  folders: z.array(z.enum(['inbox', 'sent', 'draft'])).max(3).optional(),
+})
+
 export const appSettingsSchema = z.object({
   defaultSignature: z.string().max(5000).optional(),
   signatureMode: z.enum(['shared', 'per_account']).optional(),

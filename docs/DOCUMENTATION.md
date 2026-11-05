@@ -137,6 +137,10 @@ The sync is resumable and chunked (40 metadata messages per request, 8 when body
 
 `accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the archive when present and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
 
+### `push_subscriptions` and `push_prefs`
+
+`push_subscriptions` stores Web Push endpoints and their `p256dh`/`auth` keys. Subscriptions are installation-wide, not account-scoped. `push_prefs` stores per-account notification preferences: `enabled` and `folders_json` (default `["inbox"]`). The cron endpoint reads these tables, syncs the selected folders and sends notifications for messages above the previous `max_uid`.
+
 ### `app_settings`
 
 Key/value store for deployment-wide preferences. Currently used for `default_signature` and `signature_mode`.
@@ -196,7 +200,19 @@ Automatic filtering is managed in Settings → Filters and is shared across acco
 
 When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
 
-## 10. Internationalization
+## 10. PWA and Web Push
+
+`public/manifest.webmanifest` and `public/sw.js` make the app installable. The service worker caches the app shell and static assets, never `/api/`, and handles `push` and `notificationclick`.
+
+Web Push works in three parts:
+
+1. The client asks for browser permission, registers the service worker and subscribes with the VAPID public key.
+2. `push_subscriptions` and `push_prefs` persist the subscription and per-account/folder preferences.
+3. The `worker/` cron Worker runs every 5 minutes and calls `POST /api/cron/notifications` with `CRON_SECRET`. That endpoint syncs the selected folders, detects new UIDs and sends encrypted Web Push messages with VAPID.
+
+VAPID keys are generated with `npm run vapid` and stored as Pages secrets. The cron worker needs `APP_URL` and the same `CRON_SECRET`.
+
+## 11. Internationalization
 
 - Default locale: English.
 - Italian included.
@@ -204,7 +220,7 @@ When a message moves to another folder on the provider, its UID changes and the 
 - UI strings live in `src/i18n.tsx`; add a locale object and a `LOCALES` entry to extend.
 - Provider/server error strings are not translated.
 
-## 11. Local development
+## 12. Local development
 
 ```bash
 npm install
@@ -214,7 +230,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels, contacts, IMAP-sync, IMAP-archive and archive-driver migrations to an existing local database.
+- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels, contacts, IMAP-sync, IMAP-archive, archive-driver and push migrations to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.
@@ -249,7 +265,7 @@ npm run build
 npm run lint
 ```
 
-## 12. Cloudflare deployment overview
+## 13. Cloudflare deployment overview
 
 > **Complete step-by-step guide:** [CLOUDFLARE.md](CLOUDFLARE.md). It covers dashboard clicks, exact commands, D1 setup, bindings, secrets, OAuth applications, verification and troubleshooting.
 
@@ -421,7 +437,7 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - Add a second account and verify labels and the unified inbox.
 - For relay accounts, verify the relay key, domain verification and archive storage.
 
-## 13. Environment reference
+## 14. Environment reference
 
 | Name | Required | Purpose |
 |---|---|---|
@@ -435,10 +451,13 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 | `RELAY_API_KEY` | No | Default relay key fallback |
 | `RELAY_API_SECRET` | No | Mailjet fallback secret |
 | `MAILGUN_DOMAIN` / `MAILGUN_REGION` | No | Mailgun fallback |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | No | Web Push VAPID keys |
+| `VAPID_SUBJECT` | No | VAPID contact (`mailto:`) |
+| `CRON_SECRET` | No | Shared secret for the cron worker |
 | `DB` (D1 binding) | Yes | Metadata |
 | `BUCKET` (R2 binding) | No | R2 archive |
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
@@ -456,10 +475,10 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 | `CPU time limit exceeded` | Upgrade to Workers Paid |
 | D1 errors after deploy | Placeholder `database_id` or schema not applied |
 
-## 15. Known limitations
+## 16. Known limitations
 
-- No IMAP IDLE/push and no background sync.
-- Last 30 messages per folder; client-side search over loaded messages.
+- No IMAP IDLE. Metadata sync is manual/chunked; Web Push depends on the separate cron worker polling the selected folders.
+- The list shows the newest live 30 messages merged with up to 100 mirrored messages; search is client-side over the loaded set.
 - No IMAP server-side search UI beyond the latest page.
 - HTML bodies are stripped to text; remote images and tracking pixels are not loaded.
 - Attachments are fetched by re-reading the full message on each download.
@@ -470,6 +489,6 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - Generic API errors include a stable `code`; the UI translates it. Provider details (for example IMAP or relay responses) are shown verbatim.
 - Attachment indicators in lists come from `BODYSTRUCTURE`; the body is still downloaded only when a message is opened.
 
-## 16. License
+## 17. License
 
 MIT — see [LICENSE](../LICENSE).

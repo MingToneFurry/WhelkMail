@@ -48,6 +48,22 @@ export interface SyncResult {
   hasMore: boolean
 }
 
+export interface PushSubscriptionInput {
+  endpoint: string
+  keys: {
+    p256dh: string
+    auth: string
+  }
+  userAgent?: string
+}
+
+export interface PushPrefs {
+  accountId: string
+  email: string
+  enabled: boolean
+  folders: Folder[]
+}
+
 export interface MailFilter {
   id: string
   name: string
@@ -215,6 +231,8 @@ export interface HealthStatus {
   maxAttachmentBytes: number
   microsoftConfigured: boolean
   googleMailConfigured: boolean
+  pushConfigured: boolean
+  cronConfigured: boolean
 }
 
 export interface AccountCreateInput {

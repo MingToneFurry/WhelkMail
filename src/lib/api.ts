@@ -16,6 +16,8 @@ import type {
   MailFilter,
   MessageDetail,
   MessageSummary,
+  PushPrefs,
+  PushSubscriptionInput,
   SendPayload,
   StorageOptions,
 } from '../../shared/types'
@@ -141,6 +143,28 @@ export const api = {
   },
   updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
     return request('/api/settings', { method: 'PATCH', body: JSON.stringify(input) })
+  },
+  pushKey(): Promise<{ publicKey: string | null }> {
+    return request('/api/push/key')
+  },
+  subscribePush(input: PushSubscriptionInput): Promise<{ ok: boolean }> {
+    return request('/api/push/subscribe', { method: 'POST', body: JSON.stringify(input) })
+  },
+  unsubscribePush(endpoint: string): Promise<{ ok: boolean }> {
+    return request('/api/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint }),
+    })
+  },
+  pushPrefs(): Promise<{ prefs: PushPrefs[] }> {
+    return request('/api/push/prefs')
+  },
+  updatePushPrefs(input: {
+    accountId: string
+    enabled?: boolean
+    folders?: string[]
+  }): Promise<{ ok: boolean; prefs: PushPrefs[] }> {
+    return request('/api/push/prefs', { method: 'PATCH', body: JSON.stringify(input) })
   },
   filters(): Promise<{ filters: MailFilter[] }> {
     return request('/api/filters')

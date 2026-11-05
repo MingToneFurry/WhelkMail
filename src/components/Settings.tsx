@@ -26,6 +26,7 @@ import type {
 import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
 import { FiltersSettings } from './FiltersSettings'
+import { PushSettings } from './PushSettings'
 import { SyncPanel } from './SyncPanel'
 
 interface SettingsProps {
@@ -850,6 +851,8 @@ export function Settings({
           onCreateLabel={onCreateLabel}
         />
 
+        <PushSettings />
+
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">
           <p className="mb-3 text-sm font-medium">{t('settings.serverConfig')}</p>
           <div className="flex flex-wrap gap-2">
@@ -861,6 +864,8 @@ export function Settings({
             <ConfigBadge ok={Boolean(health?.googleMailConfigured)} label={t('settings.googleMailOAuth')} />
             <ConfigBadge ok={Boolean(health?.microsoftConfigured)} label={t('settings.microsoftOAuth')} />
             <ConfigBadge ok={Boolean(health?.r2Configured)} label={t('settings.r2')} />
+            <ConfigBadge ok={Boolean(health?.pushConfigured)} label={t('settings.push')} />
+            <ConfigBadge ok={Boolean(health?.cronConfigured)} label={t('settings.cron')} />
           </div>
         </div>
 
