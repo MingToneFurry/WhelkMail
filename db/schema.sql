@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   archive_imap_bodies INTEGER NOT NULL DEFAULT 0,
   imap_archive_driver TEXT NOT NULL DEFAULT 'r2',
   delete_after_archive INTEGER NOT NULL DEFAULT 0,
+  auto_sync INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS filters (
   doesnt_have TEXT,
   has_attachment INTEGER NOT NULL DEFAULT 0,
   label_ids_json TEXT NOT NULL DEFAULT '[]',
+  forward_to_json TEXT NOT NULL DEFAULT '[]',
   enabled INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
@@ -180,21 +182,9 @@ CREATE TABLE IF NOT EXISTS push_prefs (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS forward_rules (
-  id TEXT PRIMARY KEY,
-  account_id TEXT NOT NULL,
-  label_id TEXT NOT NULL,
-  recipients_json TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_forward_rules_account ON forward_rules (account_id);
-
 CREATE TABLE IF NOT EXISTS forward_log (
   id TEXT PRIMARY KEY,
-  rule_id TEXT NOT NULL,
+  filter_id TEXT NOT NULL,
   account_id TEXT NOT NULL,
   message_id TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -203,8 +193,8 @@ CREATE TABLE IF NOT EXISTS forward_log (
   updated_at TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_forward_log_unique ON forward_log (rule_id, message_id);
-CREATE INDEX IF NOT EXISTS idx_forward_log_rule ON forward_log (rule_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forward_log_unique ON forward_log (filter_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_forward_log_filter ON forward_log (filter_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS deletion_log (
   id TEXT PRIMARY KEY,

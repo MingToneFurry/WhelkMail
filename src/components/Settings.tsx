@@ -27,7 +27,6 @@ import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
 import { DeletionPanel } from './DeletionPanel'
 import { FiltersSettings } from './FiltersSettings'
-import { ForwardRulesSettings } from './ForwardRulesSettings'
 import { PushSettings } from './PushSettings'
 import { SyncPanel } from './SyncPanel'
 
@@ -205,7 +204,9 @@ function AccountCard({
         <span className="mt-1 block text-[11px] text-muted">{t('settings.incomingLabelHint')}</span>
       </label>
 
-      {isImap ? <SyncPanel account={account} onSynced={onSyncComplete} /> : null}
+      {isImap ? (
+        <SyncPanel account={account} onSynced={onSyncComplete} onUpdate={onUpdate} />
+      ) : null}
 
       {isImap ? (
         <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs">
@@ -856,8 +857,6 @@ export function Settings({
           onDeleteFilter={onDeleteFilter}
           onCreateLabel={onCreateLabel}
         />
-
-        <ForwardRulesSettings accounts={accounts} labels={labels} />
 
         <PushSettings />
 

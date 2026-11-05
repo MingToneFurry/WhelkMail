@@ -108,6 +108,7 @@ Important fields:
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash
+- `auto_sync`: opt-in automatic background sync for Inbox, Sent and Drafts via the cron worker
 - `storage_driver`: `provider`, `drive` or `r2`
 - `relay_provider`, `relay_api_key_enc`, `relay_api_secret_enc`, `relay_domain`, `relay_region`
 - `drive_*` fields for the optional Drive archive
@@ -124,7 +125,7 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 ### `filters`
 
-Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and an action list of label ids in `label_ids_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed; matching messages receive the action labels in `message_labels`. There is no background mailbox sync yet, so a filter runs only on messages that enter the loaded inbox window.
+Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and actions: label ids in `label_ids_json` and forwarding recipients in `forward_to_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed and when the cron worker syncs new inbox messages; matching messages receive the labels in `message_labels` and are forwarded when `forward_to_json` is not empty.
 
 ### `contacts`
 
@@ -134,7 +135,9 @@ Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index
 
 `imap_messages` mirrors IMAP message metadata (headers, flags, size, attachment flag) in D1. `imap_sync` stores the per-account/per-folder cursor: `uid_validity`, `max_uid`, `min_uid`, `backfill_done`, status, error, counts and last sync time.
 
-The sync is resumable and chunked (40 metadata messages per request, 8 when body archiving is enabled). The first pass fetches the newest chunk, then backfills older messages; later passes fetch new UIDs above `max_uid`. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned when a folder finishes backfilling, and their archived R2 objects are removed.
+The sync is resumable and chunked (40 metadata messages per request, 8 when body archiving is enabled). The first pass fetches the newest chunk, then backfills older messages; later passes fetch new UIDs above `max_uid`. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned when a folder finishes backfilling; archived objects are removed unless provider cleanup is enabled, in which case the archive is preserved.
+
+`accounts.auto_sync` enables the cron worker to advance Inbox, Sent and Drafts every 5 minutes. Each run processes one bounded chunk per folder and resumes on the next run.
 
 `accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the archive when present and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
 
@@ -142,11 +145,11 @@ The sync is resumable and chunked (40 metadata messages per request, 8 when body
 
 `push_subscriptions` stores Web Push endpoints and their `p256dh`/`auth` keys. Subscriptions are installation-wide, not account-scoped. `push_prefs` stores per-account notification preferences: `enabled` and `folders_json` (default `["inbox"]`). The cron endpoint reads these tables, syncs the selected folders and sends notifications for messages above the previous `max_uid`.
 
-### `forward_rules`, `forward_log` and `deletion_log`
+### `forward_log` and `deletion_log`
 
-`forward_rules` stores label-based forwarding: account, label, recipients JSON, enabled. `forward_log` records the last result per `(rule, message)` and prevents duplicate forwards. `deletion_log` records provider-cleanup results per message.
+`forward_log` records the last forwarding result per `(filter_id, message_id)` and prevents duplicate forwards. `deletion_log` records provider-cleanup results per message.
 
-Forwarding is performed by the cron endpoint for new incoming messages that have the rule label after filters and the account incoming label are applied. The original EML is attached, and the forwarded message carries `X-WhelkMail-Forwarded` to prevent loops.
+Forwarding is an action of a filter. The cron endpoint evaluates filters for new incoming messages, applies their labels and forwards matching messages to the filter recipients. The original EML is attached, and the forwarded message carries `X-WhelkMail-Forwarded` to prevent loops.
 
 Provider cleanup only runs when `archive_imap_bodies` and `delete_after_archive` are both enabled and the message is archived. The message is copied to the provider Trash and then removed from the source folder; the archived copy is preserved.
 
@@ -205,7 +208,7 @@ Custom labels are separate and user-defined, shared across accounts. They can be
 
 Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created.
 
-Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed, matching is case-insensitive, and the action applies one or more labels. Matching runs when the inbox is listed; it is not a background daemon. The match text covers sender, recipients, subject and snippet, not the full body.
+Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed and matching is case-insensitive. Actions can apply one or more labels, forward to recipients, or both, like Gmail. Matching runs when the inbox is listed and when the cron worker syncs new inbox messages. The match text covers sender, recipients, subject and snippet, not the full body.
 
 When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
 
@@ -223,7 +226,7 @@ VAPID keys are generated with `npm run vapid` and stored as Pages secrets. The c
 
 ## 11. Forwarding and provider cleanup
 
-Forwarding rules are account + label + recipients. The cron endpoint processes only messages above the previous inbox `max_uid`, applies filters and the account incoming label, then forwards every message whose labels include the rule label. The forwarded message is built from the original EML, attached as `message/rfc822`, and stamped with `X-WhelkMail-Forwarded`; messages carrying that header are skipped to prevent loops. `forward_log` has a unique `(rule_id, message_id)` key so a message is forwarded once per rule.
+Forwarding is a filter action: a filter can apply labels, forward to one or more recipients, or both, like Gmail. The cron endpoint processes messages above the previous inbox `max_uid`, evaluates enabled filters and the account incoming label, then forwards messages matched by a filter with `forward_to_json`. The forwarded message is built from the original EML, attached as `message/rfc822`, and stamped with `X-WhelkMail-Forwarded`; messages carrying that header are skipped to prevent loops. `forward_log` has a unique `(filter_id, message_id)` key so a message is forwarded once per filter.
 
 Provider cleanup is opt-in per account and requires body archiving. For a new inbox message with `archived = 1` and an `archive_key`, the cron copies the message to the provider Trash (`\Trash`, with name fallbacks), removes it from the inbox and writes `deletion_log`. The archived R2/Drive object is preserved when this feature is enabled.
 
@@ -492,7 +495,7 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 
 ## 17. Known limitations
 
-- No IMAP IDLE. Metadata sync is manual/chunked; Web Push depends on the separate cron worker polling the selected folders.
+- No IMAP IDLE. Metadata sync is manual/chunked or opt-in automatic via the cron worker; Web Push also depends on that worker.
 - The list shows the newest live 30 messages merged with up to 100 mirrored messages; search is client-side over the loaded set.
 - No IMAP server-side search UI beyond the latest page.
 - HTML bodies are stripped to text; remote images and tracking pixels are not loaded.

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Filter, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
+import { Filter, Pencil, Plus, Send, Tag, Trash2 } from 'lucide-react'
 import type { FilterInput, Label, LabelColor, MailFilter } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { cn, labelStyle } from '../lib/utils'
@@ -41,6 +41,7 @@ export function FiltersSettings({
   const [doesntHave, setDoesntHave] = useState('')
   const [hasAttachment, setHasAttachment] = useState(false)
   const [labelIds, setLabelIds] = useState<string[]>([])
+  const [forwardTo, setForwardTo] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -73,6 +74,7 @@ export function FiltersSettings({
     setDoesntHave('')
     setHasAttachment(false)
     setLabelIds([])
+    setForwardTo('')
     setNewLabel('')
     setError(null)
   }
@@ -87,6 +89,7 @@ export function FiltersSettings({
     setDoesntHave(filter.doesntHave ?? '')
     setHasAttachment(filter.hasAttachment)
     setLabelIds(filter.labelIds)
+    setForwardTo(filter.forwardTo.join(', '))
     setError(null)
   }
 
@@ -100,12 +103,24 @@ export function FiltersSettings({
         doesntHave.trim() ||
         hasAttachment,
     )
+    const recipients = [
+      ...new Set(
+        forwardTo
+          .split(/[,;\n]/)
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ]
     if (!hasCriteria) {
       setError(t('filters.criteriaRequired'))
       return
     }
-    if (labelIds.length === 0) {
-      setError(t('filters.labelRequired'))
+    if (labelIds.length === 0 && recipients.length === 0) {
+      setError(t('filters.actionRequired'))
+      return
+    }
+    if (recipients.some((email) => !email.includes('@'))) {
+      setError(t('filters.invalidForward'))
       return
     }
     const input: FilterInput = {
@@ -117,6 +132,7 @@ export function FiltersSettings({
       doesntHave: doesntHave.trim() || null,
       hasAttachment,
       labelIds,
+      forwardTo: recipients,
     }
     setBusy(true)
     if (editingId) {
@@ -176,6 +192,17 @@ export function FiltersSettings({
                   ) : null
                 })}
               </div>
+              {filter.forwardTo.length > 0 ? (
+                <p className="mt-1 text-[11px] text-muted">
+                  {t('filters.forwardToLabel')}: {filter.forwardTo.join(', ')}
+                </p>
+              ) : null}
+              {filter.lastForwardStatus ? (
+                <p className="mt-1 text-[11px] text-muted">
+                  {t('filters.lastForward')}: {filter.lastForwardStatus}
+                  {filter.lastForwardError ? ` — ${filter.lastForwardError}` : ''}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -305,6 +332,17 @@ export function FiltersSettings({
             {t('filters.createLabel')}
           </button>
         </div>
+
+        <p className="mt-3 mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-700">
+          <Send size={13} /> {t('filters.forwardTo')}
+        </p>
+        <input
+          value={forwardTo}
+          onChange={(event) => setForwardTo(event.target.value)}
+          placeholder={t('filters.forwardToPlaceholder')}
+          className={inputClass}
+        />
+        <p className="mt-1 text-[11px] text-muted">{t('filters.forwardHint')}</p>
 
         {error ? <p className="mt-2 text-xs text-brand-strong">{error}</p> : null}
 

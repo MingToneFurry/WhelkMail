@@ -1,6 +1,12 @@
 import { filterUpdateSchema } from '../../../shared/schemas'
 import type { Env } from '../../_lib/env'
-import { labelsExist, parseLabelIds, toFilter, type FilterRow } from '../../_lib/filters'
+import {
+  labelsExist,
+  parseLabelIds,
+  parseStringArray,
+  toFilter,
+  type FilterRow,
+} from '../../_lib/filters'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
@@ -35,11 +41,20 @@ async function updateFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
   }
   const input = parsed.data
   const labelIds = input.labelIds ?? parseLabelIds(row.label_ids_json)
+  const forwardTo = input.forwardTo ?? parseStringArray(row.forward_to_json)
+  if (labelIds.length === 0 && forwardTo.length === 0) {
+    return fail(
+      'Add a label or a forwarding recipient',
+      400,
+      undefined,
+      'filter_action_required',
+    )
+  }
   if (!(await labelsExist(context.env, labelIds))) {
     return fail('Label not found', 404, undefined, 'label_not_found')
   }
   await context.env.DB.prepare(
-    `UPDATE filters SET name = ?, from_pattern = ?, to_pattern = ?, subject_pattern = ?, has_words = ?, doesnt_have = ?, has_attachment = ?, label_ids_json = ?, enabled = ? WHERE id = ?`,
+    `UPDATE filters SET name = ?, from_pattern = ?, to_pattern = ?, subject_pattern = ?, has_words = ?, doesnt_have = ?, has_attachment = ?, label_ids_json = ?, forward_to_json = ?, enabled = ? WHERE id = ?`,
   )
     .bind(
       input.name === undefined ? row.name : input.name.trim() || 'Filter',
@@ -50,6 +65,7 @@ async function updateFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
       input.doesntHave === undefined ? row.doesnt_have : input.doesntHave?.trim() || null,
       input.hasAttachment === undefined ? row.has_attachment : input.hasAttachment ? 1 : 0,
       JSON.stringify(labelIds),
+      JSON.stringify(forwardTo),
       input.enabled === undefined ? row.enabled : input.enabled ? 1 : 0,
       id,
     )
@@ -72,7 +88,10 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     if (!row) {
       return fail('Filter not found', 404, undefined, 'filter_not_found')
     }
-    await context.env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(id).run()
+    await context.env.DB.batch([
+      context.env.DB.prepare('DELETE FROM forward_log WHERE filter_id = ?').bind(id),
+      context.env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(id),
+    ])
     return json({ ok: true })
   } catch (error) {
     if (isSchemaError(error)) {

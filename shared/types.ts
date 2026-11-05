@@ -64,25 +64,6 @@ export interface PushPrefs {
   folders: Folder[]
 }
 
-export interface ForwardRule {
-  id: string
-  accountId: string
-  labelId: string
-  recipients: string[]
-  enabled: boolean
-  createdAt: string
-  lastStatus: string | null
-  lastError: string | null
-  lastAt: string | null
-}
-
-export interface ForwardRuleInput {
-  accountId: string
-  labelId: string
-  recipients: string[]
-  enabled?: boolean
-}
-
 export interface DeletionLog {
   id: string
   accountId: string
@@ -102,8 +83,12 @@ export interface MailFilter {
   doesntHave: string | null
   hasAttachment: boolean
   labelIds: string[]
+  forwardTo: string[]
   enabled: boolean
   createdAt: string
+  lastForwardStatus: string | null
+  lastForwardError: string | null
+  lastForwardAt: string | null
 }
 
 export interface FilterInput {
@@ -115,6 +100,7 @@ export interface FilterInput {
   doesntHave?: string | null
   hasAttachment?: boolean
   labelIds?: string[]
+  forwardTo?: string[]
   enabled?: boolean
 }
 
@@ -157,6 +143,7 @@ export interface Account {
   archiveImapBodies: boolean
   imapArchiveDriver: ImapArchiveDriver
   deleteAfterArchive: boolean
+  autoSync: boolean
   sentFolder: string
   autoSavesSent: boolean
   maxAttachmentBytes: number
@@ -301,6 +288,7 @@ export interface AccountPatch {
   archiveImapBodies?: boolean
   imapArchiveDriver?: ImapArchiveDriver
   deleteAfterArchive?: boolean
+  autoSync?: boolean
   sentFolder?: string
   autoSavesSent?: boolean
   storageDriver?: StorageDriver

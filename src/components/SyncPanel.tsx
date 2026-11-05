@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
-import type { Account, Folder, MailboxSyncState } from '../../shared/types'
+import type { Account, AccountPatch, Folder, MailboxSyncState } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
@@ -9,6 +9,7 @@ import { cn, formatDate } from '../lib/utils'
 interface SyncPanelProps {
   account: Account
   onSynced: () => void
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
 }
 
 const FOLDERS: Folder[] = ['inbox', 'sent', 'draft']
@@ -17,7 +18,7 @@ function folderLabel(folder: Folder, t: (key: string) => string): string {
   return folder === 'inbox' ? t('list.inbox') : folder === 'sent' ? t('list.sent') : t('list.drafts')
 }
 
-export function SyncPanel({ account, onSynced }: SyncPanelProps) {
+export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
   const { t, locale } = useI18n()
   const [states, setStates] = useState<MailboxSyncState[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,6 +121,22 @@ export function SyncPanel({ account, onSynced }: SyncPanelProps) {
           {running ? t('sync.running') : t('sync.button')}
         </button>
       </div>
+
+      <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[11px]">
+        <input
+          type="checkbox"
+          checked={account.autoSync}
+          disabled={running}
+          onChange={(event) =>
+            void onUpdate(account.id, { autoSync: event.target.checked })
+          }
+          className="mt-0.5 h-3.5 w-3.5"
+        />
+        <span>
+          <span className="block font-medium text-slate-700">{t('sync.autoTitle')}</span>
+          <span className="text-muted">{t('sync.autoHint')}</span>
+        </span>
+      </label>
 
       <div className="mt-3 space-y-1.5">
         {FOLDERS.map((folder) => {

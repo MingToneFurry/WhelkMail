@@ -15,19 +15,13 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Sync metadati IMAP in D1: incrementale, chunked/resumable, `UIDVALIDITY`, cartelle speciali, trasferimento etichette sui movimenti e stato/errore in Impostazioni.
 - [x] Rifiniture sync: archiviazione opzionale di corpi/allegati su R2 o Google Drive, ripresa automatica delle sync parziali e barra di avanzamento.
 - [x] PWA e Web Push: manifest, service worker, sottoscrizioni push in D1, VAPID, worker cron schedulato, preferenze per account/cartella e gestione permessi/revoca.
-- [x] Inoltro automatico per etichetta: regole in D1, worker cron, applicazione etichette, inoltro SMTP con EML originale, anti-loop, log per regola e UI in Impostazioni.
+- [x] Inoltro come azione dei filtri (stile Gmail): criteri + applica etichette e/o inoltra a destinatari, worker cron, EML originale allegato, anti-loop, log per filtro e UI in Impostazioni.
 - [x] Eliminazione dal provider dopo archiviazione: flag opt-in per account, verifica archivio, spostamento nel Cestino del provider, conferma esplicita, log e disattivazione.
+- [x] Sync automatica in background: flag opt-in per account, worker cron ogni 5 minuti su Inbox/Inviate/Bozze, chunk limitati e ripresa al giro successivo.
 
 ## Da fare
 
-### 1. Rifiniture sync
-
-- [ ] Sincronizzazione di cartelle personalizzate oltre Inbox/Inviate/Bozze.
-- [ ] Sync automatica in background (dipende dal Worker schedulato).
-
-Prerequisito per notifiche push e forward automatico.
-
-### 2. Login, utenti e installer
+### 1. Login, utenti e installer
 
 - [ ] Decisione architetturale: single-admin attuale oppure multi-utente reale.
 - [ ] Tabella `users` con password hashata (PBKDF2/scrypt via WebCrypto).
@@ -40,7 +34,7 @@ Prerequisito per notifiche push e forward automatico.
 
 Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutte le caselle. Aggiungere solo il campo email sarebbe cosmetico senza isolamento lato API.
 
-### 3. Pulsante “Deploy to Cloudflare”
+### 2. Pulsante “Deploy to Cloudflare”
 
 - [ ] Valutare conversione a Worker con asset statici oppure template Pages dedicato.
 - [ ] Configurazione guidata dei binding D1 (`DB`) e R2 (`BUCKET`).
@@ -49,7 +43,7 @@ Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutt
 
 Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico: oggi la Git integration resta il percorso più affidabile.
 
-### 4. Miglioramenti successivi
+### 3. Miglioramenti successivi
 
 - [ ] Notifiche in-app per nuovi messaggi mentre l'app è aperta.
 - [ ] Firma HTML oltre al testo semplice.
@@ -59,6 +53,5 @@ Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico
 
 ## Ordine consigliato
 
-1. Cartelle personalizzate e sync in background.
-2. Login multi-utente/installer.
-3. Deploy button.
+1. Login multi-utente/installer.
+2. Deploy button.

@@ -81,23 +81,6 @@ async function deleteLabel(context: Parameters<PagesFunction<Env>>[0]): Promise<
     context.env.DB.prepare('DELETE FROM labels WHERE id = ?').bind(id),
   ]
   try {
-    const rules = await context.env.DB.prepare(
-      'SELECT id FROM forward_rules WHERE label_id = ?',
-    )
-      .bind(id)
-      .all<{ id: string }>()
-    for (const rule of rules.results) {
-      statements.push(
-        context.env.DB.prepare('DELETE FROM forward_log WHERE rule_id = ?').bind(rule.id),
-        context.env.DB.prepare('DELETE FROM forward_rules WHERE id = ?').bind(rule.id),
-      )
-    }
-  } catch (error) {
-    if (!isSchemaError(error)) {
-      throw error
-    }
-  }
-  try {
     const filters = await context.env.DB.prepare(
       'SELECT id, label_ids_json FROM filters',
     ).all<{ id: string; label_ids_json: string }>()

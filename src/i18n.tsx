@@ -180,6 +180,9 @@ const en: Record<string, string> = {
   'sync.status.partial': 'Partial',
   'sync.status.done': 'Completed',
   'sync.status.error': 'Error',
+  'sync.autoTitle': 'Automatic background sync',
+  'sync.autoHint':
+    'The cron worker syncs Inbox, Sent and Drafts every 5 minutes. Requires the cron worker and CRON_SECRET.',
   'settings.archiveBodies': 'Archive bodies and attachments',
   'settings.archiveBodiesHint':
     'The sync also stores the raw EML in the selected storage. Opening and downloading messages can then use the archive.',
@@ -281,7 +284,15 @@ const en: Record<string, string> = {
   'filters.createLabel': 'Create',
   'filters.create': 'Create filter',
   'filters.criteriaRequired': 'Add at least one criterion',
+  'filters.actionRequired': 'Select a label or add a forwarding recipient',
+  'filters.invalidForward': 'One or more forwarding recipients are not valid email addresses',
   'filters.labelRequired': 'Select at least one label',
+  'filters.forwardTo': 'Forward to',
+  'filters.forwardToPlaceholder': 'recipient@example.com, other@example.com',
+  'filters.forwardHint':
+    'Gmail-style action: matching incoming messages are forwarded with the original EML attached.',
+  'filters.forwardToLabel': 'Forward to',
+  'filters.lastForward': 'Last forward',
   'filters.accountRequired': 'Select an account',
   'filters.created': 'Filter created',
   'filters.updated': 'Filter updated',
@@ -610,6 +621,9 @@ const it: Record<string, string> = {
   'sync.status.partial': 'Parziale',
   'sync.status.done': 'Completata',
   'sync.status.error': 'Errore',
+  'sync.autoTitle': 'Sincronizzazione automatica in background',
+  'sync.autoHint':
+    'Il worker cron sincronizza Posta in arrivo, Inviate e Bozze ogni 5 minuti. Richiede il worker cron e CRON_SECRET.',
   'settings.archiveBodies': 'Archivia corpi e allegati',
   'settings.archiveBodiesHint':
     'La sync salva anche l’EML originale nello storage selezionato. Apertura e download dei messaggi possono usare l’archivio.',
@@ -713,7 +727,15 @@ const it: Record<string, string> = {
   'filters.createLabel': 'Crea',
   'filters.create': 'Crea filtro',
   'filters.criteriaRequired': 'Aggiungi almeno un criterio',
+  'filters.actionRequired': 'Seleziona un’etichetta o aggiungi un destinatario per l’inoltro',
+  'filters.invalidForward': 'Uno o più destinatari dell’inoltro non sono email valide',
   'filters.labelRequired': 'Seleziona almeno un’etichetta',
+  'filters.forwardTo': 'Inoltra a',
+  'filters.forwardToPlaceholder': 'destinatario@example.com, altro@example.com',
+  'filters.forwardHint':
+    'Azione in stile Gmail: i messaggi in arrivo corrispondenti vengono inoltrati con l’EML originale allegato.',
+  'filters.forwardToLabel': 'Inoltro a',
+  'filters.lastForward': 'Ultimo inoltro',
   'filters.accountRequired': 'Seleziona un account',
   'filters.created': 'Filtro creato',
   'filters.updated': 'Filtro aggiornato',

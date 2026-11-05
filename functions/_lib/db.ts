@@ -45,6 +45,7 @@ export interface AccountRow {
   archive_imap_bodies: number
   imap_archive_driver: string
   delete_after_archive: number
+  auto_sync: number
   created_at: string
 }
 
@@ -106,6 +107,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     archiveImapBodies: Boolean(row.archive_imap_bodies),
     imapArchiveDriver: row.imap_archive_driver === 'drive' ? 'drive' : 'r2',
     deleteAfterArchive: Boolean(row.delete_after_archive),
+    autoSync: Boolean(row.auto_sync),
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     maxAttachmentBytes: row.max_attachment_bytes,

@@ -13,8 +13,9 @@ WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Gmail-style filters in Settings: shared across accounts, match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
 - Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
 - IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings, automatic resume of partial syncs, and label transfer when messages move between folders.
+- Optional automatic background sync per account: the cron worker advances Inbox, Sent and Drafts every 5 minutes in bounded chunks.
 - Optional archive of IMAP bodies and attachments on R2 or Google Drive: when enabled per account, the sync stores the raw EML and opening/downloading messages can use the archive instead of the provider.
-- Automatic forwarding rules by label, managed in Settings: the cron worker forwards new labeled messages with the original EML attached, with anti-loop headers and per-rule logs.
+- Gmail-style filter actions: a filter can apply labels and/or forward matching incoming messages, with the original EML attached, anti-loop headers and per-filter forward logs.
 - Optional provider cleanup after archiving: archived incoming messages are moved to the provider Trash instead of being permanently deleted, with explicit opt-in and logs.
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Installable PWA with an app-shell service worker and Web Push notifications, including per-account/folder preferences
@@ -54,7 +55,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If earlier migrations were already applied and you only need the forwarding/deletion tables, run `npm run db:migrate:local:9`.
+If earlier migrations were already applied and you only need the filter-forwarding changes, run `npm run db:migrate:local:11`.
 
 Create `.dev.vars` in the project root:
 
@@ -136,13 +137,13 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 
 ## Limitations
 
-- No IMAP IDLE: the list refreshes on navigation, after sending, or on manual reload. The full sync is started manually from Settings and resumes in chunks; new-mail notifications come from a scheduled worker that polls the selected folders.
+- No IMAP IDLE: the list refreshes on navigation, after sending, or on manual reload. Sync can be started manually from Settings or enabled per account for the cron worker; new-mail notifications come from the same worker.
 - Web Push requires VAPID keys, the separate cron worker under `worker/`, and the `CRON_SECRET` secret shared by Pages and the worker.
 - HTML bodies are displayed as extracted text; remote content is never loaded.
 - The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
-- Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
-- Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync; sync of custom folders and background/scheduled metadata sync are still TODO.
+- Filters run when the inbox is loaded and when the cron worker syncs new inbox messages. Matching uses From/To/Subject/snippet, not the full message body.
+- Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.

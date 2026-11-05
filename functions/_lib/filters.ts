@@ -13,11 +13,24 @@ export interface FilterRow {
   doesnt_have: string | null
   has_attachment: number
   label_ids_json: string
+  forward_to_json: string
   enabled: number
   created_at: string
 }
 
-export function parseLabelIds(value: string): string[] {
+export interface ForwardLogSummary {
+  filter_id: string
+  status: string
+  error: string | null
+  updated_at: string
+}
+
+export interface FilterForwardMatch {
+  filterId: string
+  forwardTo: string[]
+}
+
+export function parseStringArray(value: string): string[] {
   try {
     const parsed = JSON.parse(value) as unknown
     return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
@@ -26,7 +39,11 @@ export function parseLabelIds(value: string): string[] {
   }
 }
 
-export function toFilter(row: FilterRow): MailFilter {
+export function parseLabelIds(value: string): string[] {
+  return parseStringArray(value)
+}
+
+export function toFilter(row: FilterRow, last?: ForwardLogSummary): MailFilter {
   return {
     id: row.id,
     name: row.name,
@@ -37,8 +54,12 @@ export function toFilter(row: FilterRow): MailFilter {
     doesntHave: row.doesnt_have,
     hasAttachment: Boolean(row.has_attachment),
     labelIds: parseLabelIds(row.label_ids_json),
+    forwardTo: parseStringArray(row.forward_to_json),
     enabled: Boolean(row.enabled),
     createdAt: row.created_at,
+    lastForwardStatus: last?.status ?? null,
+    lastForwardError: last?.error ?? null,
+    lastForwardAt: last?.updated_at ?? null,
   }
 }
 
@@ -97,20 +118,21 @@ export async function applyFilters(
   env: Env,
   accountId: string,
   messages: MessageSummary[],
-): Promise<void> {
+): Promise<FilterForwardMatch[]> {
   if (!messages.some((message) => message.folder === 'inbox')) {
-    return
+    return []
   }
   try {
     const result = await env.DB.prepare(
       'SELECT * FROM filters WHERE enabled = 1',
     ).all<FilterRow>()
-    const filters = result.results.map(toFilter)
+    const filters = result.results.map((row) => toFilter(row))
     if (filters.length === 0) {
-      return
+      return []
     }
     const createdAt = new Date().toISOString()
     const statements: D1PreparedStatement[] = []
+    const forwards: FilterForwardMatch[] = []
     for (const message of messages) {
       if (message.folder !== 'inbox') {
         continue
@@ -118,6 +140,9 @@ export async function applyFilters(
       for (const filter of filters) {
         if (!matchesFilter(filter, message)) {
           continue
+        }
+        if (filter.forwardTo.length > 0) {
+          forwards.push({ filterId: filter.id, forwardTo: filter.forwardTo })
         }
         for (const labelId of filter.labelIds) {
           if (message.labelIds.includes(labelId)) {
@@ -135,10 +160,12 @@ export async function applyFilters(
     if (statements.length > 0) {
       await env.DB.batch(statements)
     }
+    return forwards
   } catch (error) {
     if (!isSchemaError(error)) {
       throw error
     }
+    return []
   }
 }
 

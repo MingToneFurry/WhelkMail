@@ -47,6 +47,7 @@ export const accountUpdateSchema = z.object({
   archiveImapBodies: z.boolean().optional(),
   imapArchiveDriver: z.enum(['r2', 'drive']).optional(),
   deleteAfterArchive: z.boolean().optional(),
+  autoSync: z.boolean().optional(),
   sentFolder: z.string().trim().min(1).max(255).optional(),
   autoSavesSent: z.boolean().optional(),
   storageDriver: z.enum(['provider', 'drive', 'r2']).optional(),
@@ -127,7 +128,8 @@ export const filterCreateSchema = z.object({
   hasWords: optionalPattern,
   doesntHave: optionalPattern,
   hasAttachment: z.boolean().optional(),
-  labelIds: z.array(z.string().min(1).max(64)).min(1).max(20),
+  labelIds: z.array(z.string().min(1).max(64)).max(20).optional(),
+  forwardTo: z.array(email).max(20).optional(),
   enabled: z.boolean().optional(),
 })
 
@@ -157,15 +159,6 @@ export const pushSubscribeSchema = z.object({
 export const pushUnsubscribeSchema = z.object({
   endpoint: z.string().url().max(2000),
 })
-
-export const forwardRuleCreateSchema = z.object({
-  accountId: z.string().min(1),
-  labelId: z.string().min(1),
-  recipients: z.array(z.string().trim().email().max(254)).min(1).max(20),
-  enabled: z.boolean().optional(),
-})
-
-export const forwardRuleUpdateSchema = forwardRuleCreateSchema.partial()
 
 export const pushPrefsSchema = z.object({
   accountId: z.string().min(1),

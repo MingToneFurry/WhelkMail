@@ -3,7 +3,7 @@ import { listAccountRows } from '../../_lib/db'
 import { deleteArchivedMessage } from '../../_lib/deletion'
 import type { Env } from '../../_lib/env'
 import { applyAccountLabel, applyFilters } from '../../_lib/filters'
-import { forwardMessage, type ForwardRuleRow } from '../../_lib/forward'
+import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
 import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
 import {
@@ -51,6 +51,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const prefRows = await context.env.DB.prepare('SELECT * FROM push_prefs').all<PushPrefsRow>()
   const prefs = new Map(prefRows.results.map((row) => [row.account_id, row]))
   const accounts = await listAccountRows(context.env)
+  const forwardingFilters = await context.env.DB.prepare(
+    "SELECT id FROM filters WHERE enabled = 1 AND forward_to_json <> '[]'",
+  ).all<{ id: string }>()
+  const hasForwarding = forwardingFilters.results.length > 0
   const gone = new Set<string>()
   let sent = 0
   let forwarded = 0
@@ -60,11 +64,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (account.kind !== 'imap' || !account.secret_enc) {
       continue
     }
-    const ruleRows = await context.env.DB.prepare(
-      'SELECT * FROM forward_rules WHERE account_id = ? AND enabled = 1',
-    )
-      .bind(account.id)
-      .all<ForwardRuleRow>()
     const pref = prefs.get(account.id)
     const notifyEnabled = pref ? Boolean(pref.enabled) : true
     const pushFolders = new Set<Folder>(pref ? parseFolders(pref.folders_json) : ['inbox'])
@@ -74,8 +73,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         folders.add(folder)
       }
     }
-    if (ruleRows.results.length > 0 || account.delete_after_archive) {
+    if (hasForwarding || account.delete_after_archive) {
       folders.add('inbox')
+    }
+    if (account.auto_sync) {
+      folders.add('inbox')
+      folders.add('sent')
+      folders.add('draft')
     }
     if (folders.size === 0) {
       continue
@@ -120,7 +124,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             .bind(row.id)
             .all<{ label_id: string }>()
           summary.labelIds = existingLabels.results.map((item) => item.label_id)
-          await applyFilters(context.env, account.id, [summary])
+          const forwards = await applyFilters(context.env, account.id, [summary])
           await applyAccountLabel(
             context.env,
             account.id,
@@ -128,11 +132,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             [summary],
           )
 
-          for (const rule of ruleRows.results) {
-            if (!summary.labelIds.includes(rule.label_id)) {
-              continue
-            }
-            const result = await forwardMessage(context.env, account, rule, row)
+          for (const match of forwards) {
+            const result = await forwardFilteredMessage(
+              context.env,
+              account,
+              match.filterId,
+              match.forwardTo,
+              row,
+            )
             if (result === 'sent') {
               forwarded += 1
             }
