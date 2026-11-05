@@ -220,7 +220,27 @@ export class ImapConnection {
   }
 
   async select(folder: string): Promise<void> {
-    await this.command(`SELECT ${quote(folder)}`)
+    await this.selectWithDetails(folder)
+  }
+
+  async selectWithDetails(folder: string): Promise<{
+    uidValidity: number | null
+    exists: number | null
+  }> {
+    const { parts } = await this.command(`SELECT ${quote(folder)}`)
+    let uidValidity: number | null = null
+    let exists: number | null = null
+    for (const part of parts) {
+      const validity = part.line.match(/\[UIDVALIDITY (\d+)\]/i)
+      if (validity) {
+        uidValidity = Number(validity[1])
+      }
+      const count = part.line.match(/^\* (\d+) EXISTS/)
+      if (count) {
+        exists = Number(count[1])
+      }
+    }
+    return { uidValidity, exists }
   }
 
   async searchAll(): Promise<number[]> {

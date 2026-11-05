@@ -882,6 +882,7 @@ export default function App() {
             onDefaultSignatureChange={(value) => void changeDefaultSignature(value)}
             signatureMode={signatureMode}
             onSignatureModeChange={(value) => void changeSignatureMode(value)}
+            onSyncComplete={() => setRefreshKey((key) => key + 1)}
             onLogout={() => void logout()}
           />
         ) : view === 'contacts' ? (

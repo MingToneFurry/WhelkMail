@@ -27,6 +27,26 @@ export interface ContactInput {
   note?: string
 }
 
+export type SyncStatus = 'idle' | 'partial' | 'done' | 'error'
+
+export interface MailboxSyncState {
+  folder: Folder
+  uidValidity: number | null
+  maxUid: number
+  minUid: number
+  backfillDone: boolean
+  status: SyncStatus
+  error: string | null
+  total: number
+  synced: number
+  lastSyncedAt: string | null
+}
+
+export interface SyncResult {
+  folders: MailboxSyncState[]
+  hasMore: boolean
+}
+
 export interface MailFilter {
   id: string
   name: string

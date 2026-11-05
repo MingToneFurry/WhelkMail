@@ -14,6 +14,11 @@ import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
 import { isSchemaError } from '../../_lib/schema'
+import {
+  imapMessageSummary,
+  listMirrorMessages,
+  type ImapMessageRow,
+} from '../../_lib/sync'
 
 interface AccountError {
   accountId: string
@@ -165,11 +170,56 @@ async function summariesFromRelayLabel(
   return rows.map((row) => relayMessageSummary(row, account))
 }
 
+async function loadMirrorByLabel(
+  env: Env,
+  accounts: AccountRow[],
+  labelId: string,
+): Promise<MessageSummary[]> {
+  if (accounts.length === 0) {
+    return []
+  }
+  const placeholders = accounts.map(() => '?').join(', ')
+  const rows = await env.DB.prepare(
+    `SELECT m.* FROM imap_messages m JOIN message_labels ml ON ml.message_id = m.id WHERE ml.label_id = ? AND m.account_id IN (${placeholders})`,
+  )
+    .bind(labelId, ...accounts.map((account) => account.id))
+    .all<ImapMessageRow>()
+  const byId = new Map(accounts.map((account) => [account.id, account]))
+  return rows.results
+    .map((row) => {
+      const account = byId.get(row.account_id)
+      return account ? imapMessageSummary(row, account) : null
+    })
+    .filter((message): message is MessageSummary => Boolean(message))
+}
+
 async function loadByLabel(
   env: Env,
   accounts: AccountRow[],
   labelId: string,
 ): Promise<{ messages: MessageSummary[]; errors: AccountError[] }> {
+  try {
+    const mirrored = await loadMirrorByLabel(env, accounts, labelId)
+    if (mirrored.length > 0) {
+      const groups = new Map<string, MessageSummary[]>()
+      for (const message of mirrored) {
+        const key = `${message.accountId}|${message.folder}`
+        const current = groups.get(key) ?? []
+        current.push(message)
+        groups.set(key, current)
+      }
+      for (const group of groups.values()) {
+        const first = group[0]
+        await applyLabels(env, first.accountId, first.folder, group)
+      }
+      return { messages: mirrored, errors: [] }
+    }
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+  }
+
   const result = await env.DB.prepare(
     'SELECT message_id, account_id, folder FROM message_labels WHERE label_id = ?',
   )
@@ -254,10 +304,40 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       continue
     }
     try {
-      const loaded =
-        account.kind === 'imap'
-          ? await summariesFromImap(context.env, account, folder)
-          : await summariesFromRelay(context.env, account, folder)
+      let loaded: MessageSummary[]
+      if (account.kind === 'imap') {
+        let mirrored: MessageSummary[] = []
+        try {
+          mirrored = await listMirrorMessages(context.env, account, folder)
+        } catch (error) {
+          if (!isSchemaError(error)) {
+            throw error
+          }
+        }
+        let live: MessageSummary[] = []
+        try {
+          live = await summariesFromImap(context.env, account, folder)
+        } catch (error) {
+          if (mirrored.length === 0) {
+            throw error
+          }
+        }
+        if (mirrored.length > 0) {
+          const merged = new Map(mirrored.map((message) => [message.id, message]))
+          for (const message of live) {
+            if (!merged.has(message.id)) {
+              merged.set(message.id, message)
+            }
+          }
+          loaded = [...merged.values()]
+            .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+            .slice(0, 100)
+        } else {
+          loaded = live
+        }
+      } else {
+        loaded = await summariesFromRelay(context.env, account, folder)
+      }
       await applyLabels(context.env, account.id, folder, loaded)
       await applyFilters(context.env, account.id, loaded)
       await applyAccountLabel(context.env, account.id, account.incoming_label_id, loaded)

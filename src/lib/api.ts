@@ -12,6 +12,7 @@ import type {
   HealthStatus,
   Label,
   LabelInput,
+  MailboxSyncState,
   MailFilter,
   MessageDetail,
   MessageSummary,
@@ -83,6 +84,20 @@ export const api = {
   },
   deleteAccount(id: string): Promise<{ ok: boolean }> {
     return request(`/api/accounts/${id}`, { method: 'DELETE' })
+  },
+  syncStatus(
+    id: string,
+  ): Promise<{ folders: MailboxSyncState[]; hasMore: boolean }> {
+    return request(`/api/accounts/${id}/sync`)
+  },
+  runSync(
+    id: string,
+    folder: string,
+  ): Promise<{ folders: MailboxSyncState[]; hasMore: boolean; error?: string }> {
+    return request(`/api/accounts/${id}/sync`, {
+      method: 'POST',
+      body: JSON.stringify({ folder }),
+    })
   },
   contacts(query?: string): Promise<{ contacts: Contact[] }> {
     const search = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''

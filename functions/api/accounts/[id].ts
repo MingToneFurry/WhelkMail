@@ -129,6 +129,8 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
   }
   await context.env.DB.batch([
     context.env.DB.prepare('DELETE FROM message_labels WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM imap_messages WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM imap_sync WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ])

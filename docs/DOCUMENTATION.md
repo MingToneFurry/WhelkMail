@@ -129,6 +129,12 @@ Gmail-style automatic filters, shared across all accounts. Each row stores crite
 
 Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
 
+### `imap_sync` and `imap_messages`
+
+`imap_messages` mirrors IMAP message metadata (headers, flags, size, attachment flag) in D1. `imap_sync` stores the per-account/per-folder cursor: `uid_validity`, `max_uid`, `min_uid`, `backfill_done`, status, error, counts and last sync time.
+
+The sync is resumable and chunked (40 messages per request). The first pass fetches the newest chunk, then backfills older messages; later passes fetch new UIDs above `max_uid`. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned when a folder finishes backfilling. Bodies and attachments are not archived: opening a mirrored message still fetches the raw message from the provider.
+
 ### `app_settings`
 
 Key/value store for deployment-wide preferences. Currently used for `default_signature` and `signature_mode`.
@@ -206,7 +212,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels and contacts migrations to an existing local database.
+- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels, contacts and IMAP-sync migrations to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

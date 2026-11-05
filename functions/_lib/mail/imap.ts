@@ -194,6 +194,14 @@ async function targetFolder(
   return resolveDraftsFolder(connection)
 }
 
+export async function resolveFolderName(
+  connection: ImapConnection,
+  account: AccountRow,
+  folder: Folder,
+): Promise<string> {
+  return targetFolder(connection, account, folder)
+}
+
 async function selectForRead(
   connection: ImapConnection,
   folder: string,

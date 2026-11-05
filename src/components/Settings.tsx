@@ -26,6 +26,7 @@ import type {
 import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
 import { FiltersSettings } from './FiltersSettings'
+import { SyncPanel } from './SyncPanel'
 
 interface SettingsProps {
   accounts: Account[]
@@ -55,6 +56,7 @@ interface SettingsProps {
   onDefaultSignatureChange: (value: string) => void
   signatureMode: SignatureMode
   onSignatureModeChange: (value: SignatureMode) => void
+  onSyncComplete: () => void
   onLogout: () => void
 }
 
@@ -77,6 +79,7 @@ interface AccountCardProps {
   labels: Label[]
   storage: StorageOptions
   busy: boolean
+  onSyncComplete: () => void
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
   onTest: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -89,6 +92,7 @@ function AccountCard({
   labels,
   storage,
   busy,
+  onSyncComplete,
   onUpdate,
   onTest,
   onDelete,
@@ -197,6 +201,8 @@ function AccountCard({
         </select>
         <span className="mt-1 block text-[11px] text-muted">{t('settings.incomingLabelHint')}</span>
       </label>
+
+      {isImap ? <SyncPanel account={account} onSynced={onSyncComplete} /> : null}
 
       {isImap ? (
         <>
@@ -587,6 +593,7 @@ export function Settings({
   onDefaultSignatureChange,
   signatureMode,
   onSignatureModeChange,
+  onSyncComplete,
   onLogout,
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
@@ -632,6 +639,7 @@ export function Settings({
               labels={labels}
               storage={storage}
               busy={busyId === account.id}
+              onSyncComplete={onSyncComplete}
               onUpdate={onUpdate}
               onTest={onTest}
               onDelete={onDelete}

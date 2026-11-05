@@ -12,21 +12,18 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).
 - [x] Rubrica contatti: tabella `contacts`, API CRUD, vista Rubrica con ricerca, autocomplete destinatari in To/Cc/Bcc, import/export CSV e deduplica per email.
 - [x] Rebrand completo in `whelkmail`: nome prodotto, titolo pagina, package, documentazione, logo e favicon con conchiglia di buccina.
+- [x] Sync metadati IMAP in D1: incrementale, chunked/resumable, `UIDVALIDITY`, cartelle speciali, trasferimento etichette sui movimenti e stato/errore in Impostazioni.
 
 ## Da fare
 
-### 1. Sync completa delle caselle
+### 1. Rifiniture sync
 
-- [ ] Mirror dei metadati dei messaggi da IMAP a D1.
-- [ ] Archiviazione di corpi e allegati su R2 (opzionale ma consigliata).
-- [ ] Sincronizzazione di Posta in arrivo, Inviate e Bozze, non solo gli ultimi 30 messaggi.
-- [ ] Gestione `UIDVALIDITY` e high-water mark per sync incrementale.
-- [ ] Backfill a blocchi/cursore per evitare timeout e limiti CPU dei Worker.
-- [ ] Mappatura delle cartelle speciali del provider.
-- [ ] Etichette stabili quando un messaggio viene spostato tra cartelle (con il mirror locale).
-- [ ] Stato/errore di sincronizzazione visibile nelle impostazioni.
+- [ ] Archiviazione di corpi e allegati IMAP su R2 (opzionale ma consigliata).
+- [ ] Sincronizzazione di cartelle personalizzate oltre Inbox/Inviate/Bozze.
+- [ ] Sync automatica in background (dipende dal Worker schedulato).
+- [ ] Avanzamento in tempo reale e ripresa automatica della sync parziale.
 
-Prerequisito per notifiche push, forward automatico e archiviazione locale completa.
+Prerequisito per notifiche push e forward automatico.
 
 ### 2. Webapp / PWA e notifiche
 
@@ -93,7 +90,7 @@ Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico
 
 ## Ordine consigliato
 
-1. Sync completa e mirror locale.
+1. Rifiniture sync (R2 e background).
 2. PWA e notifiche push.
 3. Forward automatico.
 4. Eliminazione dal provider.

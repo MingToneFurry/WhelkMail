@@ -12,6 +12,7 @@ whelkmail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Per-account incoming label: choose it while adding an account (or in Settings) so every incoming message of that account is labeled automatically
 - Gmail-style filters in Settings: shared across accounts, match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
 - Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
+- IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings and label transfer when messages move between folders. Bodies and attachments remain on the provider.
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
@@ -49,7 +50,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If earlier migrations were already applied and you only need the contacts table, run `npm run db:migrate:local:4`.
+If earlier migrations were already applied and you only need the IMAP sync tables, run `npm run db:migrate:local:5`.
 
 Create `.dev.vars` in the project root:
 
@@ -126,12 +127,12 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 
 ## Limitations
 
-- No IMAP IDLE / push: the list refreshes on navigation, after sending, or on manual reload.
+- No IMAP IDLE / push: the list refreshes on navigation, after sending, or on manual reload. The full sync is started manually from Settings and resumes in chunks.
 - HTML bodies are displayed as extracted text; remote content is never loaded.
-- Last 30 messages per folder are listed; search is client-side over loaded messages.
-- A label view fetches the labeled UIDs from the provider across Inbox, Sent and Drafts; it does not mirror the whole mailbox locally.
+- The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
+- A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
 - Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
-- Email forwarding rules, contacts, push notifications and full-folder synchronization are not implemented yet.
+- Email forwarding rules, push notifications and R2 archival of IMAP bodies/attachments are not implemented yet.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.
