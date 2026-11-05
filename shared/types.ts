@@ -13,6 +13,20 @@ export interface Label {
   createdAt: string
 }
 
+export interface Contact {
+  id: string
+  name: string
+  email: string
+  note: string
+  createdAt: string
+}
+
+export interface ContactInput {
+  name: string
+  email: string
+  note?: string
+}
+
 export interface MailFilter {
   id: string
   name: string

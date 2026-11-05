@@ -125,6 +125,10 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and an action list of label ids in `label_ids_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed; matching messages receive the action labels in `message_labels`. There is no background mailbox sync yet, so a filter runs only on messages that enter the loaded inbox window.
 
+### `contacts`
+
+Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
+
 ### `app_settings`
 
 Key/value store for deployment-wide preferences. Currently used for `default_signature` and `signature_mode`.
@@ -202,7 +206,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies the additive labels/signatures, filters and unified-labels migrations to an existing local database.
+- `npm run db:migrate:local` applies the additive labels/signatures, filters, unified-labels and contacts migrations to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

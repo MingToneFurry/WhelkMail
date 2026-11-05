@@ -3,6 +3,8 @@ import type {
   AccountCreateInput,
   AccountPatch,
   AppSettings,
+  Contact,
+  ContactInput,
   DraftPayload,
   DraftSavePayload,
   FilterInput,
@@ -81,6 +83,22 @@ export const api = {
   },
   deleteAccount(id: string): Promise<{ ok: boolean }> {
     return request(`/api/accounts/${id}`, { method: 'DELETE' })
+  },
+  contacts(query?: string): Promise<{ contacts: Contact[] }> {
+    const search = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''
+    return request(`/api/contacts${search}`)
+  },
+  createContact(input: ContactInput): Promise<{ contact: Contact }> {
+    return request('/api/contacts', { method: 'POST', body: JSON.stringify(input) })
+  },
+  updateContact(id: string, input: ContactInput): Promise<{ contact: Contact }> {
+    return request(`/api/contacts/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  },
+  deleteContact(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
   labels(): Promise<{ labels: Label[] }> {
     return request('/api/labels')

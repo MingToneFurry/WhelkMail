@@ -134,6 +134,14 @@ export const messageLabelsSchema = z.object({
   labelIds: z.array(z.string().min(1).max(64)).max(30),
 })
 
+export const contactCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().max(254),
+  note: z.string().trim().max(1000).optional(),
+})
+
+export const contactUpdateSchema = contactCreateSchema.partial()
+
 export const appSettingsSchema = z.object({
   defaultSignature: z.string().max(5000).optional(),
   signatureMode: z.enum(['shared', 'per_account']).optional(),

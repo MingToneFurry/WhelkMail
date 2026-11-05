@@ -155,12 +155,12 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql`, `db/migrations/002_label_accounts_filters.sql` and `db/migrations/003_unified_labels_account_label.sql`, which add the `signature` column, create the `labels`, `message_labels`, `app_settings` and `filters` tables, make labels shared across accounts, and add the per-account incoming label.
+That runs `db/migrations/001_labels_signatures.sql`, `db/migrations/002_label_accounts_filters.sql`, `db/migrations/003_unified_labels_account_label.sql` and `db/migrations/004_contacts.sql`, which add the `signature` column, create the `labels`, `message_labels`, `app_settings`, `filters` and `contacts` tables, make labels shared across accounts, and add the per-account incoming label.
 
-If the first two migrations were already applied, run only the third one:
+If earlier migrations were already applied, run only the missing one:
 
 ```bash
-npm run db:migrate:remote:3
+npm run db:migrate:remote:4
 ```
 
 If the database already existed before relay support was added, apply the additive migration:
@@ -341,7 +341,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:3` |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:4` |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |
 | Relay 503 | Relay provider not configured for the account and no deployment fallback |

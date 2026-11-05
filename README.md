@@ -11,6 +11,7 @@ Mail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server:
 - Gmail-style labels shared across all accounts: create them from the sidebar, apply them to any message, and open a label view that collects labeled messages across Inbox, Sent and Drafts
 - Per-account incoming label: choose it while adding an account (or in Settings) so every incoming message of that account is labeled automatically
 - Gmail-style filters in Settings: shared across accounts, match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
+- Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
@@ -48,7 +49,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If the labels/signatures and filters migrations were already applied and you only need the unified labels/account-label update, run `npm run db:migrate:local:3`.
+If earlier migrations were already applied and you only need the contacts table, run `npm run db:migrate:local:4`.
 
 Create `.dev.vars` in the project root:
 

@@ -5,6 +5,8 @@ import type {
   AccountCreateInput,
   AccountPatch,
   ComposeSeed,
+  Contact,
+  ContactInput,
   DraftPayload,
   FilterInput,
   Folder,
@@ -22,6 +24,7 @@ import { api, ApiError, type AccountError } from './lib/api'
 import { errorText } from './lib/errors'
 import { displayAddress } from './lib/utils'
 import { Compose } from './components/Compose'
+import { Contacts } from './components/Contacts'
 import { Login } from './components/Login'
 import { MailList } from './components/MailList'
 import { Onboarding } from './components/Onboarding'
@@ -30,7 +33,7 @@ import { Settings } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 
-type View = 'mail' | 'settings'
+type View = 'mail' | 'settings' | 'contacts'
 type AuthState = 'loading' | 'needed' | 'ok'
 
 export default function App() {
@@ -43,6 +46,7 @@ export default function App() {
   const [fatal, setFatal] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [labels, setLabels] = useState<Label[]>([])
+  const [contacts, setContacts] = useState<Contact[]>([])
   const [filters, setFilters] = useState<MailFilter[]>([])
   const [defaultSignature, setDefaultSignature] = useState('')
   const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
@@ -137,6 +141,14 @@ export default function App() {
       try {
         const filtersResponse = await api.filters()
         setFilters(filtersResponse.filters)
+      } catch (error) {
+        if (error instanceof ApiError && error.isUnauthorized) {
+          throw error
+        }
+      }
+      try {
+        const contactsResponse = await api.contacts()
+        setContacts(contactsResponse.contacts)
       } catch (error) {
         if (error instanceof ApiError && error.isUnauthorized) {
           throw error
@@ -572,6 +584,54 @@ export default function App() {
     }
   }
 
+  function sortContacts(items: Contact[]): Contact[] {
+    return [...items].sort((left, right) => left.name.localeCompare(right.name))
+  }
+
+  async function createContact(input: ContactInput): Promise<Contact | null> {
+    try {
+      const response = await api.createContact(input)
+      setContacts((current) => {
+        const exists = current.some((item) => item.id === response.contact.id)
+        return sortContacts(
+          exists
+            ? current.map((item) => (item.id === response.contact.id ? response.contact : item))
+            : [...current, response.contact],
+        )
+      })
+      return response.contact
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+      return null
+    }
+  }
+
+  async function updateContact(id: string, input: ContactInput): Promise<boolean> {
+    try {
+      const response = await api.updateContact(id, input)
+      setContacts((current) =>
+        sortContacts(current.map((item) => (item.id === id ? response.contact : item))),
+      )
+      return true
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+      return false
+    }
+  }
+
+  async function deleteContact(id: string) {
+    const contact = contacts.find((item) => item.id === id)
+    if (!contact || !window.confirm(t('contacts.deleteConfirm', { name: contact.name }))) {
+      return
+    }
+    try {
+      await api.deleteContact(id)
+      setContacts((current) => current.filter((item) => item.id !== id))
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    }
+  }
+
   async function setMessageLabels(id: string, labelIds: string[]) {
     setMessages((current) =>
       current.map((message) => (message.id === id ? { ...message, labelIds } : message)),
@@ -730,6 +790,7 @@ export default function App() {
         onCreateLabel={createLabel}
         onDeleteLabel={(id) => void deleteLabel(id)}
         onSettings={() => setView('settings')}
+        onContacts={() => setView('contacts')}
         onAddAccount={() => {
           setOnboardingError(null)
           setAddingAccount(true)
@@ -823,6 +884,13 @@ export default function App() {
             onSignatureModeChange={(value) => void changeSignatureMode(value)}
             onLogout={() => void logout()}
           />
+        ) : view === 'contacts' ? (
+          <Contacts
+            contacts={contacts}
+            onCreate={createContact}
+            onUpdate={updateContact}
+            onDelete={(id) => void deleteContact(id)}
+          />
         ) : (
           <div className="flex min-h-0 flex-1 overflow-hidden">
             {readingPane ? (
@@ -905,6 +973,7 @@ export default function App() {
         <Compose
           key={composeKey}
           accounts={accounts}
+          contacts={contacts}
           defaultAccountId={composeAccountId}
           defaultSignature={defaultSignature}
           signatureMode={signatureMode}

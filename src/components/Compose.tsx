@@ -15,6 +15,7 @@ import {
 import type {
   Account,
   ComposeSeed,
+  Contact,
   DraftPayload,
   DraftSavePayload,
   SignatureMode,
@@ -23,6 +24,7 @@ import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { cn, fileToBase64, formatBytes, isValidEmail, parseAddresses } from '../lib/utils'
+import { RecipientField } from './RecipientField'
 
 interface PendingAttachment {
   filename: string
@@ -33,6 +35,7 @@ interface PendingAttachment {
 
 interface ComposeProps {
   accounts: Account[]
+  contacts: Contact[]
   defaultAccountId: string | null
   maxAttachmentBytes: number
   defaultSignature: string
@@ -62,6 +65,7 @@ function signatureOf(
 
 export function Compose({
   accounts,
+  contacts,
   defaultAccountId,
   maxAttachmentBytes,
   defaultSignature,
@@ -412,11 +416,12 @@ export function Compose({
 
           <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">{t('compose.to')}</span>
-            <input
+            <RecipientField
               value={to}
-              onChange={(event) => setTo(event.target.value)}
+              onChange={setTo}
+              contacts={contacts}
               placeholder="destinatario@dominio.it"
-              className="w-full bg-transparent outline-none"
+              inputClassName="w-full bg-transparent outline-none"
             />
             <div className="flex shrink-0 gap-2 text-xs text-muted">
               {!showCc ? (
@@ -435,10 +440,11 @@ export function Compose({
           {showCc ? (
             <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
               <span className="w-14 shrink-0 text-xs text-muted">{t('compose.cc')}</span>
-              <input
+              <RecipientField
                 value={cc}
-                onChange={(event) => setCc(event.target.value)}
-                className="w-full bg-transparent outline-none"
+                onChange={setCc}
+                contacts={contacts}
+                inputClassName="w-full bg-transparent outline-none"
               />
             </div>
           ) : null}
@@ -446,10 +452,11 @@ export function Compose({
           {showBcc ? (
             <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
               <span className="w-14 shrink-0 text-xs text-muted">{t('compose.bcc')}</span>
-              <input
+              <RecipientField
                 value={bcc}
-                onChange={(event) => setBcc(event.target.value)}
-                className="w-full bg-transparent outline-none"
+                onChange={setBcc}
+                contacts={contacts}
+                inputClassName="w-full bg-transparent outline-none"
               />
             </div>
           ) : null}

@@ -10,21 +10,11 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Firme: scelta tra firma unica per tutti gli account o firma diversa per ciascuno, inserimento automatico in nuove email e risposte.
 - [x] Vista mobile: sidebar a scomparsa, topbar responsive, pannello di lettura a schermo intero.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).
+- [x] Rubrica contatti: tabella `contacts`, API CRUD, vista Rubrica con ricerca, autocomplete destinatari in To/Cc/Bcc, import/export CSV e deduplica per email.
 
 ## Da fare
 
-### 1. Rubrica contatti
-
-- [ ] Tabella D1 `contacts` (id, nome, email, note, created_at).
-- [ ] API CRUD `/api/contacts`.
-- [ ] Pagina/sezione Rubrica con ricerca e modifica.
-- [ ] Autocomplete destinatari nel composer (To/Cc/Bcc).
-- [ ] Import/export contatti (vCard o CSV) — opzionale ma consigliato.
-- [ ] Deduplica per indirizzo email, normalizzato in minuscolo.
-
-Prossimo passo consigliato: indipendente dal resto, basso rischio.
-
-### 2. Sync completa delle caselle
+### 1. Sync completa delle caselle
 
 - [ ] Mirror dei metadati dei messaggi da IMAP a D1.
 - [ ] Archiviazione di corpi e allegati su R2 (opzionale ma consigliata).
@@ -35,9 +25,9 @@ Prossimo passo consigliato: indipendente dal resto, basso rischio.
 - [ ] Etichette stabili quando un messaggio viene spostato tra cartelle (con il mirror locale).
 - [ ] Stato/errore di sincronizzazione visibile nelle impostazioni.
 
-Prerequisito per notifiche push, forward automatico e vista etichette globale.
+Prerequisito per notifiche push, forward automatico e archiviazione locale completa.
 
-### 3. Webapp / PWA e notifiche
+### 2. Webapp / PWA e notifiche
 
 - [ ] `manifest.webmanifest` e icone.
 - [ ] Service worker per app shell e caching statico (mai cache delle API).
@@ -48,7 +38,7 @@ Prerequisito per notifiche push, forward automatico e vista etichette globale.
 
 Nota: senza IMAP IDLE serve polling server-side; dipende dalla sync completa.
 
-### 4. Forward automatico con etichetta
+### 3. Forward automatico con etichetta
 
 - [ ] Tabella D1 `forward_rules` (account, etichetta, destinatari, enabled, created_at).
 - [ ] Worker schedulato che processa solo i nuovi UID.
@@ -60,7 +50,7 @@ Nota: senza IMAP IDLE serve polling server-side; dipende dalla sync completa.
 
 Dipende dalla sync completa e dal worker schedulato.
 
-### 5. Elimina email dal provider originale
+### 4. Elimina email dal provider originale
 
 - [ ] Flag account `delete_after_archive`, default disattivato.
 - [ ] Attivazione solo dopo archivio locale verificato.
@@ -70,7 +60,7 @@ Dipende dalla sync completa e dal worker schedulato.
 
 Da non abilitare finché la sync/archiviazione non è stabile.
 
-### 6. Login, utenti e installer
+### 5. Login, utenti e installer
 
 - [ ] Decisione architetturale: single-admin attuale oppure multi-utente reale.
 - [ ] Tabella `users` con password hashata (PBKDF2/scrypt via WebCrypto).
@@ -83,7 +73,7 @@ Da non abilitare finché la sync/archiviazione non è stabile.
 
 Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutte le caselle. Aggiungere solo il campo email sarebbe cosmetico senza isolamento lato API.
 
-### 7. Pulsante “Deploy to Cloudflare”
+### 6. Pulsante “Deploy to Cloudflare”
 
 - [ ] Valutare conversione a Worker con asset statici oppure template Pages dedicato.
 - [ ] Configurazione guidata dei binding D1 (`DB`) e R2 (`BUCKET`).
@@ -92,7 +82,7 @@ Il modello attuale (`APP_PASSWORD` unica) già dà accesso amministratore a tutt
 
 Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico: oggi la Git integration resta il percorso più affidabile.
 
-### 8. Miglioramenti successivi
+### 7. Miglioramenti successivi
 
 - [ ] Notifiche in-app per nuovi messaggi mentre l'app è aperta.
 - [ ] Firma HTML oltre al testo semplice.
@@ -102,10 +92,9 @@ Con Pages Functions + D1 + secret il pulsante non sarebbe davvero un click unico
 
 ## Ordine consigliato
 
-1. Rubrica.
-2. Sync completa e mirror locale.
-3. PWA e notifiche push.
-4. Forward automatico.
-5. Eliminazione dal provider.
-6. Login multi-utente/installer.
-7. Deploy button.
+1. Sync completa e mirror locale.
+2. PWA e notifiche push.
+3. Forward automatico.
+4. Eliminazione dal provider.
+5. Login multi-utente/installer.
+6. Deploy button.
