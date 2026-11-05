@@ -20,7 +20,7 @@ import type {
 import { useI18n } from './i18n'
 import { api, ApiError, type AccountError } from './lib/api'
 import { errorText } from './lib/errors'
-import { accountLabelStyle, cn, displayAddress } from './lib/utils'
+import { displayAddress } from './lib/utils'
 import { Compose } from './components/Compose'
 import { Login } from './components/Login'
 import { MailList } from './components/MailList'
@@ -104,7 +104,6 @@ export default function App() {
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
   const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
-  const showAccount = selectedAccountId === 'all' && accounts.length > 1
 
   const load = useCallback(async () => {
     setAuth('loading')
@@ -291,16 +290,6 @@ export default function App() {
       cancelled = true
     }
   }, [selectedMessageId, auth])
-
-  const unreadByAccount = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const message of messages) {
-      if (message.unread) {
-        counts.set(message.accountId, (counts.get(message.accountId) ?? 0) + 1)
-      }
-    }
-    return counts
-  }, [messages])
 
   const visibleMessages = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -765,54 +754,6 @@ export default function App() {
           onMenu={() => setMobileSidebarOpen(true)}
         />
 
-        {view === 'mail' && accounts.length > 1 ? (
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-4 pb-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAccountId('all')
-                setSelectedMessageId(null)
-                setDetail(null)
-              }}
-              className={cn(
-                'rounded-full border px-3 py-1 text-[11px]',
-                selectedAccountId === 'all'
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-line bg-white text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              {t('labels.all')}
-            </button>
-            {accounts.map((account) => {
-              const count = unreadByAccount.get(account.id) ?? 0
-              const active = selectedAccountId === account.id
-              return (
-                <button
-                  key={account.id}
-                  type="button"
-                  title={account.email}
-                  onClick={() => {
-                    setSelectedAccountId(account.id)
-                    setSelectedLabelId(null)
-                    setSelectedMessageId(null)
-                    setDetail(null)
-                  }}
-                  className={cn(
-                    'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium',
-                    accountLabelStyle(account.id),
-                    active ? 'border-slate-900' : 'border-transparent hover:border-slate-300',
-                  )}
-                >
-                  <span className="max-w-44 truncate">{account.displayName || account.email}</span>
-                  {count > 0 ? (
-                    <span className="rounded-full bg-white/70 px-1.5 text-[10px]">{count}</span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
-
         {view === 'mail' && listErrors.length > 0 ? (
           <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
             {listErrors.map((error) => (
@@ -893,7 +834,6 @@ export default function App() {
                   loading={loadingMessages}
                   folder={folder}
                   labelName={selectedLabel?.name ?? null}
-                  showAccount={showAccount}
                   className={selectedMessageId ? 'hidden md:flex' : ''}
                   onSelect={(id) => void selectMessage(id)}
                 />
@@ -953,7 +893,6 @@ export default function App() {
                 loading={loadingMessages}
                 folder={folder}
                 labelName={selectedLabel?.name ?? null}
-                showAccount={showAccount}
                 fullWidth
                 onSelect={(id) => void selectMessage(id)}
               />

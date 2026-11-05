@@ -1,7 +1,7 @@
 import { AlertCircle, Inbox, Paperclip } from 'lucide-react'
 import type { Folder, Label, MessageSummary } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { accountLabelStyle, cn, formatDate, initials, labelStyle } from '../lib/utils'
+import { cn, formatDate, initials, labelStyle } from '../lib/utils'
 
 interface MailListProps {
   messages: MessageSummary[]
@@ -10,7 +10,6 @@ interface MailListProps {
   loading: boolean
   folder: Folder
   labelName?: string | null
-  showAccount: boolean
   fullWidth?: boolean
   className?: string
   onSelect: (id: string) => void
@@ -31,7 +30,6 @@ export function MailList({
   loading,
   folder,
   labelName,
-  showAccount,
   fullWidth = false,
   className,
   onSelect,
@@ -118,17 +116,6 @@ export function MailList({
                           : message.folder === 'sent'
                             ? t('list.sent')
                             : t('list.drafts')}
-                      </span>
-                    ) : null}
-                    {showAccount ? (
-                      <span
-                        title={message.accountEmail}
-                        className={cn(
-                          'max-w-40 shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium',
-                          accountLabelStyle(message.accountId),
-                        )}
-                      >
-                        {message.accountName || message.accountEmail}
                       </span>
                     ) : null}
                     {message.status === 'failed' ? (
