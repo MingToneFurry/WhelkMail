@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { AlertCircle, Cloud, HardDrive, Mail, Send, Server } from 'lucide-react'
+import { AlertCircle, Cloud, HardDrive, Send, Server } from 'lucide-react'
 import { MAIL_PRESETS, RELAY_PROVIDERS, findPreset, findRelayProvider } from '../../shared/presets'
 import type {
   Account,
@@ -14,6 +14,7 @@ import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { cn } from '../lib/utils'
 import { LocaleToggle } from './LocaleToggle'
+import { WhelkLogo } from './WhelkLogo'
 
 interface OnboardingProps {
   storage: StorageOptions
@@ -161,7 +162,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
       <div className="w-full max-w-2xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <Mail size={22} />
+            <WhelkLogo size={24} />
           </div>
           <div>
             <h1 className="text-xl font-semibold">{t('onboarding.title')}</h1>

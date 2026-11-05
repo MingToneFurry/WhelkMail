@@ -1,4 +1,4 @@
-# Mail — Technical Documentation
+# whelkmail — Technical Documentation
 
 This document covers the architecture, security model, mailbox behavior and storage.
 
@@ -6,7 +6,7 @@ This document covers the architecture, security model, mailbox behavior and stor
 
 ## 1. Scope
 
-Mail is a **webmail client**, not a mail server.
+whelkmail is a **webmail client**, not a mail server.
 
 - It connects to existing mailboxes through IMAP and SMTP.
 - It does not receive mail directly, does not run an MTA, and does not listen on ports 25/143/993/465/587.
@@ -192,7 +192,7 @@ When a message moves to another folder on the provider, its UID changes and the 
 
 - Default locale: English.
 - Italian included.
-- Choice persisted in `localStorage` (`mc_locale`).
+- Choice persisted in `localStorage` (`whelkmail_locale`, falling back to the legacy `mc_locale`).
 - UI strings live in `src/i18n.tsx`; add a locale object and a `LOCALES` entry to extend.
 - Provider/server error strings are not translated.
 
@@ -267,6 +267,8 @@ database_name = "mail-client"
 database_id = "<your-database-id>"
 ```
 
+The D1 database keeps the legacy `mail-client` name to preserve existing data; the Pages project is `whelkmail`.
+
 ### 12.2 Create the Pages project
 
 Dashboard route:
@@ -281,7 +283,7 @@ Dashboard route:
 CLI alternative:
 
 ```bash
-npx wrangler pages project create mail-client
+npx wrangler pages project create whelkmail
 npm run deploy
 ```
 

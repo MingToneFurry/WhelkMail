@@ -1,8 +1,8 @@
-# Mail
+# whelkmail
 
 A self-hosted webmail client for mailboxes you already own.
 
-Mail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server: it connects to your providers over IMAP and SMTP, so your messages, sent copies, drafts and attachments stay on your mail provider. A separate "send-only" account type supports domains that have no SMTP, using an HTTP relay and an optional Google Drive or Cloudflare R2 archive.
+whelkmail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server: it connects to your providers over IMAP and SMTP, so your messages, sent copies, drafts and attachments stay on your mail provider. A separate "send-only" account type supports domains that have no SMTP, using an HTTP relay and an optional Google Drive or Cloudflare R2 archive.
 
 ## Features
 
@@ -83,6 +83,7 @@ Short version:
    ```bash
    npx wrangler d1 create mail-client
    ```
+   The D1 database keeps the legacy `mail-client` name so existing data keeps working; the Pages project is named `whelkmail`.
 2. Create a Pages project from GitHub. Build settings:
    - Build command: `npm run build`
    - Output directory: `dist`

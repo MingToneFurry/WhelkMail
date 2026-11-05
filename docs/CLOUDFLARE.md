@@ -1,6 +1,6 @@
-# Deploying Mail on Cloudflare
+# Deploying whelkmail on Cloudflare
 
-This is the complete, step-by-step guide to run Mail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
+This is the complete, step-by-step guide to run whelkmail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
 
 > **Important:** this is not a static site. Deploy it as a **Pages project with Functions**. The `functions/` directory is the API (IMAP/SMTP over `cloudflare:sockets`). Uploading only `dist` without Functions will break every API call.
 
@@ -44,6 +44,8 @@ database_id = "<paste-the-database-id-here>"
 
 Do not leave the placeholder `00000000-0000-0000-0000-000000000000`, or the deployed Functions will fail.
 
+> The D1 database intentionally keeps the legacy name `mail-client` so existing deployments and data continue to work after the whelkmail rebrand. Only the Pages project is named `whelkmail`.
+
 Dashboard equivalent: **Storage & Databases → D1 SQL Database → Create**.
 
 ### 1.2 Create the Pages project from GitHub
@@ -51,7 +53,7 @@ Dashboard equivalent: **Storage & Databases → D1 SQL Database → Create**.
 1. Open **Workers & Pages** in the Cloudflare dashboard.
 2. **Create** → **Pages** → **Connect to Git**.
 3. Select the repository and branch.
-4. Project name: `mail-client`.
+4. Project name: `whelkmail`.
 5. Build settings:
 
 | Setting | Value |
@@ -103,8 +105,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 CLI equivalent:
 
 ```bash
-npx wrangler pages secret put APP_PASSWORD --project-name mail-client
-npx wrangler pages secret put TOKEN_ENC_KEY --project-name mail-client
+npx wrangler pages secret put APP_PASSWORD --project-name whelkmail
+npx wrangler pages secret put TOKEN_ENC_KEY --project-name whelkmail
 ```
 
 Optional:
@@ -177,7 +179,7 @@ ALTER TABLE accounts ADD COLUMN relay_region TEXT;
 - **Git integration:** push to the connected branch. Cloudflare builds and deploys automatically.
 - **Manual retry:** Pages project → **Deployments** → **Retry deployment**.
 
-The first deployment URL is `https://mail-client.pages.dev` (or the project name you chose).
+The first deployment URL is `https://whelkmail.pages.dev` (or the project name you chose).
 
 ### 1.7 First login and account setup
 
@@ -206,9 +208,9 @@ The first deployment URL is `https://mail-client.pages.dev` (or the project name
 ## 2. Deploy from the CLI instead of GitHub
 
 ```bash
-npx wrangler pages project create mail-client
+npx wrangler pages project create whelkmail
 npm run build
-npx wrangler pages deploy dist --project-name mail-client
+npx wrangler pages deploy dist --project-name whelkmail
 ```
 
 Or simply:
@@ -313,7 +315,7 @@ If the binding is absent, the R2 option is hidden in the UI.
 Pages project → **Deployments** → select deployment → **Logs**, or:
 
 ```bash
-npx wrangler pages deployment tail --project-name mail-client
+npx wrangler pages deployment tail --project-name whelkmail
 ```
 
 ### Rollback

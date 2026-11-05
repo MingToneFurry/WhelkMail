@@ -4,7 +4,6 @@ import {
   FileText,
   HardDrive,
   Inbox,
-  Mail,
   Pencil,
   Plus,
   Send,
@@ -17,6 +16,7 @@ import {
 import type { Account, Folder, Label, LabelColor } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { LABEL_COLORS, cn, labelDot, labelStyle } from '../lib/utils'
+import { WhelkLogo } from './WhelkLogo'
 
 interface SidebarProps {
   account: Account | null
@@ -94,7 +94,7 @@ export function Sidebar({
         )}
       >
         <div className="mb-4 flex items-center gap-2 px-3">
-          <Mail size={22} className="text-brand" />
+          <WhelkLogo size={24} className="text-brand" />
           <span className="text-xl font-medium tracking-tight">{t('app.name')}</span>
           <button
             type="button"

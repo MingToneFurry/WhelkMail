@@ -1,10 +1,10 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Mail } from 'lucide-react'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { LocaleToggle } from './LocaleToggle'
+import { WhelkLogo } from './WhelkLogo'
 
 interface LoginProps {
   onSuccess: () => void
@@ -38,7 +38,7 @@ export function Login({ onSuccess }: LoginProps) {
       <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <Mail size={22} />
+            <WhelkLogo size={24} />
           </div>
           <div>
             <h1 className="text-lg font-semibold">{t('app.name')}</h1>

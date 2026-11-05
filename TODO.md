@@ -11,6 +11,7 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 - [x] Vista mobile: sidebar a scomparsa, topbar responsive, pannello di lettura a schermo intero.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).
 - [x] Rubrica contatti: tabella `contacts`, API CRUD, vista Rubrica con ricerca, autocomplete destinatari in To/Cc/Bcc, import/export CSV e deduplica per email.
+- [x] Rebrand completo in `whelkmail`: nome prodotto, titolo pagina, package, documentazione, logo e favicon con conchiglia di buccina.
 
 ## Da fare
 

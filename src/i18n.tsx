@@ -8,7 +8,7 @@ export const LOCALES: { id: Locale; label: string }[] = [
 ]
 
 const en: Record<string, string> = {
-  'app.name': 'Mail',
+  'app.name': 'whelkmail',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
   'common.save': 'Save',
@@ -160,7 +160,7 @@ const en: Record<string, string> = {
   'settings.r2': 'Cloudflare R2',
   'settings.driveConnected': 'Google Drive connected',
   'settings.driveNotConnected': 'Google Drive not connected',
-  'settings.driveFolderReady': 'MailClient folder ready',
+  'settings.driveFolderReady': 'whelkmail folder ready',
   'settings.driveAuthNeeded': 'OAuth authorization required.',
   'settings.reconnectDrive': 'Reconnect',
   'settings.connectDrive': 'Connect Drive',
@@ -367,7 +367,7 @@ const en: Record<string, string> = {
 }
 
 const it: Record<string, string> = {
-  'app.name': 'Mail',
+  'app.name': 'whelkmail',
   'common.cancel': 'Annulla',
   'common.close': 'Chiudi',
   'common.save': 'Salva',
@@ -519,7 +519,7 @@ const it: Record<string, string> = {
   'settings.r2': 'Cloudflare R2',
   'settings.driveConnected': 'Google Drive collegato',
   'settings.driveNotConnected': 'Google Drive non collegato',
-  'settings.driveFolderReady': 'Cartella MailClient pronta',
+  'settings.driveFolderReady': 'Cartella whelkmail pronta',
   'settings.driveAuthNeeded': 'Serve l’autorizzazione OAuth.',
   'settings.reconnectDrive': 'Ricollega',
   'settings.connectDrive': 'Collega Drive',
@@ -738,7 +738,10 @@ const I18nContext = createContext<I18nValue | null>(null)
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     try {
-      return localStorage.getItem('mc_locale') === 'it' ? 'it' : 'en'
+      return (localStorage.getItem('whelkmail_locale') ?? localStorage.getItem('mc_locale')) ===
+        'it'
+        ? 'it'
+        : 'en'
     } catch {
       return 'en'
     }
@@ -747,7 +750,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next)
     try {
-      localStorage.setItem('mc_locale', next)
+      localStorage.setItem('whelkmail_locale', next)
     } catch {
       // ignore
     }

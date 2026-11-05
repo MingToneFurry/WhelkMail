@@ -1,4 +1,4 @@
-name = "mail-client"
+name = "whelkmail"
 compatibility_date = "2026-11-01"
 pages_build_output_dir = "./dist"
 
@@ -7,6 +7,7 @@ RELAY_PROVIDER = "smtp2go"
 
 [[d1_databases]]
 binding = "DB"
+# Kept as mail-client to preserve the existing database and its data.
 database_name = "mail-client"
 database_id = "6f8c477d-277c-446d-bc9e-40cd1d56dc69"
 

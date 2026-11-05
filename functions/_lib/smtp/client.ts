@@ -156,7 +156,7 @@ export class SmtpConnection {
   }
 
   private async ehlo(): Promise<void> {
-    await this.write('EHLO mail-client')
+    await this.write('EHLO whelkmail')
     const response = await this.expect([250], 'EHLO')
     this.capabilities = response.lines
       .map((line) => line.slice(4).trim())

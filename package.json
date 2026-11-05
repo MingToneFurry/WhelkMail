@@ -1,6 +1,6 @@
 {
-  "name": "mail-client",
-  "description": "Gmail-style webmail client for IMAP/SMTP mailboxes on Cloudflare",
+  "name": "whelkmail",
+  "description": "whelkmail — Gmail-style webmail client for IMAP/SMTP mailboxes on Cloudflare",
   "author": "mlzog",
   "license": "MIT",
   "private": true,
