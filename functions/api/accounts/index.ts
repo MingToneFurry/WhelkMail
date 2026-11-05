@@ -3,31 +3,11 @@ import { findPreset, findRelayProvider } from '../../../shared/presets'
 import { encryptString } from '../../_lib/crypto'
 import { getAccountRow, listAccountRows, publicAccount } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
-import { LABEL_COLOR_IDS } from '../../_lib/labels'
+import { ensureGlobalLabel } from '../../_lib/labels'
 import { googleMailConfigured } from '../../_lib/google/oauth'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError } from '../../_lib/schema'
 import { microsoftConfigured } from '../../_lib/microsoft/oauth'
-
-async function createInitialLabels(env: Env, accountId: string, names: string[]): Promise<void> {
-  const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))].slice(0, 20)
-  if (unique.length === 0) {
-    return
-  }
-  const createdAt = new Date().toISOString()
-  const statements = unique.map((name, index) =>
-    env.DB.prepare(
-      'INSERT INTO labels (id, account_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).bind(
-      crypto.randomUUID(),
-      accountId,
-      name,
-      LABEL_COLOR_IDS[index % LABEL_COLOR_IDS.length],
-      createdAt,
-    ),
-  )
-  await env.DB.batch(statements)
-}
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const rows = await listAccountRows(context.env)
@@ -158,9 +138,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       .run()
   }
 
-  if (input.labels && input.labels.length > 0) {
+  if (input.incomingLabelName) {
     try {
-      await createInitialLabels(context.env, id, input.labels)
+      const labelId = await ensureGlobalLabel(context.env, input.incomingLabelName)
+      await context.env.DB.prepare('UPDATE accounts SET incoming_label_id = ? WHERE id = ?')
+        .bind(labelId, id)
+        .run()
     } catch (error) {
       if (!isSchemaError(error)) {
         throw error

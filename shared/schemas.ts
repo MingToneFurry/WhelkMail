@@ -19,7 +19,7 @@ const imapAccountSchema = z.object({
   oauthProvider: z.enum(['google', 'microsoft']).optional(),
   password: z.string().min(1).max(500).optional(),
   autoSavesSent: z.boolean().optional(),
-  labels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  incomingLabelName: z.string().trim().min(1).max(40).optional(),
 })
 
 const relayAccountSchema = z.object({
@@ -32,7 +32,7 @@ const relayAccountSchema = z.object({
   relayApiSecret: z.string().trim().max(2000).optional(),
   relayDomain: z.string().trim().max(255).optional(),
   relayRegion: z.enum(['us', 'eu']).optional(),
-  labels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  incomingLabelName: z.string().trim().min(1).max(40).optional(),
 })
 
 export const accountCreateSchema = z.discriminatedUnion('kind', [
@@ -43,6 +43,7 @@ export const accountCreateSchema = z.discriminatedUnion('kind', [
 export const accountUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   signature: z.string().max(5000).optional(),
+  incomingLabelId: z.string().min(1).nullable().optional(),
   sentFolder: z.string().trim().min(1).max(255).optional(),
   autoSavesSent: z.boolean().optional(),
   storageDriver: z.enum(['provider', 'drive', 'r2']).optional(),
@@ -104,7 +105,6 @@ export const labelColorSchema = z.enum([
 ])
 
 export const labelCreateSchema = z.object({
-  accountId: z.string().min(1),
   name: z.string().trim().min(1).max(40),
   color: labelColorSchema.default('blue'),
 })
@@ -117,7 +117,6 @@ export const labelUpdateSchema = z.object({
 const optionalPattern = z.string().trim().max(255).optional().nullable()
 
 export const filterCreateSchema = z.object({
-  accountId: z.string().min(1),
   name: z.string().trim().max(80).optional(),
   from: optionalPattern,
   to: optionalPattern,
@@ -129,7 +128,7 @@ export const filterCreateSchema = z.object({
   enabled: z.boolean().optional(),
 })
 
-export const filterUpdateSchema = filterCreateSchema.partial().omit({ accountId: true })
+export const filterUpdateSchema = filterCreateSchema.partial()
 
 export const messageLabelsSchema = z.object({
   labelIds: z.array(z.string().min(1).max(64)).max(30),

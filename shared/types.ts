@@ -8,7 +8,6 @@ export type LabelColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'cya
 
 export interface Label {
   id: string
-  accountId: string | null
   name: string
   color: LabelColor
   createdAt: string
@@ -16,7 +15,6 @@ export interface Label {
 
 export interface MailFilter {
   id: string
-  accountId: string
   name: string
   from: string | null
   to: string | null
@@ -30,7 +28,6 @@ export interface MailFilter {
 }
 
 export interface FilterInput {
-  accountId?: string
   name?: string
   from?: string | null
   to?: string | null
@@ -77,6 +74,7 @@ export interface Account {
   oauthProvider: 'google' | 'microsoft' | null
   connected: boolean
   signature: string
+  incomingLabelId: string | null
   sentFolder: string
   autoSavesSent: boolean
   maxAttachmentBytes: number
@@ -204,11 +202,10 @@ export interface AccountCreateInput {
   relayApiSecret?: string
   relayDomain?: string
   relayRegion?: string
-  labels?: string[]
+  incomingLabelName?: string
 }
 
 export interface LabelInput {
-  accountId: string
   name: string
   color?: LabelColor
 }
@@ -216,6 +213,7 @@ export interface LabelInput {
 export interface AccountPatch {
   displayName?: string
   signature?: string
+  incomingLabelId?: string | null
   sentFolder?: string
   autoSavesSent?: boolean
   storageDriver?: StorageDriver

@@ -58,9 +58,9 @@ async function putLabels(context: Parameters<PagesFunction<Env>>[0]): Promise<Re
   if (labelIds.length > 0) {
     const placeholders = labelIds.map(() => '?').join(', ')
     const found = await context.env.DB.prepare(
-      `SELECT id FROM labels WHERE id IN (${placeholders}) AND (account_id = ? OR account_id IS NULL)`,
+      `SELECT id FROM labels WHERE id IN (${placeholders})`,
     )
-      .bind(...labelIds, target.accountId)
+      .bind(...labelIds)
       .all<{ id: string }>()
     if (found.results.length !== labelIds.length) {
       return fail('Label not found', 404, undefined, 'label_not_found')

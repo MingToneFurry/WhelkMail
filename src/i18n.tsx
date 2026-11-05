@@ -207,6 +207,10 @@ const en: Record<string, string> = {
   'settings.signatureSharedHint': 'One signature applied to every account.',
   'settings.signaturePerAccount': 'Different signature for each account',
   'settings.signaturePerAccountHint': 'Set a signature for each account individually.',
+  'settings.incomingLabel': 'Label for incoming mail',
+  'settings.incomingLabelNone': 'No automatic label',
+  'settings.incomingLabelHint':
+    'Every incoming message of this account receives this label automatically.',
   'settings.defaultSignature': 'Signature',
   'settings.defaultSignatureHint': 'Inserted automatically in new messages and replies.',
   'settings.signaturePlaceholder': 'Name, phone, links…',
@@ -260,10 +264,10 @@ const en: Record<string, string> = {
   'onboarding.relayApiSecret': 'API secret',
   'onboarding.relayDomain': 'Mailgun domain',
   'onboarding.relayRegion': 'Region',
-  'onboarding.labels': 'Initial labels (optional)',
-  'onboarding.labelsPlaceholder': 'Work, Projects, Receipts',
-  'onboarding.labelsHint':
-    'Comma-separated. They are created for this account and appear in the sidebar.',
+  'onboarding.incomingLabel': 'Label for incoming mail (optional)',
+  'onboarding.incomingLabelPlaceholder': 'e.g. Clients, Receipts, Newsletter',
+  'onboarding.incomingLabelHint':
+    'Every incoming message of this account receives this label automatically. If the label does not exist, it is created.',
   'onboarding.create': 'Create account',
   'onboarding.creating': 'Creating...',
   'onboarding.imapHint': 'Direct IMAP/SMTP connection from the Cloudflare Worker.',
@@ -533,6 +537,10 @@ const it: Record<string, string> = {
   'settings.signatureSharedHint': 'Una sola firma applicata a ogni account.',
   'settings.signaturePerAccount': 'Firma diversa per ogni account',
   'settings.signaturePerAccountHint': 'Imposta una firma per ciascun account.',
+  'settings.incomingLabel': 'Etichetta per le email in arrivo',
+  'settings.incomingLabelNone': 'Nessuna etichetta automatica',
+  'settings.incomingLabelHint':
+    'Ogni email in arrivo di questo account riceve automaticamente questa etichetta.',
   'settings.defaultSignature': 'Firma',
   'settings.defaultSignatureHint': 'Inserita automaticamente nelle nuove email e nelle risposte.',
   'settings.signaturePlaceholder': 'Nome, telefono, link…',
@@ -586,10 +594,10 @@ const it: Record<string, string> = {
   'onboarding.relayApiSecret': 'Secret API',
   'onboarding.relayDomain': 'Dominio Mailgun',
   'onboarding.relayRegion': 'Regione',
-  'onboarding.labels': 'Etichette iniziali (opzionale)',
-  'onboarding.labelsPlaceholder': 'Lavoro, Progetti, Ricevute',
-  'onboarding.labelsHint':
-    'Separate da virgola. Vengono create per questo account e compaiono nella barra laterale.',
+  'onboarding.incomingLabel': 'Etichetta per le email in arrivo (opzionale)',
+  'onboarding.incomingLabelPlaceholder': 'es. Clienti, Ricevute, Newsletter',
+  'onboarding.incomingLabelHint':
+    'Ogni email in arrivo di questo account riceve automaticamente questa etichetta. Se non esiste, viene creata.',
   'onboarding.create': 'Crea account',
   'onboarding.creating': 'Creazione...',
   'onboarding.imapHint': 'Connessione diretta IMAP/SMTP dal Worker Cloudflare.',

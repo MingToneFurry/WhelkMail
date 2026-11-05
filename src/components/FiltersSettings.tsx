@@ -1,23 +1,16 @@
 import { useState } from 'react'
 import { Filter, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
-import type {
-  Account,
-  FilterInput,
-  Label,
-  LabelColor,
-  MailFilter,
-} from '../../shared/types'
+import type { FilterInput, Label, LabelColor, MailFilter } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { cn, labelStyle } from '../lib/utils'
 
 interface FiltersSettingsProps {
-  accounts: Account[]
   labels: Label[]
   filters: MailFilter[]
   onCreateFilter: (input: FilterInput) => Promise<boolean>
   onUpdateFilter: (id: string, input: FilterInput) => void
   onDeleteFilter: (id: string) => void
-  onCreateLabel: (name: string, color: LabelColor, accountId: string) => Promise<Label | null>
+  onCreateLabel: (name: string, color: LabelColor) => Promise<Label | null>
 }
 
 function criteriaSummary(filter: MailFilter): string {
@@ -32,7 +25,6 @@ function criteriaSummary(filter: MailFilter): string {
 }
 
 export function FiltersSettings({
-  accounts,
   labels,
   filters,
   onCreateFilter,
@@ -41,7 +33,6 @@ export function FiltersSettings({
   onCreateLabel,
 }: FiltersSettingsProps) {
   const { t } = useI18n()
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [name, setName] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -55,12 +46,6 @@ export function FiltersSettings({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const effectiveAccountId = accounts.some((item) => item.id === accountId)
-    ? accountId
-    : accounts[0]?.id ?? ''
-  const accountLabels = labels.filter((label) => label.accountId === effectiveAccountId)
-  const accountFilters = filters.filter((filter) => filter.accountId === effectiveAccountId)
-
   function toggleLabel(id: string) {
     setLabelIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
@@ -68,10 +53,10 @@ export function FiltersSettings({
   }
 
   async function addLabel() {
-    if (!newLabel.trim() || !effectiveAccountId) {
+    if (!newLabel.trim()) {
       return
     }
-    const created = await onCreateLabel(newLabel.trim(), 'blue', effectiveAccountId)
+    const created = await onCreateLabel(newLabel.trim(), 'blue')
     if (created) {
       setLabelIds((current) => [...current, created.id])
       setNewLabel('')
@@ -115,10 +100,6 @@ export function FiltersSettings({
         doesntHave.trim() ||
         hasAttachment,
     )
-    if (!effectiveAccountId) {
-      setError(t('filters.accountRequired'))
-      return
-    }
     if (!hasCriteria) {
       setError(t('filters.criteriaRequired'))
       return
@@ -128,7 +109,6 @@ export function FiltersSettings({
       return
     }
     const input: FilterInput = {
-      accountId: effectiveAccountId,
       name: name.trim() || undefined,
       from: from.trim() || null,
       to: to.trim() || null,
@@ -163,33 +143,13 @@ export function FiltersSettings({
       </div>
       <p className="mb-4 text-[11px] text-muted">{t('filters.hint')}</p>
 
-      {accounts.length > 1 ? (
-        <label className="mb-4 block text-xs">
-          <span className="mb-1 block font-medium text-muted">{t('filters.account')}</span>
-          <select
-            value={effectiveAccountId}
-            onChange={(event) => {
-              setAccountId(event.target.value)
-              resetForm()
-            }}
-            className={inputClass}
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.email}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
       <div className="space-y-2">
-        {accountFilters.length === 0 ? (
+        {filters.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted">
             {t('filters.empty')}
           </p>
         ) : null}
-        {accountFilters.map((filter) => (
+        {filters.map((filter) => (
           <div
             key={filter.id}
             className={cn(
@@ -307,10 +267,10 @@ export function FiltersSettings({
           <Tag size={13} /> {t('filters.applyLabel')}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {accountLabels.length === 0 ? (
+          {labels.length === 0 ? (
             <p className="text-[11px] text-muted">{t('labels.empty')}</p>
           ) : null}
-          {accountLabels.map((label) => {
+          {labels.map((label) => {
             const checked = labelIds.includes(label.id)
             return (
               <button

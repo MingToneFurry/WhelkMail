@@ -4,8 +4,9 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 
 ## Completato
 
-- [x] Etichette personalizzate per account: creazione dalla sidebar, dall'editor filtri o durante l'aggiunta di un account; assegnazione dal pannello di lettura e vista etichetta Gmail-style da Inbox, Inviate e Bozze.
-- [x] Filtri Gmail-style in Impostazioni: criteri Da/A/Oggetto/parole/allegato e azione “applica etichetta”, con creazione/modifica/attivazione/eliminazione. Valutati al caricamento della Posta in arrivo.
+- [x] Etichette personalizzate unificate per tutti gli account: creazione dalla sidebar o dall'editor filtri; assegnazione dal pannello di lettura e vista etichetta Gmail-style da Inbox, Inviate e Bozze.
+- [x] Etichetta automatica per account: scelta durante l'aggiunta dell'account o nelle impostazioni; ogni email in arrivo di quell'account viene etichettata.
+- [x] Filtri Gmail-style unificati in Impostazioni: criteri Da/A/Oggetto/parole/allegato e azione “applica etichetta”, con creazione/modifica/attivazione/eliminazione. Valutati al caricamento della Posta in arrivo.
 - [x] Firme: scelta tra firma unica per tutti gli account o firma diversa per ciascuno, inserimento automatico in nuove email e risposte.
 - [x] Vista mobile: sidebar a scomparsa, topbar responsive, pannello di lettura a schermo intero.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).

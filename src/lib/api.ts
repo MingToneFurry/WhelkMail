@@ -82,8 +82,8 @@ export const api = {
   deleteAccount(id: string): Promise<{ ok: boolean }> {
     return request(`/api/accounts/${id}`, { method: 'DELETE' })
   },
-  labels(accountId?: string): Promise<{ labels: Label[] }> {
-    return request(`/api/labels${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`)
+  labels(): Promise<{ labels: Label[] }> {
+    return request('/api/labels')
   },
   createLabel(input: LabelInput): Promise<{ label: Label }> {
     return request('/api/labels', { method: 'POST', body: JSON.stringify(input) })
@@ -109,10 +109,8 @@ export const api = {
   updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
     return request('/api/settings', { method: 'PATCH', body: JSON.stringify(input) })
   },
-  filters(accountId?: string): Promise<{ filters: MailFilter[] }> {
-    return request(
-      `/api/filters${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
-    )
+  filters(): Promise<{ filters: MailFilter[] }> {
+    return request('/api/filters')
   },
   createFilter(input: FilterInput): Promise<{ filter: MailFilter }> {
     return request('/api/filters', { method: 'POST', body: JSON.stringify(input) })

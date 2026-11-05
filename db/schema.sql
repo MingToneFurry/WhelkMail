@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   drive_access_token_enc TEXT,
   drive_token_expires_at INTEGER,
   signature TEXT,
+  incoming_label_id TEXT,
   created_at TEXT NOT NULL
 );
 
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_account_folder ON messages (account_id, folder, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_accounts_incoming_label ON accounts (incoming_label_id);
 
 CREATE TABLE IF NOT EXISTS labels (
   id TEXT PRIMARY KEY,
@@ -87,7 +89,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 CREATE TABLE IF NOT EXISTS filters (
   id TEXT PRIMARY KEY,
-  account_id TEXT NOT NULL,
+  account_id TEXT NOT NULL DEFAULT '',
   name TEXT NOT NULL DEFAULT '',
   from_pattern TEXT,
   to_pattern TEXT,

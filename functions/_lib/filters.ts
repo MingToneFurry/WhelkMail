@@ -29,7 +29,6 @@ export function parseLabelIds(value: string): string[] {
 export function toFilter(row: FilterRow): MailFilter {
   return {
     id: row.id,
-    accountId: row.account_id,
     name: row.name,
     from: row.from_pattern,
     to: row.to_pattern,
@@ -81,19 +80,15 @@ export function matchesFilter(filter: MailFilter, message: MessageSummary): bool
   return true
 }
 
-export async function labelsBelongToAccount(
-  env: Env,
-  accountId: string,
-  labelIds: string[],
-): Promise<boolean> {
+export async function labelsExist(env: Env, labelIds: string[]): Promise<boolean> {
   if (labelIds.length === 0) {
     return true
   }
   const placeholders = labelIds.map(() => '?').join(', ')
   const found = await env.DB.prepare(
-    `SELECT id FROM labels WHERE id IN (${placeholders}) AND account_id = ?`,
+    `SELECT id FROM labels WHERE id IN (${placeholders})`,
   )
-    .bind(...labelIds, accountId)
+    .bind(...labelIds)
     .all<{ id: string }>()
   return found.results.length === labelIds.length
 }
@@ -108,10 +103,8 @@ export async function applyFilters(
   }
   try {
     const result = await env.DB.prepare(
-      'SELECT * FROM filters WHERE account_id = ? AND enabled = 1',
-    )
-      .bind(accountId)
-      .all<FilterRow>()
+      'SELECT * FROM filters WHERE enabled = 1',
+    ).all<FilterRow>()
     const filters = result.results.map(toFilter)
     if (filters.length === 0) {
       return
@@ -138,6 +131,39 @@ export async function applyFilters(
           )
         }
       }
+    }
+    if (statements.length > 0) {
+      await env.DB.batch(statements)
+    }
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+  }
+}
+
+export async function applyAccountLabel(
+  env: Env,
+  accountId: string,
+  labelId: string | null,
+  messages: MessageSummary[],
+): Promise<void> {
+  if (!labelId) {
+    return
+  }
+  try {
+    const createdAt = new Date().toISOString()
+    const statements: D1PreparedStatement[] = []
+    for (const message of messages) {
+      if (message.folder !== 'inbox' || message.labelIds.includes(labelId)) {
+        continue
+      }
+      message.labelIds.push(labelId)
+      statements.push(
+        env.DB.prepare(
+          'INSERT OR IGNORE INTO message_labels (message_id, account_id, folder, label_id, created_at) VALUES (?, ?, ?, ?, ?)',
+        ).bind(message.id, accountId, message.folder, labelId, createdAt),
+      )
     }
     if (statements.length > 0) {
       await env.DB.batch(statements)

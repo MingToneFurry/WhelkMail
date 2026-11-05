@@ -38,7 +38,7 @@ interface SettingsProps {
   onCreateFilter: (input: FilterInput) => Promise<boolean>
   onUpdateFilter: (id: string, input: FilterInput) => void
   onDeleteFilter: (id: string) => void
-  onCreateLabel: (name: string, color: LabelColor, accountId: string) => Promise<Label | null>
+  onCreateLabel: (name: string, color: LabelColor) => Promise<Label | null>
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
   onTest: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -74,6 +74,7 @@ function ConfigBadge({ ok, label }: { ok: boolean; label: string }) {
 
 interface AccountCardProps {
   account: Account
+  labels: Label[]
   storage: StorageOptions
   busy: boolean
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
@@ -85,6 +86,7 @@ interface AccountCardProps {
 
 function AccountCard({
   account,
+  labels,
   storage,
   busy,
   onUpdate,
@@ -175,6 +177,26 @@ function AccountCard({
           <Trash2 size={14} /> {t('settings.delete')}
         </button>
       </div>
+
+      <label className="mt-4 block rounded-xl bg-slate-50 p-3 text-xs">
+        <span className="mb-1 block font-medium text-slate-700">{t('settings.incomingLabel')}</span>
+        <select
+          value={account.incomingLabelId ?? ''}
+          disabled={busy}
+          onChange={(event) =>
+            void onUpdate(account.id, { incomingLabelId: event.target.value || null })
+          }
+          className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+        >
+          <option value="">{t('settings.incomingLabelNone')}</option>
+          {labels.map((label) => (
+            <option key={label.id} value={label.id}>
+              {label.name}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-[11px] text-muted">{t('settings.incomingLabelHint')}</span>
+      </label>
 
       {isImap ? (
         <>
@@ -607,6 +629,7 @@ export function Settings({
             <AccountCard
               key={account.id}
               account={account}
+              labels={labels}
               storage={storage}
               busy={busyId === account.id}
               onUpdate={onUpdate}
@@ -740,7 +763,6 @@ export function Settings({
         </div>
 
         <FiltersSettings
-          accounts={accounts}
           labels={labels}
           filters={filters}
           onCreateFilter={onCreateFilter}

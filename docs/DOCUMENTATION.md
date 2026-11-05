@@ -106,6 +106,7 @@ Important fields:
 - `oauth_provider`: currently `microsoft`
 - `sent_folder`, `auto_saves_sent`
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
+- `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
 - `storage_driver`: `provider`, `drive` or `r2`
 - `relay_provider`, `relay_api_key_enc`, `relay_api_secret_enc`, `relay_domain`, `relay_region`
 - `drive_*` fields for the optional Drive archive
@@ -118,11 +119,11 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 ### `labels` and `message_labels`
 
-`labels` stores the custom label definitions (account, name, color). Labels belong to an account namespace, like Gmail. `message_labels` stores assignments keyed by the app message id (`i_<account>.<folder>.<uid>` for IMAP, `r_<uuid>` for relay messages). IMAP assignments survive page reloads but refer to IMAP UIDs; if a mailbox changes UIDVALIDITY, reassign labels on affected messages. Deleting a label or an account removes the related assignments and filter references.
+`labels` stores the custom label definitions (name, color). Labels are shared across every account, which keeps one unified taxonomy. `message_labels` stores assignments keyed by the app message id (`i_<account>.<folder>.<uid>` for IMAP, `r_<uuid>` for relay messages). IMAP assignments survive page reloads but refer to IMAP UIDs; if a mailbox changes UIDVALIDITY, reassign labels on affected messages. Deleting a label removes the related assignments and filter references.
 
 ### `filters`
 
-Gmail-style automatic filters. Each row belongs to one account and stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and an action list of label ids in `label_ids_json`. Enabled filters are evaluated when the inbox is listed; matching messages receive the action labels in `message_labels`. There is no background mailbox sync yet, so a filter runs only on messages that enter the loaded inbox window.
+Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and an action list of label ids in `label_ids_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed; matching messages receive the action labels in `message_labels`. There is no background mailbox sync yet, so a filter runs only on messages that enter the loaded inbox window.
 
 ### `app_settings`
 
@@ -175,9 +176,11 @@ IMAP accounts never use external storage: attachments, Sent copies and drafts st
 
 Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the account bar filters by address. This is address-level labeling, not alias-level labeling.
 
-Custom labels are separate and user-defined, scoped to an account. They can be created from the sidebar, from the filter editor, or while adding an account. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
+Custom labels are separate and user-defined, shared across accounts. They can be created from the sidebar or from the filter editor. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
 
-Automatic filtering is managed in Settings → Filters. Criteria are ANDed, matching is case-insensitive, and the action applies one or more labels. Matching runs when the inbox is listed; it is not a background daemon. The match text covers sender, recipients, subject and snippet, not the full body.
+Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created.
+
+Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed, matching is case-insensitive, and the action applies one or more labels. Matching runs when the inbox is listed; it is not a background daemon. The match text covers sender, recipients, subject and snippet, not the full body.
 
 When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
 
@@ -199,7 +202,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies the additive labels/signatures migration to an existing local database.
+- `npm run db:migrate:local` applies the additive labels/signatures, filters and unified-labels migrations to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

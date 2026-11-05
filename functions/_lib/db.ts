@@ -41,6 +41,7 @@ export interface AccountRow {
   drive_access_token_enc: string | null
   drive_token_expires_at: number | null
   signature: string | null
+  incoming_label_id: string | null
   created_at: string
 }
 
@@ -98,6 +99,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
         : null,
     connected,
     signature: row.signature ?? '',
+    incomingLabelId: row.incoming_label_id ?? null,
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     maxAttachmentBytes: row.max_attachment_bytes,

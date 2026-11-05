@@ -95,9 +95,7 @@ export function ReadingPane({
     )
   }
 
-  const availableLabels = labels.filter(
-    (label) => !label.accountId || label.accountId === message.accountId,
-  )
+  const availableLabels = labels
 
   return (
     <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-2xl border-t border-l border-line bg-white">

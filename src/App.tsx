@@ -104,10 +104,6 @@ export default function App() {
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
   const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
-  const visibleLabels =
-    selectedAccountId === 'all'
-      ? labels
-      : labels.filter((item) => item.accountId === selectedAccountId || item.accountId === null)
   const showAccount = selectedAccountId === 'all' && accounts.length > 1
 
   const load = useCallback(async () => {
@@ -484,8 +480,6 @@ export default function App() {
     try {
       await api.deleteAccount(id)
       setAccounts((current) => current.filter((item) => item.id !== id))
-      setLabels((current) => current.filter((item) => item.accountId !== id))
-      setFilters((current) => current.filter((item) => item.accountId !== id))
       if (selectedAccountId === id) {
         setSelectedAccountId('all')
       }
@@ -497,17 +491,9 @@ export default function App() {
     }
   }
 
-  async function createLabel(
-    name: string,
-    color: LabelColor,
-    accountId: string,
-  ): Promise<Label | null> {
-    if (!accountId) {
-      setNotice(tRef.current('labels.accountRequired'))
-      return null
-    }
+  async function createLabel(name: string, color: LabelColor): Promise<Label | null> {
     try {
-      const response = await api.createLabel({ name, color, accountId })
+      const response = await api.createLabel({ name, color })
       setLabels((current) => [...current, response.label])
       return response.label
     } catch (error) {
@@ -524,6 +510,11 @@ export default function App() {
     try {
       await api.deleteLabel(id)
       setLabels((current) => current.filter((item) => item.id !== id))
+      setAccounts((current) =>
+        current.map((item) =>
+          item.incomingLabelId === id ? { ...item, incomingLabelId: null } : item,
+        ),
+      )
       setFilters((current) =>
         current.flatMap((item) => {
           if (!item.labelIds.includes(id)) {
@@ -739,11 +730,9 @@ export default function App() {
     <div className="flex h-full">
       <Sidebar
         account={selectedAccount}
-        accounts={accounts}
-        selectedAccountId={selectedAccountId}
         view={view}
         folder={folder}
-        labels={visibleLabels}
+        labels={labels}
         selectedLabelId={selectedLabelId}
         mobileOpen={mobileSidebarOpen}
         onCompose={() => openCompose(null)}

@@ -35,6 +35,16 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
   const displayName = input.displayName ?? row.display_name
   const signature = input.signature === undefined ? row.signature : input.signature
+  const incomingLabelId =
+    input.incomingLabelId === undefined ? row.incoming_label_id : input.incomingLabelId
+  if (incomingLabelId) {
+    const label = await context.env.DB.prepare('SELECT id FROM labels WHERE id = ?')
+      .bind(incomingLabelId)
+      .first<{ id: string }>()
+    if (!label) {
+      return fail('Label not found', 404, undefined, 'label_not_found')
+    }
+  }
   const sentFolder = input.sentFolder ?? row.sent_folder
   const autoSavesSent = input.autoSavesSent === undefined ? row.auto_saves_sent : input.autoSavesSent ? 1 : 0
   const storageDriver = input.storageDriver ?? row.storage_driver
@@ -78,11 +88,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   await context.env.DB.prepare(
-    'UPDATE accounts SET display_name = ?, signature = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
+    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, sent_folder = ?, auto_saves_sent = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
   )
     .bind(
       displayName,
       signature,
+      incomingLabelId,
       sentFolder,
       autoSavesSent,
       storageDriver,
@@ -117,9 +128,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     return fail('Account not found', 404, undefined, 'account_not_found')
   }
   await context.env.DB.batch([
-    context.env.DB.prepare('DELETE FROM filters WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM message_labels WHERE account_id = ?').bind(id),
-    context.env.DB.prepare('DELETE FROM labels WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ])

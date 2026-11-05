@@ -19,8 +19,6 @@ import { LABEL_COLORS, cn, labelDot, labelStyle } from '../lib/utils'
 
 interface SidebarProps {
   account: Account | null
-  accounts: Account[]
-  selectedAccountId: string
   view: 'mail' | 'settings'
   folder: Folder
   labels: Label[]
@@ -29,11 +27,7 @@ interface SidebarProps {
   onCompose: () => void
   onFolder: (folder: Folder) => void
   onSelectLabel: (id: string | null) => void
-  onCreateLabel: (
-    name: string,
-    color: LabelColor,
-    accountId: string,
-  ) => Promise<Label | null>
+  onCreateLabel: (name: string, color: LabelColor) => Promise<Label | null>
   onDeleteLabel: (id: string) => void
   onSettings: () => void
   onAddAccount: () => void
@@ -42,8 +36,6 @@ interface SidebarProps {
 
 export function Sidebar({
   account,
-  accounts,
-  selectedAccountId,
   view,
   folder,
   labels,
@@ -62,23 +54,15 @@ export function Sidebar({
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [color, setColor] = useState<LabelColor>('blue')
-  const [labelAccountId, setLabelAccountId] = useState(
-    selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id ?? '',
-  )
   const [busy, setBusy] = useState(false)
-  const effectiveAccountId = accounts.some((item) => item.id === labelAccountId)
-    ? labelAccountId
-    : selectedAccountId !== 'all'
-      ? selectedAccountId
-      : accounts[0]?.id ?? ''
 
   async function create(event: FormEvent) {
     event.preventDefault()
-    if (!name.trim() || busy || !effectiveAccountId) {
+    if (!name.trim() || busy) {
       return
     }
     setBusy(true)
-    const created = await onCreateLabel(name.trim(), color, effectiveAccountId)
+    const created = await onCreateLabel(name.trim(), color)
     setBusy(false)
     if (created) {
       setName('')
@@ -226,19 +210,6 @@ export function Sidebar({
                 autoFocus
                 className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
               />
-              {accounts.length > 1 ? (
-                <select
-                  value={effectiveAccountId}
-                  onChange={(event) => setLabelAccountId(event.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
-                >
-                  {accounts.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.email}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {LABEL_COLORS.map((item) => (
                   <button
@@ -270,7 +241,6 @@ export function Sidebar({
             ) : null}
             {labels.map((label) => {
               const active = selectedLabelId === label.id
-              const labelAccount = accounts.find((item) => item.id === label.accountId)
               return (
                 <div
                   key={label.id}
@@ -289,11 +259,6 @@ export function Sidebar({
                   >
                     <span className={cn('h-3 w-3 shrink-0 rounded-sm', labelDot(label.color))} />
                     <span className="truncate">{label.name}</span>
-                    {selectedAccountId === 'all' && labelAccount ? (
-                      <span className="ml-auto max-w-16 shrink-0 truncate text-[10px] text-muted">
-                        {labelAccount.displayName || labelAccount.email}
-                      </span>
-                    ) : null}
                   </button>
                   <button
                     type="button"

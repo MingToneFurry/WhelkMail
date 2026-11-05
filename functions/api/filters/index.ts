@@ -1,24 +1,17 @@
 import { filterCreateSchema } from '../../../shared/schemas'
 import type { Env } from '../../_lib/env'
-import { labelsBelongToAccount, toFilter, type FilterRow } from '../../_lib/filters'
+import { labelsExist, toFilter, type FilterRow } from '../../_lib/filters'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
-async function listFilters(env: Env, accountId: string | null) {
-  const result = accountId
-    ? await env.DB.prepare(
-        'SELECT * FROM filters WHERE account_id = ? ORDER BY created_at ASC',
-      )
-        .bind(accountId)
-        .all<FilterRow>()
-    : await env.DB.prepare('SELECT * FROM filters ORDER BY created_at ASC').all<FilterRow>()
+async function listFilters(env: Env) {
+  const result = await env.DB.prepare('SELECT * FROM filters ORDER BY created_at ASC').all<FilterRow>()
   return result.results.map(toFilter)
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
-    const url = new URL(context.request.url)
-    return json({ filters: await listFilters(context.env, url.searchParams.get('accountId')) })
+    return json({ filters: await listFilters(context.env) })
   } catch (error) {
     if (isSchemaError(error)) {
       return schemaOutdated(error)
@@ -50,13 +43,7 @@ async function createFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
     )
   }
   const input = parsed.data
-  const account = await context.env.DB.prepare('SELECT id FROM accounts WHERE id = ?')
-    .bind(input.accountId)
-    .first<{ id: string }>()
-  if (!account) {
-    return fail('Account not found', 404, undefined, 'account_not_found')
-  }
-  if (!(await labelsBelongToAccount(context.env, input.accountId, input.labelIds))) {
+  if (!(await labelsExist(context.env, input.labelIds))) {
     return fail('Label not found', 404, undefined, 'label_not_found')
   }
   const id = crypto.randomUUID()
@@ -67,7 +54,7 @@ async function createFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
   )
     .bind(
       id,
-      input.accountId,
+      '',
       input.name?.trim() || 'Filter',
       input.from?.trim() || null,
       input.to?.trim() || null,

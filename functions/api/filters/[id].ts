@@ -1,11 +1,6 @@
 import { filterUpdateSchema } from '../../../shared/schemas'
 import type { Env } from '../../_lib/env'
-import {
-  labelsBelongToAccount,
-  parseLabelIds,
-  toFilter,
-  type FilterRow,
-} from '../../_lib/filters'
+import { labelsExist, parseLabelIds, toFilter, type FilterRow } from '../../_lib/filters'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
@@ -40,7 +35,7 @@ async function updateFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
   }
   const input = parsed.data
   const labelIds = input.labelIds ?? parseLabelIds(row.label_ids_json)
-  if (!(await labelsBelongToAccount(context.env, row.account_id, labelIds))) {
+  if (!(await labelsExist(context.env, labelIds))) {
     return fail('Label not found', 404, undefined, 'label_not_found')
   }
   await context.env.DB.prepare(
