@@ -8,6 +8,9 @@ Mail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server:
 
 - Familiar webmail layout: message list with a full-width reading view and an optional right-side reading pane
 - Multiple accounts in one view, with colored address labels and quick filters
+- Custom labels: create them from the sidebar, apply them to any message, and filter from the sidebar
+- Signatures: a global default plus an optional per-account override, inserted automatically in new messages and replies
+- Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
 - Sending through each account's own SMTP server
 - Drafts saved on the provider (IMAP `\Drafts`) or on Drive/R2 for relay accounts
@@ -35,6 +38,12 @@ Requirements: Node.js 22+, npm.
 ```bash
 npm install
 npm run db:local
+```
+
+If you already have a local database created before labels/signatures, run:
+
+```bash
+npm run db:migrate:local
 ```
 
 Create `.dev.vars` in the project root:
@@ -79,6 +88,10 @@ Short version:
    ```bash
    npm run db:remote
    ```
+   If the database already existed before labels and signatures were added, also run the additive migration:
+   ```bash
+   npm run db:migrate:remote
+   ```
 5. Deploy and open the Pages URL.
 
 A Workers Paid plan is recommended: IMAP/SMTP TLS handshakes exceed the free plan CPU budget.
@@ -110,6 +123,8 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - No IMAP IDLE / push: the list refreshes on navigation, after sending, or on manual reload.
 - HTML bodies are displayed as extracted text; remote content is never loaded.
 - Last 30 messages per folder are listed; search is client-side over loaded messages.
+- Label filters apply to the currently loaded folder; a cross-folder label view would require mirroring IMAP metadata into D1.
+- Email forwarding rules, contacts, push notifications and full-folder synchronization are not implemented yet.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.

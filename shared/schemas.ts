@@ -40,6 +40,7 @@ export const accountCreateSchema = z.discriminatedUnion('kind', [
 
 export const accountUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
+  signature: z.string().max(5000).optional(),
   sentFolder: z.string().trim().min(1).max(255).optional(),
   autoSavesSent: z.boolean().optional(),
   storageDriver: z.enum(['provider', 'drive', 'r2']).optional(),
@@ -89,3 +90,32 @@ export const sendSchema = z.object({
 })
 
 export type SendInput = z.infer<typeof sendSchema>
+
+export const labelColorSchema = z.enum([
+  'blue',
+  'emerald',
+  'amber',
+  'violet',
+  'rose',
+  'cyan',
+  'lime',
+])
+
+export const labelCreateSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  color: labelColorSchema.default('blue'),
+})
+
+export const labelUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
+  color: labelColorSchema.optional(),
+})
+
+export const messageLabelsSchema = z.object({
+  labelIds: z.array(z.string().min(1).max(64)).max(30),
+})
+
+export const appSettingsSchema = z.object({
+  defaultSignature: z.string().max(5000).optional(),
+})
+

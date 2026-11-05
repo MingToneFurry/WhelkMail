@@ -4,6 +4,18 @@ export type AuthType = 'password' | 'oauth2'
 export type MailSecurity = 'tls' | 'starttls'
 export type Folder = 'inbox' | 'sent' | 'draft'
 export type MessageStatus = 'sent' | 'failed' | 'draft'
+export type LabelColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'cyan' | 'lime'
+
+export interface Label {
+  id: string
+  name: string
+  color: LabelColor
+  createdAt: string
+}
+
+export interface AppSettings {
+  defaultSignature: string
+}
 
 export interface Mailbox {
   name: string | null
@@ -32,6 +44,7 @@ export interface Account {
   authType: AuthType
   oauthProvider: 'google' | 'microsoft' | null
   connected: boolean
+  signature: string
   sentFolder: string
   autoSavesSent: boolean
   maxAttachmentBytes: number
@@ -59,6 +72,7 @@ export interface MessageSummary {
   unread: boolean
   hasAttachments: boolean
   status: MessageStatus
+  labelIds: string[]
 }
 
 export interface MessageDetail extends MessageSummary {
@@ -160,8 +174,14 @@ export interface AccountCreateInput {
   relayRegion?: string
 }
 
+export interface LabelInput {
+  name: string
+  color?: LabelColor
+}
+
 export interface AccountPatch {
   displayName?: string
+  signature?: string
   sentFolder?: string
   autoSavesSent?: boolean
   storageDriver?: StorageDriver

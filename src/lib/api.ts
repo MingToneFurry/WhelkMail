@@ -2,10 +2,13 @@ import type {
   Account,
   AccountCreateInput,
   AccountPatch,
+  AppSettings,
   DraftPayload,
   DraftSavePayload,
   Folder,
   HealthStatus,
+  Label,
+  LabelInput,
   MessageDetail,
   MessageSummary,
   SendPayload,
@@ -76,6 +79,33 @@ export const api = {
   },
   deleteAccount(id: string): Promise<{ ok: boolean }> {
     return request(`/api/accounts/${id}`, { method: 'DELETE' })
+  },
+  labels(): Promise<{ labels: Label[] }> {
+    return request('/api/labels')
+  },
+  createLabel(input: LabelInput): Promise<{ label: Label }> {
+    return request('/api/labels', { method: 'POST', body: JSON.stringify(input) })
+  },
+  updateLabel(id: string, input: LabelInput): Promise<{ label: Label }> {
+    return request(`/api/labels/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  },
+  deleteLabel(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/labels/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  setMessageLabels(id: string, labelIds: string[]): Promise<{ ok: boolean; labelIds: string[] }> {
+    return request(`/api/messages/${encodeURIComponent(id)}/labels`, {
+      method: 'PUT',
+      body: JSON.stringify({ labelIds }),
+    })
+  },
+  settings(): Promise<AppSettings> {
+    return request('/api/settings')
+  },
+  updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
+    return request('/api/settings', { method: 'PATCH', body: JSON.stringify(input) })
   },
   testAccount(id: string): Promise<{ ok: boolean; checks?: Record<string, string> }> {
     return request(`/api/accounts/${id}/test`, { method: 'POST' })

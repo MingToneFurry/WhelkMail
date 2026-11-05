@@ -8,6 +8,8 @@ import type {
   DraftPayload,
   Folder,
   HealthStatus,
+  Label,
+  LabelColor,
   MessageDetail,
   MessageSummary,
   StorageOptions,
@@ -37,10 +39,14 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState>('loading')
   const [fatal, setFatal] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [labels, setLabels] = useState<Label[]>([])
+  const [defaultSignature, setDefaultSignature] = useState('')
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null)
   const [folder, setFolder] = useState<Folder>('inbox')
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [messages, setMessages] = useState<MessageSummary[]>([])
   const [listErrors, setListErrors] = useState<AccountError[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
@@ -106,6 +112,22 @@ export default function App() {
       setAccounts(accountsResponse.accounts)
       setStorage(storageResponse)
       setHealth(healthResponse)
+      try {
+        const labelsResponse = await api.labels()
+        setLabels(labelsResponse.labels)
+      } catch (error) {
+        if (error instanceof ApiError && error.isUnauthorized) {
+          throw error
+        }
+      }
+      try {
+        const settingsResponse = await api.settings()
+        setDefaultSignature(settingsResponse.defaultSignature)
+      } catch (error) {
+        if (error instanceof ApiError && error.isUnauthorized) {
+          throw error
+        }
+      }
       setAuth('ok')
     } catch (error) {
       if (error instanceof ApiError && error.isUnauthorized) {
@@ -267,23 +289,27 @@ export default function App() {
 
   const visibleMessages = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) {
-      return messages
+    let result = messages
+    if (needle) {
+      result = result.filter((message) => {
+        const haystack = [
+          message.subject,
+          message.snippet,
+          message.accountEmail,
+          message.from.name ?? '',
+          message.from.email,
+          ...message.to.map((item) => `${item.name ?? ''} ${item.email}`),
+        ]
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(needle)
+      })
     }
-    return messages.filter((message) => {
-      const haystack = [
-        message.subject,
-        message.snippet,
-        message.accountEmail,
-        message.from.name ?? '',
-        message.from.email,
-        ...message.to.map((item) => `${item.name ?? ''} ${item.email}`),
-      ]
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(needle)
-    })
-  }, [messages, query])
+    if (selectedLabelId) {
+      result = result.filter((message) => message.labelIds.includes(selectedLabelId))
+    }
+    return result
+  }, [messages, query, selectedLabelId])
 
   function openCompose(draft: DraftPayload | null, seed: ComposeSeed | null = null) {
     setComposeDraft(draft)
@@ -442,6 +468,66 @@ export default function App() {
     }
   }
 
+  async function createLabel(name: string, color: LabelColor): Promise<boolean> {
+    try {
+      const response = await api.createLabel({ name, color })
+      setLabels((current) => [...current, response.label])
+      return true
+    } catch (error) {
+      setNotice(errorText(error, tRef.current))
+      return false
+    }
+  }
+
+  async function deleteLabel(id: string) {
+    const label = labels.find((item) => item.id === id)
+    if (!label || !window.confirm(t('labels.deleteConfirm', { name: label.name }))) {
+      return
+    }
+    try {
+      await api.deleteLabel(id)
+      setLabels((current) => current.filter((item) => item.id !== id))
+      setMessages((current) =>
+        current.map((message) => ({
+          ...message,
+          labelIds: message.labelIds.filter((labelId) => labelId !== id),
+        })),
+      )
+      setDetail((current) =>
+        current
+          ? { ...current, labelIds: current.labelIds.filter((labelId) => labelId !== id) }
+          : current,
+      )
+      if (selectedLabelId === id) {
+        setSelectedLabelId(null)
+      }
+    } catch (error) {
+      setNotice(errorText(error, tRef.current))
+    }
+  }
+
+  async function setMessageLabels(id: string, labelIds: string[]) {
+    setMessages((current) =>
+      current.map((message) => (message.id === id ? { ...message, labelIds } : message)),
+    )
+    setDetail((current) => (current && current.id === id ? { ...current, labelIds } : current))
+    try {
+      await api.setMessageLabels(id, labelIds)
+    } catch (error) {
+      setNotice(errorText(error, tRef.current))
+      setRefreshKey((key) => key + 1)
+    }
+  }
+
+  async function changeDefaultSignature(value: string) {
+    setDefaultSignature(value)
+    try {
+      await api.updateSettings({ defaultSignature: value })
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    }
+  }
+
   async function logout() {
     try {
       await api.logout()
@@ -456,6 +542,15 @@ export default function App() {
 
   function openFolder(next: Folder) {
     setFolder(next)
+    setSelectedLabelId(null)
+    setView('mail')
+    setSelectedMessageId(null)
+    setDetail(null)
+    setQuery('')
+  }
+
+  function selectLabel(id: string | null) {
+    setSelectedLabelId(id)
     setView('mail')
     setSelectedMessageId(null)
     setDetail(null)
@@ -551,13 +646,20 @@ export default function App() {
         account={selectedAccount}
         view={view}
         folder={folder}
+        labels={labels}
+        selectedLabelId={selectedLabelId}
+        mobileOpen={mobileSidebarOpen}
         onCompose={() => openCompose(null)}
         onFolder={openFolder}
+        onSelectLabel={selectLabel}
+        onCreateLabel={createLabel}
+        onDeleteLabel={(id) => void deleteLabel(id)}
         onSettings={() => setView('settings')}
         onAddAccount={() => {
           setOnboardingError(null)
           setAddingAccount(true)
         }}
+        onClose={() => setMobileSidebarOpen(false)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -573,6 +675,7 @@ export default function App() {
           onQuery={setQuery}
           onOpenSettings={() => setView('settings')}
           onLogout={() => void logout()}
+          onMenu={() => setMobileSidebarOpen(true)}
         />
 
         {view === 'mail' && accounts.length > 1 ? (
@@ -679,6 +782,8 @@ export default function App() {
             onDefaultSenderNewChange={changeDefaultSenderNew}
             defaultSenderReply={defaultSenderReply}
             onDefaultSenderReplyChange={changeDefaultSenderReply}
+            defaultSignature={defaultSignature}
+            onDefaultSignatureChange={(value) => void changeDefaultSignature(value)}
             onLogout={() => void logout()}
           />
         ) : (
@@ -687,23 +792,35 @@ export default function App() {
               <>
                 <MailList
                   messages={visibleMessages}
+                  labels={labels}
                   selectedId={selectedMessageId}
                   loading={loadingMessages}
                   folder={folder}
                   showAccount={showAccount}
+                  className={selectedMessageId ? 'hidden md:flex' : ''}
                   onSelect={(id) => void selectMessage(id)}
                 />
                 <ReadingPane
                   message={detail}
+                  labels={labels}
                   loading={detailLoading}
                   error={detailError}
                   rawUrl={selectedMessageId ? api.rawUrl(selectedMessageId) : null}
                   attachmentUrl={(index) =>
                     selectedMessageId ? api.attachmentUrl(selectedMessageId, index) : '#'
                   }
+                  onBack={() => {
+                    setSelectedMessageId(null)
+                    setDetail(null)
+                  }}
                   onReply={(all) => {
                     if (detail) {
                       replyTo(detail, all)
+                    }
+                  }}
+                  onSetLabels={(ids) => {
+                    if (detail) {
+                      void setMessageLabels(detail.id, ids)
                     }
                   }}
                 />
@@ -711,6 +828,7 @@ export default function App() {
             ) : selectedMessageId ? (
               <ReadingPane
                 message={detail}
+                labels={labels}
                 loading={detailLoading}
                 error={detailError}
                 rawUrl={api.rawUrl(selectedMessageId)}
@@ -724,10 +842,16 @@ export default function App() {
                     replyTo(detail, all)
                   }
                 }}
+                onSetLabels={(ids) => {
+                  if (detail) {
+                    void setMessageLabels(detail.id, ids)
+                  }
+                }}
               />
             ) : (
               <MailList
                 messages={visibleMessages}
+                labels={labels}
                 selectedId={selectedMessageId}
                 loading={loadingMessages}
                 folder={folder}
@@ -745,6 +869,7 @@ export default function App() {
           key={composeKey}
           accounts={accounts}
           defaultAccountId={composeAccountId}
+          defaultSignature={defaultSignature}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
           initialDraft={composeDraft}
           seed={composeSeed}

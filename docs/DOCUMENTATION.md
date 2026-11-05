@@ -105,6 +105,7 @@ Important fields:
 - `access_token_enc`, `access_token_expires_at`
 - `oauth_provider`: currently `microsoft`
 - `sent_folder`, `auto_saves_sent`
+- `signature`: optional per-account signature; empty means use the global default
 - `storage_driver`: `provider`, `drive` or `r2`
 - `relay_provider`, `relay_api_key_enc`, `relay_api_secret_enc`, `relay_domain`, `relay_region`
 - `drive_*` fields for the optional Drive archive
@@ -114,6 +115,14 @@ Important fields:
 Used for relay accounts only: sent copies and drafts. IMAP messages are read live from the provider and are not mirrored into D1.
 
 Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, storage key, attachment metadata and status.
+
+### `labels` and `message_labels`
+
+`labels` stores the custom label definitions (name, color). `message_labels` stores assignments keyed by the app message id (`i_<account>.<folder>.<uid>` for IMAP, `r_<uuid>` for relay messages). IMAP assignments survive page reloads but refer to IMAP UIDs; if a mailbox changes UIDVALIDITY, reassign labels on affected messages. Deleting a label or an account removes the related assignments.
+
+### `app_settings`
+
+Key/value store for deployment-wide preferences. Currently used for `default_signature`. Per-account signatures live in `accounts.signature` and override the default.
 
 ## 6. Security model
 
@@ -153,9 +162,11 @@ Archive storage:
 
 IMAP accounts never use external storage: attachments, Sent copies and drafts stay on the mail provider.
 
-## 9. Multi-account labels
+## 9. Account chips and custom labels
 
-Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the label bar filters by address. This is address-level labeling, not alias-level labeling.
+Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the account bar filters by address. This is address-level labeling, not alias-level labeling.
+
+Custom labels are separate and user-defined. Create them from the sidebar, then apply them from the reading pane. The sidebar lists every label and filters the currently loaded folder client-side. Because IMAP messages are not mirrored, a label view only covers messages already fetched for the active folder; a global label inbox would require mirroring message metadata into D1.
 
 ## 10. Internationalization
 
@@ -175,6 +186,7 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
+- `npm run db:migrate:local` applies the additive labels/signatures migration to an existing local database.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.
@@ -300,7 +312,13 @@ Relay credentials entered per account in the UI take precedence over these value
 npm run db:remote
 ```
 
-If you already created the tables before adding relay support, apply the additive migration:
+If you already created the tables before labels and signatures were added, apply the additive migration:
+
+```bash
+npm run db:migrate:remote
+```
+
+If you already created the tables before relay support, apply the additive migration:
 
 ```sql
 ALTER TABLE accounts ADD COLUMN relay_api_key_enc TEXT;

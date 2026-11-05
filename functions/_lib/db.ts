@@ -40,6 +40,7 @@ export interface AccountRow {
   drive_refresh_token_enc: string | null
   drive_access_token_enc: string | null
   drive_token_expires_at: number | null
+  signature: string | null
   created_at: string
 }
 
@@ -96,6 +97,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
         ? row.oauth_provider
         : null,
     connected,
+    signature: row.signature ?? '',
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     maxAttachmentBytes: row.max_attachment_bytes,
@@ -134,6 +136,7 @@ export function relayMessageSummary(row: MessageRow, account: AccountRow): Messa
     unread: false,
     hasAttachments: attachments.length > 0,
     status: row.status === 'failed' ? 'failed' : row.status === 'draft' ? 'draft' : 'sent',
+    labelIds: [],
   }
 }
 

@@ -39,6 +39,8 @@ interface SettingsProps {
   onDefaultSenderNewChange: (value: string) => void
   defaultSenderReply: string
   onDefaultSenderReplyChange: (value: string) => void
+  defaultSignature: string
+  onDefaultSignatureChange: (value: string) => void
   onLogout: () => void
 }
 
@@ -79,6 +81,7 @@ function AccountCard({
 }: AccountCardProps) {
   const { t } = useI18n()
   const [password, setPassword] = useState('')
+  const [signature, setSignature] = useState(account.signature)
   const [sentFolder, setSentFolder] = useState(account.sentFolder)
   const [imapHost, setImapHost] = useState(account.imapHost ?? '')
   const [imapPort, setImapPort] = useState(String(account.imapPort ?? 993))
@@ -310,6 +313,28 @@ function AccountCard({
             <p className="mt-2 text-[11px] text-muted">{t('settings.sentHint')}</p>
           </div>
 
+          <div className="mt-4 rounded-xl border border-line p-3">
+            <p className="mb-1 text-xs font-medium text-muted">{t('settings.accountSignature')}</p>
+            <textarea
+              value={signature}
+              onChange={(event) => setSignature(event.target.value)}
+              rows={3}
+              placeholder={t('settings.signaturePlaceholder')}
+              className="w-full resize-y rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+            />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] text-muted">{t('settings.accountSignatureHint')}</p>
+              <button
+                type="button"
+                disabled={busy || signature === account.signature}
+                onClick={() => void onUpdate(account.id, { signature })}
+                className="rounded-lg border border-line px-2 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+
           {account.authType === 'password' ? (
             <div className="mt-4 flex flex-wrap items-end gap-2">
               <label className="block flex-1 text-xs">
@@ -504,9 +529,12 @@ export function Settings({
   onDefaultSenderNewChange,
   defaultSenderReply,
   onDefaultSenderReplyChange,
+  defaultSignature,
+  onDefaultSignatureChange,
   onLogout,
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
+  const [signatureDraft, setSignatureDraft] = useState(defaultSignature)
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10">
@@ -604,6 +632,31 @@ export function Settings({
             </select>
           </label>
           <p className="mt-2 text-[11px] text-muted">{t('settings.defaultSenderHint')}</p>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+          <p className="mb-3 text-sm font-medium">{t('settings.signature')}</p>
+          <label className="block text-xs">
+            <span className="mb-1 block font-medium text-muted">{t('settings.defaultSignature')}</span>
+            <textarea
+              value={signatureDraft}
+              onChange={(event) => setSignatureDraft(event.target.value)}
+              rows={4}
+              placeholder={t('settings.signaturePlaceholder')}
+              className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+          </label>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-muted">{t('settings.defaultSignatureHint')}</p>
+            <button
+              type="button"
+              disabled={signatureDraft === defaultSignature}
+              onClick={() => onDefaultSignatureChange(signatureDraft)}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {t('common.save')}
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">

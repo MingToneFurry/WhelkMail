@@ -29,6 +29,7 @@ interface ComposeProps {
   accounts: Account[]
   defaultAccountId: string | null
   maxAttachmentBytes: number
+  defaultSignature: string
   initialDraft: DraftPayload | null
   seed: ComposeSeed | null
   onClose: () => void
@@ -41,10 +42,15 @@ function base64Size(value: string): number {
   return Math.floor((value.length * 3) / 4)
 }
 
+function signatureOf(account: Account | undefined, fallback: string): string {
+  return (account?.signature?.trim() || fallback).trim()
+}
+
 export function Compose({
   accounts,
   defaultAccountId,
   maxAttachmentBytes,
+  defaultSignature,
   initialDraft,
   seed,
   onClose,
@@ -56,16 +62,28 @@ export function Compose({
   const initialTo = initialDraft?.to ?? seed?.to ?? []
   const initialCc = initialDraft?.cc ?? seed?.cc ?? []
   const initialBcc = initialDraft?.bcc ?? seed?.bcc ?? []
-  const [accountId, setAccountId] = useState(
-    initialDraft?.accountId ?? seed?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? '',
+  const initialAccountId =
+    initialDraft?.accountId ?? seed?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? ''
+  const initialSignature = signatureOf(
+    accounts.find((item) => item.id === initialAccountId),
+    defaultSignature,
   )
+  const initialText = initialDraft
+    ? initialDraft.text
+    : seed
+      ? initialSignature
+        ? `${initialSignature}\n\n${seed.text.trimStart()}`
+        : seed.text
+      : initialSignature
+  const [accountId, setAccountId] = useState(initialAccountId)
   const [to, setTo] = useState(initialTo.join(', '))
   const [cc, setCc] = useState(initialCc.join(', '))
   const [bcc, setBcc] = useState(initialBcc.join(', '))
   const [showCc, setShowCc] = useState(Boolean(initialCc.length))
   const [showBcc, setShowBcc] = useState(Boolean(initialBcc.length))
   const [subject, setSubject] = useState(initialDraft?.subject ?? seed?.subject ?? '')
-  const [text, setText] = useState(initialDraft?.text ?? seed?.text ?? '')
+  const [text, setText] = useState(initialText)
+  const signatureRef = useRef(initialSignature)
   const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null)
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialDraft?.attachments ?? []).map((attachment) => ({
@@ -152,12 +170,13 @@ export function Compose({
   }
 
   function hasContent(): boolean {
+    const body = text.trim()
     return Boolean(
       to.trim() ||
         cc.trim() ||
         bcc.trim() ||
         subject.trim() ||
-        text.trim() ||
+        (body && body !== signatureRef.current.trim()) ||
         attachments.length > 0,
     )
   }
@@ -207,6 +226,24 @@ export function Compose({
   useEffect(() => {
     persistRef.current = persistDraft
   })
+
+  useEffect(() => {
+    const next = signatureOf(
+      accounts.find((item) => item.id === accountId),
+      defaultSignature,
+    )
+    if (next === signatureRef.current) {
+      return
+    }
+    setText((current) => {
+      const trimmed = current.trim()
+      if (!trimmed || trimmed === signatureRef.current.trim()) {
+        return next
+      }
+      return current
+    })
+    signatureRef.current = next
+  }, [accountId, accounts, defaultSignature])
 
   async function saveDraftManually() {
     const saved = await persistDraft(false)

@@ -20,6 +20,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const email = await parseFull(loaded.bytes)
   const text = bodyText(email)
   const attachments = attachmentMeta(email)
+  const labels = await context.env.DB.prepare(
+    'SELECT label_id FROM message_labels WHERE message_id = ?',
+  )
+    .bind(id)
+    .all<{ label_id: string }>()
   const detail: MessageDetail = {
     id,
     accountId: loaded.account.id,
@@ -40,6 +45,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     html: email.html ?? null,
     attachments,
     size: loaded.bytes.byteLength,
+    labelIds: labels.results.map((row) => row.label_id),
   }
   return json({ message: detail })
 }

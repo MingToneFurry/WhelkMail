@@ -149,6 +149,14 @@ npx wrangler d1 execute mail-client --remote \
 
 You should see `accounts` and `messages`.
 
+If the database already existed before labels and signatures were added, apply the additive migration:
+
+```bash
+npm run db:migrate:remote
+```
+
+That runs `db/migrations/001_labels_signatures.sql`, which adds the `signature` column and creates the `labels`, `message_labels` and `app_settings` tables.
+
 If the database already existed before relay support was added, apply the additive migration:
 
 ```sql

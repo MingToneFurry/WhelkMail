@@ -1,15 +1,17 @@
 import { AlertCircle, Inbox, Paperclip } from 'lucide-react'
-import type { Folder, MessageSummary } from '../../shared/types'
+import type { Folder, Label, MessageSummary } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { accountLabelStyle, cn, formatDate, initials } from '../lib/utils'
+import { accountLabelStyle, cn, formatDate, initials, labelStyle } from '../lib/utils'
 
 interface MailListProps {
   messages: MessageSummary[]
+  labels: Label[]
   selectedId: string | null
   loading: boolean
   folder: Folder
   showAccount: boolean
   fullWidth?: boolean
+  className?: string
   onSelect: (id: string) => void
 }
 
@@ -23,11 +25,13 @@ function primaryLabel(message: MessageSummary, folder: Folder, fallback: string)
 
 export function MailList({
   messages,
+  labels,
   selectedId,
   loading,
   folder,
   showAccount,
   fullWidth = false,
+  className,
   onSelect,
 }: MailListProps) {
   const { t, locale } = useI18n()
@@ -47,6 +51,7 @@ export function MailList({
       className={cn(
         'flex w-full shrink-0 flex-col overflow-hidden rounded-tl-2xl border-t border-l border-line bg-white',
         !fullWidth && 'max-w-2xl',
+        className,
       )}
     >
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4 text-sm">
@@ -73,6 +78,9 @@ export function MailList({
         ) : (
           messages.map((message) => {
             const label = primaryLabel(message, folder, fallback)
+            const messageLabels = message.labelIds
+              .map((id) => labels.find((item) => item.id === id))
+              .filter((item): item is Label => Boolean(item))
             return (
               <button
                 type="button"
@@ -119,6 +127,22 @@ export function MailList({
                     <span className={cn('text-slate-700', message.unread && 'font-medium')}>
                       {message.subject || t('list.noSubject')}
                     </span>
+                    {messageLabels.slice(0, 2).map((item) => (
+                      <span
+                        key={item.id}
+                        className={cn(
+                          'ml-1.5 inline-block rounded px-1.5 py-0.5 align-middle text-[10px] font-medium',
+                          labelStyle(item.color),
+                        )}
+                      >
+                        {item.name}
+                      </span>
+                    ))}
+                    {messageLabels.length > 2 ? (
+                      <span className="ml-1 text-[10px] text-muted">
+                        +{messageLabels.length - 2}
+                      </span>
+                    ) : null}
                     {message.snippet ? <span className="text-muted"> — {message.snippet}</span> : null}
                   </p>
                 </div>

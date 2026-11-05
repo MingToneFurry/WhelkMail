@@ -1,26 +1,39 @@
-import { AlertCircle, ArrowLeft, Download, FileText, Mail, Reply, ReplyAll } from 'lucide-react'
-import type { MessageDetail } from '../../shared/types'
+import {
+  AlertCircle,
+  ArrowLeft,
+  Download,
+  FileText,
+  Mail,
+  Reply,
+  ReplyAll,
+  Tag,
+} from 'lucide-react'
+import type { Label, MessageDetail } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { displayAddress, formatBytes, formatDate } from '../lib/utils'
+import { cn, displayAddress, formatBytes, formatDate, labelStyle } from '../lib/utils'
 
 interface ReadingPaneProps {
   message: MessageDetail | null
+  labels: Label[]
   loading: boolean
   error: string | null
   rawUrl: string | null
   attachmentUrl: (index: number) => string
   onBack?: () => void
   onReply: (all: boolean) => void
+  onSetLabels: (labelIds: string[]) => void
 }
 
 export function ReadingPane({
   message,
+  labels,
   loading,
   error,
   rawUrl,
   attachmentUrl,
   onBack,
   onReply,
+  onSetLabels,
 }: ReadingPaneProps) {
   const { t, locale } = useI18n()
 
@@ -97,6 +110,24 @@ export function ReadingPane({
           ) : null}
           <div className="min-w-0">
             <h2 className="truncate text-xl font-medium">{message.subject || t('list.noSubject')}</h2>
+            {message.labelIds.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {message.labelIds.map((id) => {
+                  const item = labels.find((label) => label.id === id)
+                  return item ? (
+                    <span
+                      key={id}
+                      className={cn(
+                        'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                        labelStyle(item.color),
+                      )}
+                    >
+                      {item.name}
+                    </span>
+                  ) : null
+                })}
+              </div>
+            ) : null}
             <div className="mt-2 space-y-0.5 text-xs text-muted">
             <p>
               <span className="font-medium text-slate-600">{t('reading.from')}</span>{' '}
@@ -135,6 +166,48 @@ export function ReadingPane({
             <ReplyAll size={14} />
             {t('reading.replyAll')}
           </button>
+          <details className="relative">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+              <Tag size={14} />
+              {t('reading.labels')}
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-line bg-white p-2 shadow-lg">
+              {labels.length === 0 ? (
+                <p className="px-2 py-1 text-xs text-muted">{t('reading.noLabels')}</p>
+              ) : (
+                labels.map((label) => {
+                  const checked = message.labelIds.includes(label.id)
+                  return (
+                    <label
+                      key={label.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          onSetLabels(
+                            checked
+                              ? message.labelIds.filter((id) => id !== label.id)
+                              : [...message.labelIds, label.id],
+                          )
+                        }
+                        className="h-3.5 w-3.5"
+                      />
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                          labelStyle(label.color),
+                        )}
+                      >
+                        {label.name}
+                      </span>
+                    </label>
+                  )
+                })
+              )}
+            </div>
+          </details>
           {rawUrl ? (
             <a
               href={rawUrl}

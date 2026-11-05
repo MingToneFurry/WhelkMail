@@ -46,9 +46,35 @@ async function summariesFromImap(
       unread: folder === 'draft' ? false : !header.flags.some((flag) => flag.toLowerCase() === '\\seen'),
       hasAttachments: header.hasAttachments,
       status: folder === 'draft' ? 'draft' : 'sent',
+      labelIds: [],
     })
   }
   return summaries
+}
+
+async function applyLabels(
+  env: Env,
+  accountId: string,
+  folder: Folder,
+  messages: MessageSummary[],
+): Promise<void> {
+  if (messages.length === 0) {
+    return
+  }
+  const result = await env.DB.prepare(
+    'SELECT message_id, label_id FROM message_labels WHERE account_id = ? AND folder = ?',
+  )
+    .bind(accountId, folder)
+    .all<{ message_id: string; label_id: string }>()
+  const assignments = new Map<string, string[]>()
+  for (const row of result.results) {
+    const current = assignments.get(row.message_id) ?? []
+    current.push(row.label_id)
+    assignments.set(row.message_id, current)
+  }
+  for (const message of messages) {
+    message.labelIds = assignments.get(message.id) ?? []
+  }
 }
 
 async function summariesFromRelay(
@@ -93,11 +119,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       continue
     }
     try {
-      if (account.kind === 'imap') {
-        messages.push(...(await summariesFromImap(context.env, account, folder)))
-      } else {
-        messages.push(...(await summariesFromRelay(context.env, account, folder)))
-      }
+      const loaded =
+        account.kind === 'imap'
+          ? await summariesFromImap(context.env, account, folder)
+          : await summariesFromRelay(context.env, account, folder)
+      await applyLabels(context.env, account.id, folder, loaded)
+      messages.push(...loaded)
     } catch (error) {
       errors.push({
         accountId: account.id,

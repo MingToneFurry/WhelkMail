@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import type { LabelColor } from '../../shared/types'
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
@@ -78,6 +79,24 @@ const LABEL_STYLES = [
   'bg-cyan-50 text-cyan-700',
   'bg-lime-50 text-lime-700',
 ]
+
+export const LABEL_COLORS: { id: LabelColor; className: string; dot: string }[] = [
+  { id: 'blue', className: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
+  { id: 'emerald', className: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+  { id: 'amber', className: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+  { id: 'violet', className: 'bg-violet-50 text-violet-700', dot: 'bg-violet-500' },
+  { id: 'rose', className: 'bg-rose-50 text-rose-700', dot: 'bg-rose-500' },
+  { id: 'cyan', className: 'bg-cyan-50 text-cyan-700', dot: 'bg-cyan-500' },
+  { id: 'lime', className: 'bg-lime-50 text-lime-700', dot: 'bg-lime-500' },
+]
+
+export function labelStyle(color: LabelColor): string {
+  return LABEL_COLORS.find((item) => item.id === color)?.className ?? LABEL_COLORS[0].className
+}
+
+export function labelDot(color: LabelColor): string {
+  return LABEL_COLORS.find((item) => item.id === color)?.dot ?? LABEL_COLORS[0].dot
+}
 
 export function accountLabelStyle(id: string): string {
   let hash = 0
