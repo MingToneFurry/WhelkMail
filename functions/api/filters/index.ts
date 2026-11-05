@@ -21,7 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return json({ filters: await listFilters(context.env, url.searchParams.get('accountId')) })
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
@@ -32,7 +32,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return await createFilter(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }

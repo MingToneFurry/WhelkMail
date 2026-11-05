@@ -5,11 +5,12 @@ export function isSchemaError(error: unknown): boolean {
   return /no such (table|column)/i.test(message)
 }
 
-export function schemaOutdated(): Response {
+export function schemaOutdated(error?: unknown): Response {
+  const reason = error instanceof Error ? error.message : error ? String(error) : ''
   return fail(
     'Database schema is outdated',
     503,
-    'Run npm run db:migrate:remote (or npm run db:migrate:local) to create the labels, message_labels and app_settings tables.',
+    `${reason ? `${reason}. ` : ''}Run npm run db:migrate:remote (or npm run db:migrate:local) to update the labels and filters schema.`,
     'schema_outdated',
   )
 }

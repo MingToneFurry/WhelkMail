@@ -9,7 +9,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     return await updateLabel(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
@@ -62,7 +62,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     return await deleteLabel(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
@@ -81,30 +81,36 @@ async function deleteLabel(context: Parameters<PagesFunction<Env>>[0]): Promise<
     context.env.DB.prepare('DELETE FROM labels WHERE id = ?').bind(id),
   ]
   if (row.account_id) {
-    const filters = await context.env.DB.prepare(
-      'SELECT id, label_ids_json FROM filters WHERE account_id = ?',
-    )
-      .bind(row.account_id)
-      .all<{ id: string; label_ids_json: string }>()
-    for (const filter of filters.results) {
-      let labelIds: string[] = []
-      try {
-        labelIds = JSON.parse(filter.label_ids_json) as string[]
-      } catch {
-        continue
-      }
-      if (!labelIds.includes(id)) {
-        continue
-      }
-      const remaining = labelIds.filter((labelId) => labelId !== id)
-      statements.push(
-        remaining.length > 0
-          ? context.env.DB.prepare('UPDATE filters SET label_ids_json = ? WHERE id = ?').bind(
-              JSON.stringify(remaining),
-              filter.id,
-            )
-          : context.env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(filter.id),
+    try {
+      const filters = await context.env.DB.prepare(
+        'SELECT id, label_ids_json FROM filters WHERE account_id = ?',
       )
+        .bind(row.account_id)
+        .all<{ id: string; label_ids_json: string }>()
+      for (const filter of filters.results) {
+        let labelIds: string[] = []
+        try {
+          labelIds = JSON.parse(filter.label_ids_json) as string[]
+        } catch {
+          continue
+        }
+        if (!labelIds.includes(id)) {
+          continue
+        }
+        const remaining = labelIds.filter((labelId) => labelId !== id)
+        statements.push(
+          remaining.length > 0
+            ? context.env.DB.prepare('UPDATE filters SET label_ids_json = ? WHERE id = ?').bind(
+                JSON.stringify(remaining),
+                filter.id,
+              )
+            : context.env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(filter.id),
+        )
+      }
+    } catch (error) {
+      if (!isSchemaError(error)) {
+        throw error
+      }
     }
   }
   await context.env.DB.batch(statements)

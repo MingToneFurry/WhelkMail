@@ -26,7 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return json(await getSettings(context.env))
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
@@ -37,7 +37,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     return await updateSettings(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }

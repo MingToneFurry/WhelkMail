@@ -14,7 +14,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     return await updateFilter(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
@@ -81,7 +81,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     return json({ ok: true })
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }

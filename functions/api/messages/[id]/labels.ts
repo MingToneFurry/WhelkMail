@@ -31,7 +31,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     return await putLabels(context)
   } catch (error) {
     if (isSchemaError(error)) {
-      return schemaOutdated()
+      return schemaOutdated(error)
     }
     throw error
   }
