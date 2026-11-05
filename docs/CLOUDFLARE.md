@@ -155,7 +155,13 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql`, which adds the `signature` column and creates the `labels`, `message_labels` and `app_settings` tables.
+That runs `db/migrations/001_labels_signatures.sql` and `db/migrations/002_label_accounts_filters.sql`, which add the `signature` column, make labels account-scoped, and create the `labels`, `message_labels`, `app_settings` and `filters` tables.
+
+If the first migration was already applied, run only the second one:
+
+```bash
+npm run db:migrate:remote:2
+```
 
 If the database already existed before relay support was added, apply the additive migration:
 
@@ -335,7 +341,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` | Run `npm run db:migrate:remote` to apply the labels/signatures migration |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` | Run `npm run db:migrate:remote`; if the first migration was already applied, run `npm run db:migrate:remote:2` |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |
 | Relay 503 | Relay provider not configured for the account and no deployment fallback |

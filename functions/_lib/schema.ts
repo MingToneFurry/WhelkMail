@@ -2,7 +2,7 @@ import { fail } from './http'
 
 export function isSchemaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /no such table/i.test(message)
+  return /no such (table|column)/i.test(message)
 }
 
 export function schemaOutdated(): Response {

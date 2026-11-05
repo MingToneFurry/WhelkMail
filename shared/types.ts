@@ -8,9 +8,38 @@ export type LabelColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'cya
 
 export interface Label {
   id: string
+  accountId: string | null
   name: string
   color: LabelColor
   createdAt: string
+}
+
+export interface MailFilter {
+  id: string
+  accountId: string
+  name: string
+  from: string | null
+  to: string | null
+  subject: string | null
+  hasWords: string | null
+  doesntHave: string | null
+  hasAttachment: boolean
+  labelIds: string[]
+  enabled: boolean
+  createdAt: string
+}
+
+export interface FilterInput {
+  accountId?: string
+  name?: string
+  from?: string | null
+  to?: string | null
+  subject?: string | null
+  hasWords?: string | null
+  doesntHave?: string | null
+  hasAttachment?: boolean
+  labelIds?: string[]
+  enabled?: boolean
 }
 
 export type SignatureMode = 'shared' | 'per_account'
@@ -175,9 +204,11 @@ export interface AccountCreateInput {
   relayApiSecret?: string
   relayDomain?: string
   relayRegion?: string
+  labels?: string[]
 }
 
 export interface LabelInput {
+  accountId: string
   name: string
   color?: LabelColor
 }

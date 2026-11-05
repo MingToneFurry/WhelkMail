@@ -14,20 +14,31 @@ import { RELAY_PROVIDERS, findRelayProvider } from '../../shared/presets'
 import type {
   Account,
   AccountPatch,
+  FilterInput,
   HealthStatus,
+  Label,
+  LabelColor,
+  MailFilter,
   MailSecurity,
   SignatureMode,
   StorageOptions,
 } from '../../shared/types'
 import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
+import { FiltersSettings } from './FiltersSettings'
 
 interface SettingsProps {
   accounts: Account[]
+  labels: Label[]
+  filters: MailFilter[]
   storage: StorageOptions
   health: HealthStatus | null
   busyId: string | null
   error: string | null
+  onCreateFilter: (input: FilterInput) => Promise<boolean>
+  onUpdateFilter: (id: string, input: FilterInput) => void
+  onDeleteFilter: (id: string) => void
+  onCreateLabel: (name: string, color: LabelColor, accountId: string) => Promise<Label | null>
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
   onTest: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -528,10 +539,16 @@ function AccountSignatureEditor({ account, busy, onUpdate }: AccountSignatureEdi
 
 export function Settings({
   accounts,
+  labels,
+  filters,
   storage,
   health,
   busyId,
   error,
+  onCreateFilter,
+  onUpdateFilter,
+  onDeleteFilter,
+  onCreateLabel,
   onUpdate,
   onTest,
   onDelete,
@@ -721,6 +738,16 @@ export function Settings({
             </div>
           )}
         </div>
+
+        <FiltersSettings
+          accounts={accounts}
+          labels={labels}
+          filters={filters}
+          onCreateFilter={onCreateFilter}
+          onUpdateFilter={onUpdateFilter}
+          onDeleteFilter={onDeleteFilter}
+          onCreateLabel={onCreateLabel}
+        />
 
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">
           <p className="mb-3 text-sm font-medium">{t('settings.serverConfig')}</p>

@@ -5,10 +5,12 @@ import type {
   AppSettings,
   DraftPayload,
   DraftSavePayload,
+  FilterInput,
   Folder,
   HealthStatus,
   Label,
   LabelInput,
+  MailFilter,
   MessageDetail,
   MessageSummary,
   SendPayload,
@@ -80,8 +82,8 @@ export const api = {
   deleteAccount(id: string): Promise<{ ok: boolean }> {
     return request(`/api/accounts/${id}`, { method: 'DELETE' })
   },
-  labels(): Promise<{ labels: Label[] }> {
-    return request('/api/labels')
+  labels(accountId?: string): Promise<{ labels: Label[] }> {
+    return request(`/api/labels${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`)
   },
   createLabel(input: LabelInput): Promise<{ label: Label }> {
     return request('/api/labels', { method: 'POST', body: JSON.stringify(input) })
@@ -106,6 +108,23 @@ export const api = {
   },
   updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
     return request('/api/settings', { method: 'PATCH', body: JSON.stringify(input) })
+  },
+  filters(accountId?: string): Promise<{ filters: MailFilter[] }> {
+    return request(
+      `/api/filters${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
+    )
+  },
+  createFilter(input: FilterInput): Promise<{ filter: MailFilter }> {
+    return request('/api/filters', { method: 'POST', body: JSON.stringify(input) })
+  },
+  updateFilter(id: string, input: FilterInput): Promise<{ filter: MailFilter }> {
+    return request(`/api/filters/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  },
+  deleteFilter(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/filters/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
   testAccount(id: string): Promise<{ ok: boolean; checks?: Record<string, string> }> {
     return request(`/api/accounts/${id}/test`, { method: 'POST' })

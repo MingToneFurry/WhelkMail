@@ -4,7 +4,8 @@ Stato al 2026-11-05. Le voci sono ordinate per dipendenza tecnica consigliata.
 
 ## Completato
 
-- [x] Etichette personalizzate: creazione/eliminazione dalla sidebar, colori, assegnazione dal pannello di lettura e vista etichetta Gmail-style che raccoglie i messaggi da Inbox, Inviate e Bozze.
+- [x] Etichette personalizzate per account: creazione dalla sidebar, dall'editor filtri o durante l'aggiunta di un account; assegnazione dal pannello di lettura e vista etichetta Gmail-style da Inbox, Inviate e Bozze.
+- [x] Filtri Gmail-style in Impostazioni: criteri Da/A/Oggetto/parole/allegato e azione “applica etichetta”, con creazione/modifica/attivazione/eliminazione. Valutati al caricamento della Posta in arrivo.
 - [x] Firme: scelta tra firma unica per tutti gli account o firma diversa per ciascuno, inserimento automatico in nuove email e risposte.
 - [x] Vista mobile: sidebar a scomparsa, topbar responsive, pannello di lettura a schermo intero.
 - [x] Migrazione D1 per etichette/firme (`npm run db:migrate:remote`).

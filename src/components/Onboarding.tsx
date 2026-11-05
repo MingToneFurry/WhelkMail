@@ -33,6 +33,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
+  const [initialLabels, setInitialLabels] = useState('')
   const [presetId, setPresetId] = useState(initial.id)
   const [password, setPassword] = useState('')
   const [imapHost, setImapHost] = useState(initial.imapHost)
@@ -66,6 +67,14 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
   const microsoftReady = health?.microsoftConfigured ?? false
   const oauthReady =
     oauthProvider === 'google' ? googleReady : oauthProvider === 'microsoft' ? microsoftReady : false
+  const labelNames = [
+    ...new Set(
+      initialLabels
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 20)
 
   function applyPreset(id: string) {
     const next = findPreset(id)
@@ -114,6 +123,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
         oauthProvider: oauth ? oauthProvider : undefined,
         password: oauth ? undefined : password,
         autoSavesSent,
+        labels: labelNames.length > 0 ? labelNames : undefined,
       })
       if (account && oauth) {
         window.location.href =
@@ -146,6 +156,7 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
       relayApiSecret: relayApiSecret || undefined,
       relayDomain: relayDomain || undefined,
       relayRegion: relayRegion === 'eu' ? 'eu' : 'us',
+      labels: labelNames.length > 0 ? labelNames : undefined,
     })
   }
 
@@ -222,6 +233,17 @@ export function Onboarding({ storage, health, busy, error, onCancel, onCreate }:
               />
             </label>
           </div>
+
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-muted">{t('onboarding.labels')}</span>
+            <input
+              value={initialLabels}
+              onChange={(event) => setInitialLabels(event.target.value)}
+              placeholder={t('onboarding.labelsPlaceholder')}
+              className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
+            />
+            <span className="mt-1 block text-[11px] text-muted">{t('onboarding.labelsHint')}</span>
+          </label>
 
           {mode === 'imap' ? (
             <>

@@ -8,7 +8,8 @@ Mail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server:
 
 - Familiar webmail layout: message list with a full-width reading view and an optional right-side reading pane
 - Multiple accounts in one view, with colored address labels and quick filters
-- Custom labels: create them from the sidebar, apply them to any message, and open a Gmail-style label view that collects labeled messages across Inbox, Sent and Drafts
+- Gmail-style labels per account: create them from the sidebar or while adding an account, apply them to any message, and open a label view that collects labeled messages across Inbox, Sent and Drafts
+- Gmail-style filters in Settings: match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
 - Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
 - Mobile layout with a collapsible sidebar drawer
 - Inbox, Sent and Drafts, with autosave and reopenable drafts
@@ -45,6 +46,8 @@ If you already have a local database created before labels/signatures, run:
 ```bash
 npm run db:migrate:local
 ```
+
+If the first labels/signatures migration was already applied and you only need account-scoped labels and filters, run `npm run db:migrate:local:2`.
 
 Create `.dev.vars` in the project root:
 
@@ -124,6 +127,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - HTML bodies are displayed as extracted text; remote content is never loaded.
 - Last 30 messages per folder are listed; search is client-side over loaded messages.
 - A label view fetches the labeled UIDs from the provider across Inbox, Sent and Drafts; it does not mirror the whole mailbox locally.
+- Filters run when the inbox is loaded, not in the background. Matching uses From/To/Subject/snippet, not the full message body.
 - Email forwarding rules, contacts, push notifications and full-folder synchronization are not implemented yet.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.

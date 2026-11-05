@@ -118,7 +118,11 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 ### `labels` and `message_labels`
 
-`labels` stores the custom label definitions (name, color). `message_labels` stores assignments keyed by the app message id (`i_<account>.<folder>.<uid>` for IMAP, `r_<uuid>` for relay messages). IMAP assignments survive page reloads but refer to IMAP UIDs; if a mailbox changes UIDVALIDITY, reassign labels on affected messages. Deleting a label or an account removes the related assignments.
+`labels` stores the custom label definitions (account, name, color). Labels belong to an account namespace, like Gmail. `message_labels` stores assignments keyed by the app message id (`i_<account>.<folder>.<uid>` for IMAP, `r_<uuid>` for relay messages). IMAP assignments survive page reloads but refer to IMAP UIDs; if a mailbox changes UIDVALIDITY, reassign labels on affected messages. Deleting a label or an account removes the related assignments and filter references.
+
+### `filters`
+
+Gmail-style automatic filters. Each row belongs to one account and stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and an action list of label ids in `label_ids_json`. Enabled filters are evaluated when the inbox is listed; matching messages receive the action labels in `message_labels`. There is no background mailbox sync yet, so a filter runs only on messages that enter the loaded inbox window.
 
 ### `app_settings`
 
@@ -171,7 +175,9 @@ IMAP accounts never use external storage: attachments, Sent copies and drafts st
 
 Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the account bar filters by address. This is address-level labeling, not alias-level labeling.
 
-Custom labels are separate and user-defined. Create them from the sidebar, then apply them from the reading pane. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
+Custom labels are separate and user-defined, scoped to an account. They can be created from the sidebar, from the filter editor, or while adding an account. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
+
+Automatic filtering is managed in Settings → Filters. Criteria are ANDed, matching is case-insensitive, and the action applies one or more labels. Matching runs when the inbox is listed; it is not a background daemon. The match text covers sender, recipients, subject and snippet, not the full body.
 
 When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
 

@@ -15,8 +15,10 @@
     "preview": "vite preview",
     "db:local": "wrangler d1 execute mail-client --local --file=./db/schema.sql",
     "db:remote": "wrangler d1 execute mail-client --remote --file=./db/schema.sql",
-    "db:migrate:local": "wrangler d1 execute mail-client --local --file=./db/migrations/001_labels_signatures.sql",
-    "db:migrate:remote": "wrangler d1 execute mail-client --remote --file=./db/migrations/001_labels_signatures.sql",
+    "db:migrate:local": "wrangler d1 execute mail-client --local --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --local --file=./db/migrations/002_label_accounts_filters.sql",
+    "db:migrate:remote": "wrangler d1 execute mail-client --remote --file=./db/migrations/001_labels_signatures.sql && wrangler d1 execute mail-client --remote --file=./db/migrations/002_label_accounts_filters.sql",
+    "db:migrate:local:2": "wrangler d1 execute mail-client --local --file=./db/migrations/002_label_accounts_filters.sql",
+    "db:migrate:remote:2": "wrangler d1 execute mail-client --remote --file=./db/migrations/002_label_accounts_filters.sql",
     "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {

@@ -6,10 +6,12 @@ import type {
   AccountPatch,
   ComposeSeed,
   DraftPayload,
+  FilterInput,
   Folder,
   HealthStatus,
   Label,
   LabelColor,
+  MailFilter,
   MessageDetail,
   MessageSummary,
   SignatureMode,
@@ -41,6 +43,7 @@ export default function App() {
   const [fatal, setFatal] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [labels, setLabels] = useState<Label[]>([])
+  const [filters, setFilters] = useState<MailFilter[]>([])
   const [defaultSignature, setDefaultSignature] = useState('')
   const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
@@ -101,6 +104,10 @@ export default function App() {
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
   const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
+  const visibleLabels =
+    selectedAccountId === 'all'
+      ? labels
+      : labels.filter((item) => item.accountId === selectedAccountId || item.accountId === null)
   const showAccount = selectedAccountId === 'all' && accounts.length > 1
 
   const load = useCallback(async () => {
@@ -127,6 +134,14 @@ export default function App() {
         const settingsResponse = await api.settings()
         setDefaultSignature(settingsResponse.defaultSignature)
         setSignatureMode(settingsResponse.signatureMode)
+      } catch (error) {
+        if (error instanceof ApiError && error.isUnauthorized) {
+          throw error
+        }
+      }
+      try {
+        const filtersResponse = await api.filters()
+        setFilters(filtersResponse.filters)
       } catch (error) {
         if (error instanceof ApiError && error.isUnauthorized) {
           throw error
@@ -400,10 +415,17 @@ export default function App() {
       const response = await api.createAccount(input)
       setAccounts((current) => [...current, response.account])
       setSelectedAccountId(response.account.id)
+      setSelectedLabelId(null)
       setAddingAccount(false)
       setView('mail')
       setNotice(input.kind === 'imap' ? t('app.accountCreatedTest') : t('app.accountCreated'))
       setRefreshKey((key) => key + 1)
+      try {
+        const labelsResponse = await api.labels()
+        setLabels(labelsResponse.labels)
+      } catch {
+        // labels require the latest schema; the account is still usable
+      }
       return response.account
     } catch (error) {
       if (error instanceof ApiError && error.isUnauthorized) {
@@ -462,6 +484,8 @@ export default function App() {
     try {
       await api.deleteAccount(id)
       setAccounts((current) => current.filter((item) => item.id !== id))
+      setLabels((current) => current.filter((item) => item.accountId !== id))
+      setFilters((current) => current.filter((item) => item.accountId !== id))
       if (selectedAccountId === id) {
         setSelectedAccountId('all')
       }
@@ -473,14 +497,22 @@ export default function App() {
     }
   }
 
-  async function createLabel(name: string, color: LabelColor): Promise<boolean> {
+  async function createLabel(
+    name: string,
+    color: LabelColor,
+    accountId: string,
+  ): Promise<Label | null> {
+    if (!accountId) {
+      setNotice(tRef.current('labels.accountRequired'))
+      return null
+    }
     try {
-      const response = await api.createLabel({ name, color })
+      const response = await api.createLabel({ name, color, accountId })
       setLabels((current) => [...current, response.label])
-      return true
+      return response.label
     } catch (error) {
       setNotice(errorText(error, tRef.current))
-      return false
+      return null
     }
   }
 
@@ -492,6 +524,15 @@ export default function App() {
     try {
       await api.deleteLabel(id)
       setLabels((current) => current.filter((item) => item.id !== id))
+      setFilters((current) =>
+        current.flatMap((item) => {
+          if (!item.labelIds.includes(id)) {
+            return [item]
+          }
+          const labelIds = item.labelIds.filter((labelId) => labelId !== id)
+          return labelIds.length > 0 ? [{ ...item, labelIds }] : []
+        }),
+      )
       setMessages((current) =>
         current.map((message) => ({
           ...message,
@@ -508,6 +549,46 @@ export default function App() {
       }
     } catch (error) {
       setNotice(errorText(error, tRef.current))
+    }
+  }
+
+  async function createFilter(input: FilterInput) {
+    try {
+      const response = await api.createFilter(input)
+      setFilters((current) => [...current, response.filter])
+      setNotice(t('filters.created'))
+      setRefreshKey((key) => key + 1)
+      return true
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+      return false
+    }
+  }
+
+  async function updateFilter(id: string, input: FilterInput) {
+    try {
+      const response = await api.updateFilter(id, input)
+      setFilters((current) =>
+        current.map((item) => (item.id === id ? response.filter : item)),
+      )
+      setNotice(t('filters.updated'))
+      setRefreshKey((key) => key + 1)
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+    }
+  }
+
+  async function deleteFilter(id: string) {
+    const filter = filters.find((item) => item.id === id)
+    if (!filter || !window.confirm(t('filters.deleteConfirm', { name: filter.name }))) {
+      return
+    }
+    try {
+      await api.deleteFilter(id)
+      setFilters((current) => current.filter((item) => item.id !== id))
+      setNotice(t('filters.deleted'))
+    } catch (error) {
+      setSettingsError(errorText(error, t))
     }
   }
 
@@ -658,9 +739,11 @@ export default function App() {
     <div className="flex h-full">
       <Sidebar
         account={selectedAccount}
+        accounts={accounts}
+        selectedAccountId={selectedAccountId}
         view={view}
         folder={folder}
-        labels={labels}
+        labels={visibleLabels}
         selectedLabelId={selectedLabelId}
         mobileOpen={mobileSidebarOpen}
         onCompose={() => openCompose(null)}
@@ -683,6 +766,7 @@ export default function App() {
           query={query}
           onSelectAccount={(id) => {
             setSelectedAccountId(id)
+            setSelectedLabelId(null)
             setSelectedMessageId(null)
             setDetail(null)
           }}
@@ -720,6 +804,7 @@ export default function App() {
                   title={account.email}
                   onClick={() => {
                     setSelectedAccountId(account.id)
+                    setSelectedLabelId(null)
                     setSelectedMessageId(null)
                     setDetail(null)
                   }}
@@ -770,10 +855,16 @@ export default function App() {
         {view === 'settings' ? (
           <Settings
             accounts={accounts}
+            labels={labels}
+            filters={filters}
             storage={storage}
             health={health}
             busyId={settingsBusyId}
             error={settingsError}
+            onCreateFilter={createFilter}
+            onUpdateFilter={(id, input) => void updateFilter(id, input)}
+            onDeleteFilter={(id) => void deleteFilter(id)}
+            onCreateLabel={createLabel}
             onUpdate={updateAccount}
             onTest={testAccount}
             onDelete={deleteAccount}

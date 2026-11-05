@@ -117,7 +117,9 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     return fail('Account not found', 404, undefined, 'account_not_found')
   }
   await context.env.DB.batch([
+    context.env.DB.prepare('DELETE FROM filters WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM message_labels WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM labels WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ])
