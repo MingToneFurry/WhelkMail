@@ -44,7 +44,7 @@ function emailDocument(
   allowImages: boolean,
   cidMap: Map<string, string>,
 ): string {
-  const imgSrc = allowImages ? "'self' data: cid: https: http:" : 'data:'
+  const imgSrc = allowImages ? '* data: blob: cid:' : 'data:'
   const clean = html
     .replace(/\bsrc\s*=\s*(["'])cid:([^"']+)\1/gi, (match, quote: string, cid: string) => {
       let key = cid
@@ -59,6 +59,10 @@ function emailDocument(
     .replace(/<\s*(script|iframe|object|embed)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     .replace(/<\s*base[^>]*>/gi, '')
     .replace(/<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, '')
+    .replace(
+      /<meta[^>]+http-equiv\s*=\s*["']?content-security-policy["']?[^>]*>/gi,
+      '',
+    )
     .replace(/<a\b([^>]*)>/gi, (match, attrs: string) =>
       /\btarget\s*=/i.test(attrs)
         ? match.replace(/\btarget\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i, 'target="_blank"')
@@ -98,7 +102,9 @@ export function ReadingPane({
   })
   const frameRef = useRef<HTMLIFrameElement | null>(null)
   const html = message?.html?.trim() ?? ''
-  const hasImages = /<img\b/i.test(html)
+  const hasImages =
+    /(?:src|srcset)\s*=\s*["']?[^"'\s>]*(?:https?:|\/\/|cid:)/i.test(html) ||
+    /url\(\s*["']?(?:https?:|\/\/|cid:)/i.test(html)
   const showImages = imageState.id === message?.id ? imageState.show : false
   const frameHeight = frameState.id === message?.id ? frameState.height : 420
   const cidMap = new Map<string, string>()

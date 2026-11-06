@@ -360,15 +360,7 @@ export async function fetchMessage(
   return withImap(env, account, async (connection) => {
     const target = await targetFolder(env, connection, account, folder)
     await connection.select(target)
-    const bytes = await connection.fetchFull(uid)
-    if (markRead && (folder === 'inbox' || folder === 'spam')) {
-      try {
-        await connection.markSeen(uid)
-      } catch {
-        // non-blocking
-      }
-    }
-    return bytes
+    return connection.fetchFull(uid, markRead && (folder === 'inbox' || folder === 'spam'))
   })
 }
 

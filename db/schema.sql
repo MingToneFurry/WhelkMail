@@ -167,6 +167,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_imap_messages_uid ON imap_messages (accoun
 CREATE INDEX IF NOT EXISTS idx_imap_messages_list ON imap_messages (account_id, folder, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_imap_messages_stable ON imap_messages (account_id, stable_key);
 
+CREATE TABLE IF NOT EXISTS imap_body_cache (
+  message_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  folder TEXT NOT NULL,
+  uid INTEGER NOT NULL,
+  body BLOB NOT NULL,
+  size INTEGER NOT NULL,
+  cached_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_imap_body_cache_cached ON imap_body_cache (cached_at);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id TEXT PRIMARY KEY,
   endpoint TEXT NOT NULL UNIQUE,

@@ -386,13 +386,33 @@ export class ImapConnection {
     return headers
   }
 
-  async fetchFull(uid: number): Promise<Uint8Array> {
-    const { parts } = await this.command(`UID FETCH ${uid} (BODY.PEEK[])`)
+  async fetchFull(uid: number, markSeen = false): Promise<Uint8Array> {
+    const { parts } = await this.command(`UID FETCH ${uid} (BODY${markSeen ? '' : '.PEEK'}[])`)
     const part = parts.find((item) => item.literal)
     if (!part?.literal) {
       throw new ImapError(`Messaggio ${uid} non trovato`)
     }
     return part.literal
+  }
+
+  async fetchFullMany(uids: number[]): Promise<Map<number, Uint8Array>> {
+    const result = new Map<number, Uint8Array>()
+    if (uids.length === 0) {
+      return result
+    }
+    const { parts } = await this.command(
+      `UID FETCH ${uids.join(',')} (UID BODY.PEEK[])`,
+    )
+    for (const part of parts) {
+      if (!part.literal) {
+        continue
+      }
+      const match = part.line.match(/\bUID (\d+)/)
+      if (match) {
+        result.set(Number(match[1]), part.literal)
+      }
+    }
+    return result
   }
 
   async markSeen(uid: number): Promise<void> {

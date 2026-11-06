@@ -11,6 +11,7 @@ import { fail, json } from '../../_lib/http'
 import type { ImapHeader } from '../../_lib/imap/client'
 import { applyAccountLabel, applyFilters } from '../../_lib/filters'
 import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
+import { prefetchMessageBodies } from '../../_lib/mail/prefetch'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
 import { isSchemaError } from '../../_lib/schema'
@@ -390,6 +391,28 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       await applyFilters(context.env, account.id, loaded)
       await applyAccountLabel(context.env, account.id, account.incoming_label_id, loaded)
       messages.push(...loaded)
+      if (
+        account.kind === 'imap' &&
+        loaded.length > 0 &&
+        (accountId !== 'all' || account.id === accounts[0]?.id)
+      ) {
+        const maxPrefetch = accountId === 'all' ? 1 : 3
+        const prefetchIds = [...loaded]
+          .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+          .slice(0, maxPrefetch)
+          .map((message) => message.id)
+        if (prefetchIds.length > 0) {
+          context.waitUntil(
+            prefetchMessageBodies(
+              context.env,
+              account,
+              folder,
+              prefetchIds,
+              prefetchIds.length,
+            ).catch(() => undefined),
+          )
+        }
+      }
       console.log(
         `[messages] ${account.id}/${folder} mirror=${mirrorMs}ms live=${liveMs}ms labels=${Date.now() - accountStartedAt - mirrorMs - liveMs}ms sync=${needSync}`,
       )

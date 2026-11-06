@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import type { Account, AccountPatch, Folder, MailboxSyncState } from '../../shared/types'
 import { useI18n } from '../i18n'
@@ -31,7 +31,6 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const autoResumed = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -87,19 +86,6 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
       onSynced()
     }
   }
-
-  useEffect(() => {
-    if (loading || autoResumed.current) {
-      return
-    }
-    if (states.some((state) => state.status === 'partial')) {
-      autoResumed.current = true
-      const timer = window.setTimeout(() => {
-        void runSync()
-      }, 0)
-      return () => window.clearTimeout(timer)
-    }
-  })
 
   if (loading) {
     return <p className="mt-4 text-xs text-muted">{t('common.loading')}</p>

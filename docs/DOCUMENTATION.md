@@ -45,14 +45,15 @@ Key constraints:
 2. The list is served from the D1 mirror first. If the folder has never been synced, the request bootstraps the newest headers from IMAP; otherwise a stale folder returns the cached list immediately and schedules a background sync.
 3. The sync reads `UIDNEXT` from `SELECT` and fetches new UIDs plus bounded backfill windows instead of running `UID SEARCH ALL` on every pass. `BODYSTRUCTURE` is parsed locally to detect attachments without downloading message bodies.
 4. Headers are parsed with `postal-mime`; results from all accounts are merged and sorted. Relay accounts contribute their D1 `messages` rows.
+5. After the response, the server prefetches the newest few bodies (one message per account in the unified view, up to three for a selected account) into the D1 body cache with `UID FETCH ... (BODY.PEEK[])` on a single connection.
 
 ### Read a message
 
 1. `GET /api/messages/:id`
 2. The ID encodes the account, folder and UID (`i_<account>.<folder>.<uid>`) or a relay row (`r_<uuid>`).
-3. The raw MIME is fetched from IMAP or storage and parsed.
-4. Text, HTML and attachment metadata are returned. The message is marked `\Seen` for Inbox and Spam items.
-5. HTML is rendered by the client in a sandboxed iframe with a restrictive CSP; scripts and forms are disabled. Remote images are blocked by default and can be enabled per message. `cid:` images are rewritten to the authenticated attachment endpoint.
+3. The raw MIME is served from the D1 body cache when available, then from the R2/Drive archive, then from IMAP. A body fetched from IMAP or the archive is stored in the D1 cache (up to 512 KB) to make later opens and attachment requests fast.
+4. Text, HTML and attachment metadata are returned. The message is marked `\Seen` for Inbox and Spam items. Cache/archive hits update D1 immediately and mark the provider asynchronously, so the HTTP response does not wait for a second IMAP connection.
+5. HTML is rendered by the client in a sandboxed iframe with a restrictive CSP; scripts and forms are disabled. Remote images are blocked by default and can be enabled per message. Small `cid:` images are embedded as data URIs in the detail response; larger ones fall back to the authenticated attachment endpoint.
 
 ### Message actions
 
@@ -123,7 +124,7 @@ Important fields:
 
 ### `messages`
 
-Used for relay accounts: sent copies and drafts. IMAP messages are read live from the provider; the optional sync mirrors only their metadata into `imap_messages`, while full bodies stay on the provider unless archiving is enabled.
+Used for relay accounts: sent copies and drafts. IMAP messages are read from the provider and mirrored in `imap_messages`; the optional sync keeps metadata current, while recent bodies are held in the short-lived D1 cache. Full bodies are copied to R2/Drive only when long-term archiving is enabled.
 
 Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, storage key, attachment metadata and status.
 
@@ -147,9 +148,11 @@ The sync is resumable and chunked (40 metadata messages per request, 8 when body
 
 The folder list reads from `imap_messages` first. Opening a folder does not block on IMAP: if the mirror is stale, the request returns the cached list immediately and schedules a background sync; the frontend refreshes a few times while that sync runs. IMAP is only read synchronously on the first open of an account (empty mirror), then the sync fills D1. Sent, Drafts and Spam folder names are resolved once and stored in `accounts.sent_folder` / `accounts.drafts_folder` / `accounts.spam_folder`.
 
+`imap_body_cache` is a bounded, best-effort cache: message bodies up to 512 KB are kept for 3 days and cleaned opportunistically or by the cron worker. It never replaces the provider or the long-term archive; it only avoids repeated IMAP fetches for recently listed/opened messages.
+
 `accounts.auto_sync` enables the cron worker to advance Inbox, Sent, Drafts and Spam every 5 minutes. Each run processes one bounded chunk per folder and resumes on the next run. New IMAP accounts enable it by default; existing accounts can still rely on the sync scheduled when a folder is opened.
 
-`accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the archive when present and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
+`accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the D1 body cache first, then the archive, and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
 
 ### `push_subscriptions` and `push_prefs`
 
@@ -520,8 +523,8 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - No IMAP IDLE. Metadata sync is manual/chunked or opt-in automatic via the cron worker; Web Push also depends on that worker.
 - Folder lists are served from the D1 mirror (up to 100 messages); the first open of an account bootstraps from IMAP. Search is client-side over the loaded set.
 - No IMAP server-side search UI beyond the latest page.
-- HTML bodies are rendered in a sandboxed frame; remote images and tracking pixels are blocked until enabled per message. Inline `cid:` images require an attachment request, which is cheap with R2/Drive archiving but re-reads the message over IMAP when archiving is disabled.
-- Attachments are fetched by re-reading the full message on each download.
+- HTML bodies are rendered in a sandboxed frame; remote images and tracking pixels are blocked until enabled per message. Small inline `cid:` images are embedded in the detail response; larger ones fall back to the authenticated attachment endpoint, which uses the D1 body cache when the message fits.
+- Attachments for messages not in the D1 body cache are fetched by re-reading the full message. Messages up to 512 KB are cached after the first read; larger ones keep using the provider unless a long-term archive is configured.
 - No alias-based send-as; the sender is the account address.
 - Autosave requires the provider to accept `APPEND` in the Drafts folder; without `APPENDUID`, the new UID is resolved with a search, which can be ambiguous with concurrent clients.
 - Forwarding and provider cleanup only process new messages detected by the cron worker after the initial sync; failed attempts are logged but not retried automatically.
@@ -529,7 +532,7 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - Account deletion removes D1 rows and makes a best-effort cleanup of R2/Drive objects referenced in D1; it never deletes mail from the provider. Objects orphaned by failed writes may remain.
 - No per-user isolation or audit log. Login and 2FA rate limiting are present but per-IP only.
 - Generic API errors include a stable `code`; the UI translates it. Provider details (for example IMAP or relay responses) are shown to the authenticated admin to help debugging and are not exposed on public endpoints.
-- Attachment indicators in lists come from `BODYSTRUCTURE`; the body is still downloaded only when a message is opened.
+- Attachment indicators in lists come from `BODYSTRUCTURE`. The newest bodies are prefetched in the background and cached; other bodies are downloaded when a message is opened.
 
 ## 18. License
 

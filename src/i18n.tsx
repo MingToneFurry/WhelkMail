@@ -230,7 +230,7 @@ const en: Record<string, string> = {
   'settings.connectDrive': 'Connect Drive',
   'sync.title': 'Mailbox sync',
   'sync.hint':
-    'Mirrors message metadata in D1 so labels, filters and history work beyond the last 30 messages. Message bodies and attachments stay on the provider.',
+    'Folder opens sync automatically. Use this panel to complete the stored history, check progress or retry errors. Recent bodies are cached in D1 for a few days; long-term bodies stay on the provider unless archiving is enabled.',
   'sync.button': 'Sync now',
   'sync.running': 'Syncing…',
   'sync.progress': '{synced} of {total} messages',
@@ -242,9 +242,9 @@ const en: Record<string, string> = {
   'sync.status.partial': 'Partial',
   'sync.status.done': 'Completed',
   'sync.status.error': 'Error',
-  'sync.autoTitle': 'Automatic background sync',
+  'sync.autoTitle': 'Periodic sync (cron)',
   'sync.autoHint':
-    'The cron worker syncs Inbox, Sent and Drafts every 5 minutes. Requires the cron worker and CRON_SECRET.',
+    'Folder opens already sync automatically. This enables the cron worker every 5 minutes for Inbox, Sent, Drafts and Spam; it is also required for Web Push and forwarding. Requires the cron worker and CRON_SECRET.',
   'settings.archiveBodies': 'Archive bodies and attachments',
   'settings.archiveBodiesHint':
     'The sync also stores the raw EML in the selected storage. Opening and downloading messages can then use the archive.',
@@ -743,7 +743,7 @@ const it: Record<string, string> = {
   'settings.connectDrive': 'Collega Drive',
   'sync.title': 'Sincronizzazione casella',
   'sync.hint':
-    'Copia i metadati dei messaggi in D1 così etichette, filtri e cronologia funzionano oltre gli ultimi 30 messaggi. Corpi e allegati restano sul provider.',
+    'L’apertura di una cartella sincronizza automaticamente. Usa questo pannello per completare la cronologia salvata, controllare l’avanzamento o riprovare gli errori. I corpi recenti sono in cache D1 per alcuni giorni; quelli a lungo termine restano sul provider salvo archivio attivo.',
   'sync.button': 'Sincronizza ora',
   'sync.running': 'Sincronizzazione…',
   'sync.progress': '{synced} di {total} messaggi',
@@ -755,9 +755,9 @@ const it: Record<string, string> = {
   'sync.status.partial': 'Parziale',
   'sync.status.done': 'Completata',
   'sync.status.error': 'Errore',
-  'sync.autoTitle': 'Sincronizzazione automatica in background',
+  'sync.autoTitle': 'Sincronizzazione periodica (cron)',
   'sync.autoHint':
-    'Il worker cron sincronizza Posta in arrivo, Inviate e Bozze ogni 5 minuti. Richiede il worker cron e CRON_SECRET.',
+    'L’apertura di una cartella sincronizza già automaticamente. Questa opzione abilita il worker cron ogni 5 minuti per Posta in arrivo, Inviate, Bozze e Spam; serve anche per Web Push e inoltro. Richiede il worker cron e CRON_SECRET.',
   'settings.archiveBodies': 'Archivia corpi e allegati',
   'settings.archiveBodiesHint':
     'La sync salva anche l’EML originale nello storage selezionato. Apertura e download dei messaggi possono usare l’archivio.',

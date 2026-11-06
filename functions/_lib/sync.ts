@@ -461,6 +461,12 @@ export async function runSyncChunk(
           folder,
         ),
       ])
+      await env.DB.prepare(
+        'DELETE FROM imap_body_cache WHERE account_id = ? AND folder = ?',
+      )
+        .bind(account.id, folder)
+        .run()
+        .catch(() => undefined)
       maxUid = 0
       minUid = 0
       backfillDone = false
