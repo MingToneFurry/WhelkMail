@@ -78,82 +78,84 @@ export function Topbar({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        title={t('topbar.settings')}
-        aria-label={t('topbar.settings')}
-        className="rounded-full p-2 text-muted hover:bg-slate-200/60"
-      >
-        <Settings size={20} />
-      </button>
-
-      <div className="relative" ref={menuRef}>
+      <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <button
           type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          title={t('topbar.accountMenu')}
-          aria-label={t('topbar.accountMenu')}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white hover:bg-brand-strong"
+          onClick={onOpenSettings}
+          title={t('topbar.settings')}
+          aria-label={t('topbar.settings')}
+          className="rounded-full p-2 text-muted hover:bg-slate-200/60"
         >
-          {initials(account?.displayName ?? account?.email ?? t('sidebar.all'))}
+          <Settings size={20} />
         </button>
 
-        {menuOpen ? (
-          <div
-            role="menu"
-            className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg"
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            title={t('topbar.accountMenu')}
+            aria-label={t('topbar.accountMenu')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white hover:bg-brand-strong"
           >
-            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              {t('topbar.accounts')}
-            </p>
-            <button
-              type="button"
-              role="menuitemradio"
-              aria-checked={selectedAccountId === 'all'}
-              onClick={() => selectAccount('all')}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50',
-                selectedAccountId === 'all' ? 'text-brand-strong' : 'text-slate-700',
-              )}
+            {initials(account?.displayName ?? account?.email ?? t('sidebar.all'))}
+          </button>
+
+          {menuOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg"
             >
-              <span className="min-w-0 flex-1 truncate">{t('topbar.allAccounts')}</span>
-              {selectedAccountId === 'all' ? <Check size={14} className="shrink-0" /> : null}
-            </button>
-            {accounts.map((item) => (
+              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                {t('topbar.accounts')}
+              </p>
               <button
-                key={item.id}
                 type="button"
                 role="menuitemradio"
-                aria-checked={selectedAccountId === item.id}
-                onClick={() => selectAccount(item.id)}
+                aria-checked={selectedAccountId === 'all'}
+                onClick={() => selectAccount('all')}
                 className={cn(
                   'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50',
-                  selectedAccountId === item.id ? 'text-brand-strong' : 'text-slate-700',
+                  selectedAccountId === 'all' ? 'text-brand-strong' : 'text-slate-700',
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">{item.email}</span>
-                {selectedAccountId === item.id ? <Check size={14} className="shrink-0" /> : null}
+                <span className="min-w-0 flex-1 truncate">{t('topbar.allAccounts')}</span>
+                {selectedAccountId === 'all' ? <Check size={14} className="shrink-0" /> : null}
               </button>
-            ))}
+              {accounts.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selectedAccountId === item.id}
+                  onClick={() => selectAccount(item.id)}
+                  className={cn(
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50',
+                    selectedAccountId === item.id ? 'text-brand-strong' : 'text-slate-700',
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate">{item.email}</span>
+                  {selectedAccountId === item.id ? <Check size={14} className="shrink-0" /> : null}
+                </button>
+              ))}
 
-            <div className="my-1 border-t border-line" />
+              <div className="my-1 border-t border-line" />
 
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false)
-                onLogout()
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-slate-50 hover:text-slate-800"
-            >
-              <LogOut size={15} /> {t('topbar.logout')}
-            </button>
-          </div>
-        ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onLogout()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-slate-50 hover:text-slate-800"
+              >
+                <LogOut size={15} /> {t('topbar.logout')}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   )
