@@ -1,6 +1,7 @@
 # Copy this file to wrangler.toml and replace the placeholders with your own values.
 # Do not commit the real wrangler.toml of a personal deployment: database_id and
-# bucket names are account-scoped resource identifiers.
+# bucket names are account-scoped resource identifiers. For GitHub deployments,
+# configure the DB binding in the Pages dashboard instead.
 
 name = "whelkmail"
 compatibility_date = "2026-11-01"
@@ -13,7 +14,9 @@ RELAY_PROVIDER = "smtp2go"
 binding = "DB"
 # The npm db:* scripts use "mail-client"; change both if you name it differently.
 database_name = "mail-client"
-database_id = "<your-d1-database-id>"
+# Local development can use this placeholder. Replace it with your D1 ID for
+# remote CLI commands and Pages deployments.
+database_id = "00000000-0000-0000-0000-000000000000"
 
 # Optional: enable the R2 body/attachment archive.
 # Create the bucket first, then uncomment this binding.
@@ -36,4 +39,5 @@ database_id = "<your-d1-database-id>"
 #   npx wrangler pages secret put RELAY_API_SECRET --project-name whelkmail
 #   npx wrangler pages secret put VAPID_PUBLIC_KEY --project-name whelkmail
 #   npx wrangler pages secret put VAPID_PRIVATE_KEY --project-name whelkmail
+#   npx wrangler pages secret put VAPID_SUBJECT --project-name whelkmail
 #   npx wrangler pages secret put CRON_SECRET --project-name whelkmail

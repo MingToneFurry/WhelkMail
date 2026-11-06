@@ -33,7 +33,10 @@ This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do 
 npx wrangler d1 create mail-client
 ```
 
-The command prints a `database_id`. Put it in `wrangler.toml`:
+The command prints a `database_id`. Use it in one of two ways:
+
+- **GitHub deployment:** set the `DB` binding in the Pages dashboard; `wrangler.toml` can stay local and untracked.
+- **CLI/local:** copy `wrangler.toml.example` to `wrangler.toml` and paste the ID:
 
 ```toml
 [[d1_databases]]
@@ -42,7 +45,7 @@ database_name = "mail-client"
 database_id = "<paste-the-database-id-here>"
 ```
 
-Do not leave the placeholder `00000000-0000-0000-0000-000000000000`, or the deployed Functions will fail.
+The zero UUID in the example is fine for local development. For remote CLI commands and for deployments that read `wrangler.toml`, replace it with the real D1 ID or the Functions will fail.
 
 > The D1 database intentionally keeps the legacy name `mail-client` so existing deployments and data continue to work after the whelkmail rebrand. Only the Pages project is named `whelkmail`.
 
@@ -254,7 +257,7 @@ npm run deploy
 
 `npm run deploy` runs `npm run build` and then `wrangler pages deploy dist`.
 
-With CLI deployments, bindings and secrets are read from the project configuration. Create the D1 binding in the dashboard or keep `wrangler.toml` in sync.
+With CLI deployments, bindings and secrets come from the project configuration and your local `wrangler.toml`. With GitHub deployments, configure the D1 binding and secrets in the Pages dashboard instead; keep `wrangler.toml` local and untracked.
 
 ## 3. OAuth setup
 
@@ -335,7 +338,9 @@ If the binding is absent, the R2 option is hidden in the UI.
 ## 5. Verification checklist
 
 - `GET /api/health` returns `ok: true`.
-- Login succeeds with `APP_PASSWORD`.
+- Login succeeds with `APP_PASSWORD` (plus the TOTP code if 2FA is enabled).
+- Optional: 2FA can be enabled in Settings → Security, and a recovery code can complete the login.
+- Security headers are present on `/` and `/api/health`.
 - **Test connection** succeeds for an IMAP account.
 - Sending adds a copy to the provider Sent folder (or the app appends it when `auto_saves_sent` is off).
 - A draft can be saved, reopened and deleted.
@@ -369,19 +374,19 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 
 ### Secret rotation
 
-- Rotating `APP_PASSWORD` invalidates the next login only; existing session cookies remain valid until they expire.
-- Rotating `TOKEN_ENC_KEY` invalidates all stored credentials. Users must re-enter passwords and reconnect OAuth accounts.
+- Rotating `APP_PASSWORD` does not revoke existing sessions automatically; they remain valid until their 7-day expiry. To revoke all sessions immediately, delete the rows in `sessions` (or change `TOKEN_ENC_KEY`, which also invalidates credentials).
+- Rotating `TOKEN_ENC_KEY` invalidates all stored credentials, sessions and pending OAuth states. Users must re-enter passwords and reconnect OAuth accounts.
 
 ## 7. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
-| `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
+| `database_id` placeholder error | Replace the placeholder in the local `wrangler.toml`, or set the `DB` binding in the Pages dashboard |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
 | `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` / `sessions` / `login_attempts` / `oauth_states` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:12` |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` / `auto_sync` / `delete_after_archive` / `forward_to_json` | Run `npm run db:migrate:remote`, or apply the missing `006`–`011` migrations in order |
-| 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
-| 500 on every API call | Missing `DB` binding or missing secrets |
+| 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, site not served over HTTPS, or the `sessions` table missing (run `npm run db:migrate:remote:12`) |
+| 500 on every API call | Missing `DB` binding, missing secrets, or missing security tables |
 | Relay 503 | Relay provider not configured for the account and no deployment fallback |
 | Google OAuth 503 | `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` missing |
 | Microsoft OAuth 503 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` missing |

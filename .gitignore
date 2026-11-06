@@ -16,6 +16,8 @@ dist-ssr
 .env.*
 !.env.example
 .wrangler
+# Personal deployment config; use wrangler.toml.example as a template.
+wrangler.toml
 
 # Editor directories and files
 .vscode/*

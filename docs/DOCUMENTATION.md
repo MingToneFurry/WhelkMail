@@ -86,7 +86,7 @@ functions/                 Cloudflare Pages Functions
 shared/                    Types, Zod schemas, provider presets
 src/                       React application
 db/schema.sql              D1 schema
-wrangler.toml              Pages project and D1 binding
+wrangler.toml.example      local Pages/D1 configuration template
 ```
 
 ## 5. Data model
@@ -221,7 +221,7 @@ Each account can also define an `incoming_label_id`. When the inbox is listed, e
 
 Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed and matching is case-insensitive. Actions can apply one or more labels, forward to recipients, or both, like Gmail. Matching runs when the inbox is listed and when the cron worker syncs new inbox messages. The match text covers sender, recipients, subject and snippet, not the full body.
 
-When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. A full local mirror (see the TODO) would make label assignments stable across moves.
+When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. The optional IMAP metadata sync mirrors headers and UIDs, but labels still follow the UID, so a move can lose the local assignment until the message is labeled again.
 
 ## 10. PWA and Web Push
 
@@ -312,7 +312,7 @@ npm run lint
 npx wrangler d1 create mail-client
 ```
 
-Copy the returned `database_id` into `wrangler.toml`:
+Copy the returned `database_id` into your local `wrangler.toml` (gitignored; start from `wrangler.toml.example`), or configure the `DB` binding in the Pages dashboard:
 
 ```toml
 [[d1_databases]]
@@ -516,9 +516,9 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - Autosave requires the provider to accept `APPEND` in the Drafts folder; without `APPENDUID`, the new UID is resolved with a search, which can be ambiguous with concurrent clients.
 - Forwarding and provider cleanup only process new messages detected by the cron worker after the initial sync; failed attempts are logged but not retried automatically.
 - Provider cleanup moves messages to Trash and requires archive; it never performs a permanent delete from the provider.
-- Account deletion does not delete provider mail or relay storage objects (except messages already moved by provider cleanup).
-- No per-user isolation, rate limiting, or audit log.
-- Generic API errors include a stable `code`; the UI translates it. Provider details (for example IMAP or relay responses) are shown verbatim.
+- Account deletion removes D1 rows and makes a best-effort cleanup of R2/Drive objects referenced in D1; it never deletes mail from the provider. Objects orphaned by failed writes may remain.
+- No per-user isolation or audit log. Login and 2FA rate limiting are present but per-IP only.
+- Generic API errors include a stable `code`; the UI translates it. Provider details (for example IMAP or relay responses) are shown to the authenticated admin to help debugging and are not exposed on public endpoints.
 - Attachment indicators in lists come from `BODYSTRUCTURE`; the body is still downloaded only when a message is opened.
 
 ## 18. License

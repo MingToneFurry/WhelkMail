@@ -1,37 +1,70 @@
 # WhelkMail
 
-A self-hosted webmail client for mailboxes you already own.
+**Your mailboxes. Your domain. One calm inbox.**
 
-WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail server: it connects to your providers over IMAP and SMTP, so your messages, sent copies, drafts and attachments stay on your mail provider. A separate "send-only" account type supports domains that have no SMTP, using an HTTP relay and an optional Google Drive or Cloudflare R2 archive.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white)](https://pages.cloudflare.com)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-yes-success.svg)](#using-this-repository)
 
-## Features
+WhelkMail is a self-hosted webmail client for the IMAP and SMTP accounts you already own. It runs entirely on Cloudflare Pages and Workers, so there is no mail server to operate and no infrastructure to babysit.
 
-- Familiar webmail layout: message list with a full-width reading view and an optional right-side reading pane
-- Multiple accounts in one view, with colored address labels and quick filters
-- Gmail-style labels shared across all accounts: create them from the sidebar, apply them to any message, and open a label view that collects labeled messages across Inbox, Sent and Drafts
-- Per-account incoming label: choose it while adding an account (or in Settings) so every incoming message of that account is labeled automatically
-- Gmail-style filters in Settings: shared across accounts, match From/To/Subject/words/attachments and apply one or more labels automatically to incoming messages
-- Contacts: shared address book with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc
-- IMAP metadata sync into D1: incremental, chunked and resumable, with per-account status in Settings, automatic resume of partial syncs, and label transfer when messages move between folders.
-- Optional automatic background sync per account: the cron worker advances Inbox, Sent and Drafts every 5 minutes in bounded chunks.
-- Optional archive of IMAP bodies and attachments on R2 or Google Drive: when enabled per account, the sync stores the raw EML and opening/downloading messages can use the archive instead of the provider.
-- Gmail-style filter actions: a filter can apply labels and/or forward matching incoming messages, with the original EML attached, anti-loop headers and per-filter forward logs.
-- Optional provider cleanup after archiving: archived incoming messages are moved to the provider Trash instead of being permanently deleted, with explicit opt-in and logs.
-- Signatures: choose one shared signature for every account or a different signature per account; inserted automatically in new messages and replies
-- Installable PWA with an app-shell service worker and Web Push notifications, including per-account/folder preferences
-- Mobile layout with a collapsible sidebar drawer
-- Inbox, Sent and Drafts, with autosave and reopenable drafts
-- Sending through each account's own SMTP server
-- Drafts saved on the provider (IMAP `\Drafts`) or on Drive/R2 for relay accounts
-- Attachment indicators in lists via `BODYSTRUCTURE`, without downloading bodies
-- Google OAuth2 or app passwords for Google accounts
-- Microsoft OAuth2 (XOAUTH2) for Outlook / Microsoft 365
-- Password / app-password authentication for Yahoo, iCloud and generic IMAP
-- Optional two-factor authentication (TOTP, RFC 6238) from Settings → Security, disabled by default and compatible with any authenticator app; one-time recovery codes
-- Login rate limiting and server-side revocable sessions (7-day TTL)
-- MIME handling with attachments, streamed on demand
-- English by default, Italian available; extensible dictionary
-- MIT licensed
+Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a familiar, Gmail-style interface on top of the mailboxes you already use. Messages, sent copies, drafts and attachments stay on your provider unless you explicitly enable the optional archive.
+
+> **WhelkMail is not a mail server.** It talks IMAP and SMTP to the providers you already trust.
+
+[Quick start](#quick-start) · [Deploy on Cloudflare](#deploy-on-cloudflare) · [Security](#security) · [Documentation](#documentation)
+
+## Why WhelkMail
+
+- **One inbox, many accounts.** Gmail, Outlook, iCloud, Yahoo and custom domains side by side, with colored account labels and a shared address book.
+- **Cloudflare-native.** Pages Functions, D1, R2 and `cloudflare:sockets`: no VPS, no container, no mail server to patch.
+- **Your data stays put.** By default the client reads from the provider and does not copy bodies; the archive on R2 or Google Drive is strictly opt-in.
+- **Privacy by default.** HTML email is rendered as text, remote images and tracking pixels are never loaded, and credentials are encrypted at rest.
+- **Actually yours.** Self-hosted, MIT licensed, no telemetry, no vendor account required beyond your Cloudflare project.
+
+## What you get
+
+### Inbox experience
+
+- Message list with a full-width reading view or an optional right-side reading pane.
+- Inbox, Sent and Drafts with autosave and reopenable drafts.
+- Attachment indicators from `BODYSTRUCTURE`, without downloading the body up front.
+- Installable PWA, mobile drawer layout and Web Push notifications with per-account/folder preferences.
+- English by default, Italian available; the dictionary is extensible.
+
+### Accounts and sending
+
+- Multiple accounts in one view, each with its own IMAP/SMTP servers and credentials.
+- Password, app-password, Google OAuth2 and Microsoft OAuth2 (XOAUTH2) authentication.
+- Sending through each account's own SMTP server.
+- Send-only "relay" accounts (SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmark) for domains without SMTP, with sent/draft archive on Drive or R2.
+- Optional archive and provider cleanup for IMAP: archive bodies and attachments, then move the original to the provider Trash.
+
+### Organization
+
+- Gmail-style labels shared across all accounts, with a label view that collects messages from Inbox, Sent and Drafts.
+- Per-account incoming labels applied automatically.
+- Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc.
+- Signatures: one shared signature or a different signature per account.
+
+### Automation
+
+- Gmail-style filters shared across accounts: match From/To/Subject/words/attachments and apply labels and/or forward the original EML.
+- Incremental, resumable IMAP metadata sync into D1, with per-account status and automatic resume.
+- Optional background sync through the cron worker every 5 minutes.
+- Anti-loop forwarding headers, per-filter forward logs and deletion logs.
+
+## Security
+
+- Single deployment password plus optional **TOTP two-factor authentication** (RFC 6238) from Settings → Security, disabled by default and compatible with any authenticator app. Recovery codes are shown once and stored hashed.
+- Random server-side sessions stored as SHA-256 hashes in D1, 7-day TTL, real revocation on logout.
+- Login and 2FA rate limiting per IP.
+- AES-256-GCM encryption for IMAP/SMTP passwords, OAuth refresh tokens and relay keys; HKDF-derived keys for session and challenge signatures.
+- One-time OAuth state stored in D1 plus PKCE (`S256`) for Google, Microsoft and Drive.
+- CSP, HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy` on static assets and API responses.
+- HTML bodies displayed as text and remote content never loaded.
+
+See [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) for the full threat model and [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md) for the deployment checklist.
 
 ## Stack
 
@@ -39,25 +72,22 @@ WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Cloudflare Pages Functions (Workers runtime)
 - Cloudflare D1 for accounts and metadata
 - `cloudflare:sockets` for IMAP/SMTP
-- Optional Cloudflare R2 or Google Drive for send-only accounts
+- Optional Cloudflare R2 or Google Drive for archive
 - `postal-mime` for MIME parsing
 
 ## Quick start
 
-Requirements: Node.js 22+, npm.
+Requirements: Node.js 22+ and npm.
 
 ```bash
 npm install
+cp wrangler.toml.example wrangler.toml
 npm run db:local
 ```
 
-If you already have a local database created before labels/signatures, run:
+The example uses a placeholder D1 ID; for local development that is fine. For a real deployment, create your own database and replace it (or configure the `DB` binding in the Pages dashboard).
 
-```bash
-npm run db:migrate:local
-```
-
-If earlier migrations were already applied and you only need the security changes (sessions, 2FA rate limiting, one-time OAuth state), run `npm run db:migrate:local:12`. This invalidates existing sessions.
+If you already have a local database created before labels/signatures, run `npm run db:migrate:local`. If you only need the security tables (sessions, rate limiting, OAuth state), run `npm run db:migrate:local:12`; existing sessions are invalidated.
 
 Create `.dev.vars` in the project root:
 
@@ -81,17 +111,27 @@ npm run dev:api   # Pages Functions on http://localhost:8788
 
 Open `http://localhost:8788` and sign in with `APP_PASSWORD`.
 
+## Using this repository
+
+This project is meant to be self-hosted. Do not point your deployment at someone else's database or secrets:
+
+- use **Use this template** (or a fork) to create your own copy;
+- create your own D1 database and run the migrations;
+- set your own secrets in the Cloudflare dashboard;
+- keep `wrangler.toml` local (it is gitignored) or configure the `DB` binding in the dashboard. Start from `wrangler.toml.example`.
+
 ## Deploy on Cloudflare
 
 The complete guide — dashboard clicks, exact commands, bindings, secrets, OAuth apps and troubleshooting — is in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
 
 Short version:
 
-1. Create the database and copy its ID into `wrangler.toml`:
+1. Create the database and configure the D1 binding. For local/CLI work, copy the example and paste your own ID:
    ```bash
+   cp wrangler.toml.example wrangler.toml
    npx wrangler d1 create mail-client
    ```
-   The D1 database keeps the legacy `mail-client` name so existing data keeps working; the Pages project is named `whelkmail`.
+   The D1 database keeps the legacy `mail-client` name so existing data keeps working; the Pages project is named `whelkmail`. Do not commit `wrangler.toml`: for GitHub deployments, set the `DB` binding in the Pages dashboard instead.
 2. Create a Pages project from GitHub. Build settings:
    - Build command: `npm run build`
    - Output directory: `dist`
@@ -102,10 +142,11 @@ Short version:
    ```bash
    npm run db:remote
    ```
-   If the database already existed before labels and signatures were added, also run the additive migrations:
+   If the database already existed before labels and signatures were added, run the additive migrations too:
    ```bash
    npm run db:migrate:remote
    ```
+   If you only need the security tables, run `npm run db:migrate:remote:12`.
 5. Optional Web Push:
    ```bash
    npm run vapid
@@ -147,7 +188,10 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Filters run when the inbox is loaded and when the cron worker syncs new inbox messages. Matching uses From/To/Subject/snippet, not the full message body.
 - Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync.
 - No alias-based "send as" yet: the sender is the account address.
-- Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
+- Single shared `APP_PASSWORD` (with optional TOTP); this is a personal / small-team tool, not a multi-tenant service.
+- Login rate limiting is per IP and best-effort, not a substitute for Cloudflare Access or a WAF.
+- Account deletion removes D1 rows and makes a best-effort cleanup of R2/Drive objects referenced in D1; it never deletes mail from the provider.
+- Provider error details are returned to the authenticated admin to help with IMAP/SMTP setup.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
 - Google OAuth uses the restricted `https://mail.google.com/` scope. A public production app needs Google verification (CASA); personal/testing apps can use OAuth in Testing mode, where refresh tokens expire after 7 days. App passwords remain available as an alternative.
 
