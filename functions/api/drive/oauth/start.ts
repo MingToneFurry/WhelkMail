@@ -1,4 +1,4 @@
-import { createOAuthState } from '../../../_lib/crypto'
+import { createOAuthState, pkceChallenge, randomToken } from '../../../_lib/crypto'
 import { getAccountRow } from '../../../_lib/db'
 import { buildAuthorizeUrl } from '../../../_lib/drive/oauth'
 import type { Env } from '../../../_lib/env'
@@ -18,6 +18,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return fail('Account not found', 404, undefined, 'account_not_found')
   }
   const redirectUri = `${url.origin}/api/drive/oauth/callback`
-  const state = await createOAuthState(context.env, accountId)
-  return Response.redirect(buildAuthorizeUrl(context.env, redirectUri, state), 302)
+  const verifier = randomToken(32)
+  const state = await createOAuthState(context.env, accountId, 'drive', verifier)
+  const challenge = await pkceChallenge(verifier)
+  return Response.redirect(buildAuthorizeUrl(context.env, redirectUri, state, challenge), 302)
 }

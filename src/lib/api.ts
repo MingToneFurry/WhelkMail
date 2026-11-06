@@ -13,6 +13,7 @@ import type {
   HealthStatus,
   Label,
   LabelInput,
+  LoginResult,
   MailboxSyncState,
   MailFilter,
   MessageDetail,
@@ -21,6 +22,9 @@ import type {
   PushSubscriptionInput,
   SendPayload,
   StorageOptions,
+  TotpEnableResult,
+  TotpSetup,
+  TwoFactorStatus,
 } from '../../shared/types'
 
 export class ApiError extends Error {
@@ -64,8 +68,32 @@ export interface AccountError {
 }
 
 export const api = {
-  login(password: string): Promise<{ ok: boolean }> {
+  login(password: string): Promise<LoginResult> {
     return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) })
+  },
+  loginTwoFactor(challenge: string, code: string): Promise<{ ok: boolean }> {
+    return request('/api/auth/2fa', {
+      method: 'POST',
+      body: JSON.stringify({ challenge, code }),
+    })
+  },
+  totpStatus(): Promise<TwoFactorStatus> {
+    return request('/api/auth/totp')
+  },
+  totpSetup(): Promise<TotpSetup> {
+    return request('/api/auth/totp', { method: 'POST', body: JSON.stringify({ action: 'setup' }) })
+  },
+  totpEnable(code: string): Promise<TotpEnableResult> {
+    return request('/api/auth/totp', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'enable', code }),
+    })
+  },
+  totpDisable(password: string, code: string): Promise<{ ok: boolean }> {
+    return request('/api/auth/totp', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'disable', password, code }),
+    })
   },
   logout(): Promise<{ ok: boolean }> {
     return request('/api/auth/logout', { method: 'POST' })

@@ -1,4 +1,4 @@
-import { createOAuthState } from '../../../_lib/crypto'
+import { createOAuthState, pkceChallenge, randomToken } from '../../../_lib/crypto'
 import { getAccountRow } from '../../../_lib/db'
 import type { Env } from '../../../_lib/env'
 import { buildGoogleAuthorizeUrl, googleMailConfigured } from '../../../_lib/google/oauth'
@@ -21,6 +21,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return fail('Invalid OAuth provider', 400, undefined, 'oauth_invalid_provider')
   }
   const redirectUri = `${url.origin}/api/google/oauth/callback`
-  const state = await createOAuthState(context.env, accountId)
-  return Response.redirect(buildGoogleAuthorizeUrl(context.env, redirectUri, state, row.email), 302)
+  const verifier = randomToken(32)
+  const state = await createOAuthState(context.env, accountId, 'google', verifier)
+  const challenge = await pkceChallenge(verifier)
+  return Response.redirect(
+    buildGoogleAuthorizeUrl(context.env, redirectUri, state, row.email, challenge),
+    302,
+  )
 }

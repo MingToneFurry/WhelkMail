@@ -27,11 +27,28 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return fail('Account not found', 404, undefined, 'account_not_found')
   }
 
-  const attachments = input.attachments.map((attachment) => ({
-    filename: attachment.filename,
-    contentType: attachment.contentType,
-    content: fromBase64(attachment.dataBase64),
-  }))
+  const estimatedBytes = input.attachments.reduce(
+    (total, attachment) => total + Math.ceil((attachment.dataBase64.length * 3) / 4),
+    0,
+  )
+  if (estimatedBytes > account.max_attachment_bytes) {
+    return fail(
+      `Attachments too large: limit ${Math.floor(account.max_attachment_bytes / (1024 * 1024))} MB`,
+      413,
+      undefined,
+      'attachment_too_large',
+    )
+  }
+  let attachments: { filename: string; contentType: string; content: Uint8Array }[]
+  try {
+    attachments = input.attachments.map((attachment) => ({
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      content: fromBase64(attachment.dataBase64),
+    }))
+  } catch {
+    return fail('Invalid attachment data', 400, undefined, 'attachment_invalid')
+  }
   const totalBytes = attachments.reduce((total, attachment) => total + attachment.content.byteLength, 0)
   if (totalBytes > account.max_attachment_bytes) {
     return fail(

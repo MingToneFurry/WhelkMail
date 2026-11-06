@@ -5,7 +5,13 @@ export function json(data: unknown, status = 200, headers?: HeadersInit): Respon
   return new Response(JSON.stringify(data), { status, headers: base })
 }
 
-export function fail(message: string, status = 400, detail?: string, code?: string): Response {
+export function fail(
+  message: string,
+  status = 400,
+  detail?: string,
+  code?: string,
+  headers?: HeadersInit,
+): Response {
   return json(
     {
       error: message,
@@ -13,6 +19,7 @@ export function fail(message: string, status = 400, detail?: string, code?: stri
       ...(code ? { code } : {}),
     },
     status,
+    headers,
   )
 }
 
@@ -20,7 +27,13 @@ export function failCode(code: string, status = 400, detail?: string, message?: 
   return fail(message ?? code, status, detail, code)
 }
 
+export const MAX_JSON_BYTES = 32 * 1024 * 1024
+
 export async function readJson<T>(request: Request): Promise<T> {
+  const declared = Number(request.headers.get('Content-Length') ?? '0')
+  if (Number.isFinite(declared) && declared > MAX_JSON_BYTES) {
+    throw new HttpError(413, 'Payload too large')
+  }
   try {
     return (await request.json()) as T
   } catch {

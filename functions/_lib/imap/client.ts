@@ -43,7 +43,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 }
 
 function quote(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  const safe = value.replace(/[\r\n\0]/g, ' ')
+  return `"${safe.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
 function indexOfCrlf(buffer: Uint8Array): number {

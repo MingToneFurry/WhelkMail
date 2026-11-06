@@ -1,4 +1,4 @@
-import { encryptString, verifyOAuthState } from '../../../_lib/crypto'
+import { consumeOAuthState, encryptString } from '../../../_lib/crypto'
 import { getAccountRow } from '../../../_lib/db'
 import {
   createDriveFolder,
@@ -27,18 +27,23 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return redirectBack(origin, { drive: 'error', reason: 'missing_code' })
   }
 
-  const accountId = await verifyOAuthState(context.env, state)
-  if (!accountId) {
+  const stateData = await consumeOAuthState(context.env, state, 'drive')
+  if (!stateData) {
     return redirectBack(origin, { drive: 'error', reason: 'invalid_state' })
   }
-
+  const accountId = stateData.accountId
   const row = await getAccountRow(context.env, accountId)
   if (!row) {
     return redirectBack(origin, { drive: 'error', reason: 'account_not_found' })
   }
 
   try {
-    const tokens = await exchangeCode(context.env, code, `${origin}/api/drive/oauth/callback`)
+    const tokens = await exchangeCode(
+      context.env,
+      code,
+      `${origin}/api/drive/oauth/callback`,
+      stateData.codeVerifier,
+    )
     if (!tokens.refresh_token) {
       throw new Error('Google non ha restituito un refresh token')
     }

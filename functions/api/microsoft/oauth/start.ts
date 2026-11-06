@@ -1,4 +1,4 @@
-import { createOAuthState } from '../../../_lib/crypto'
+import { createOAuthState, pkceChallenge, randomToken } from '../../../_lib/crypto'
 import { getAccountRow } from '../../../_lib/db'
 import type { Env } from '../../../_lib/env'
 import { fail } from '../../../_lib/http'
@@ -21,6 +21,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return fail('Invalid OAuth provider', 400, undefined, 'oauth_invalid_provider')
   }
   const redirectUri = `${url.origin}/api/microsoft/oauth/callback`
-  const state = await createOAuthState(context.env, accountId)
-  return Response.redirect(buildMicrosoftAuthorizeUrl(context.env, redirectUri, state, row.email), 302)
+  const verifier = randomToken(32)
+  const state = await createOAuthState(context.env, accountId, 'microsoft', verifier)
+  const challenge = await pkceChallenge(verifier)
+  return Response.redirect(
+    buildMicrosoftAuthorizeUrl(context.env, redirectUri, state, row.email, challenge),
+    302,
+  )
 }

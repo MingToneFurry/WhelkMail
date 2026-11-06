@@ -306,3 +306,23 @@ export interface AccountPatch {
   relayDomain?: string
   relayRegion?: string
 }
+
+export interface LoginResult {
+  ok: boolean
+  twoFactorRequired?: boolean
+  challenge?: string
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean
+  recoveryRemaining: number
+}
+
+export interface TotpSetup {
+  secret: string
+  otpauth: string
+}
+
+export interface TotpEnableResult {
+  recoveryCodes: string[]
+}

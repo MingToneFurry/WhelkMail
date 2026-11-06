@@ -12,7 +12,8 @@ interface ContactsProps {
 }
 
 function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 function parseCsv(text: string): string[][] {

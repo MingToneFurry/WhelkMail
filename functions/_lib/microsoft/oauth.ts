@@ -38,6 +38,7 @@ export function buildMicrosoftAuthorizeUrl(
   redirectUri: string,
   state: string,
   loginHint?: string,
+  codeChallenge?: string,
 ): string {
   const url = new URL(`https://login.microsoftonline.com/${tenant(env)}/oauth2/v2.0/authorize`)
   url.searchParams.set('client_id', env.MICROSOFT_CLIENT_ID ?? '')
@@ -47,6 +48,10 @@ export function buildMicrosoftAuthorizeUrl(
   url.searchParams.set('scope', SCOPES)
   url.searchParams.set('state', state)
   url.searchParams.set('prompt', 'consent')
+  if (codeChallenge) {
+    url.searchParams.set('code_challenge', codeChallenge)
+    url.searchParams.set('code_challenge_method', 'S256')
+  }
   if (loginHint) {
     url.searchParams.set('login_hint', loginHint)
   }
@@ -57,18 +62,23 @@ export async function exchangeMicrosoftCode(
   env: Env,
   code: string,
   redirectUri: string,
+  codeVerifier?: string | null,
 ): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    client_id: env.MICROSOFT_CLIENT_ID ?? '',
+    client_secret: env.MICROSOFT_CLIENT_SECRET ?? '',
+    code,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+    scope: SCOPES,
+  })
+  if (codeVerifier) {
+    body.set('code_verifier', codeVerifier)
+  }
   const response = await fetch(tokenEndpoint(env), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: env.MICROSOFT_CLIENT_ID ?? '',
-      client_secret: env.MICROSOFT_CLIENT_SECRET ?? '',
-      code,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-      scope: SCOPES,
-    }),
+    body,
   })
   const data = (await response.json()) as TokenResponse
   if (!response.ok || !data.access_token) {

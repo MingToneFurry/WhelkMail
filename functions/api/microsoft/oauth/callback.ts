@@ -1,4 +1,4 @@
-import { encryptString, verifyOAuthState } from '../../../_lib/crypto'
+import { consumeOAuthState, encryptString } from '../../../_lib/crypto'
 import { getAccountRow } from '../../../_lib/db'
 import type { Env } from '../../../_lib/env'
 import { exchangeMicrosoftCode, emailFromIdToken, microsoftConfigured } from '../../../_lib/microsoft/oauth'
@@ -26,17 +26,23 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (!code || !state) {
     return redirectBack(origin, { microsoft: 'error', reason: 'missing_code' })
   }
-  const accountId = await verifyOAuthState(context.env, state)
-  if (!accountId) {
+  const stateData = await consumeOAuthState(context.env, state, 'microsoft')
+  if (!stateData) {
     return redirectBack(origin, { microsoft: 'error', reason: 'invalid_state' })
   }
+  const accountId = stateData.accountId
   const row = await getAccountRow(context.env, accountId)
   if (!row) {
     return redirectBack(origin, { microsoft: 'error', reason: 'account_not_found' })
   }
 
   try {
-    const tokens = await exchangeMicrosoftCode(context.env, code, `${origin}/api/microsoft/oauth/callback`)
+    const tokens = await exchangeMicrosoftCode(
+      context.env,
+      code,
+      `${origin}/api/microsoft/oauth/callback`,
+      stateData.codeVerifier,
+    )
     if (!tokens.refresh_token) {
       throw new Error('Microsoft non ha restituito un refresh token')
     }

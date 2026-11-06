@@ -27,6 +27,8 @@ WhelkMail runs entirely on Cloudflare Pages and Workers. It is **not** a mail se
 - Google OAuth2 or app passwords for Google accounts
 - Microsoft OAuth2 (XOAUTH2) for Outlook / Microsoft 365
 - Password / app-password authentication for Yahoo, iCloud and generic IMAP
+- Optional two-factor authentication (TOTP, RFC 6238) from Settings → Security, disabled by default and compatible with any authenticator app; one-time recovery codes
+- Login rate limiting and server-side revocable sessions (7-day TTL)
 - MIME handling with attachments, streamed on demand
 - English by default, Italian available; extensible dictionary
 - MIT licensed
@@ -55,7 +57,7 @@ If you already have a local database created before labels/signatures, run:
 npm run db:migrate:local
 ```
 
-If earlier migrations were already applied and you only need the filter-forwarding changes, run `npm run db:migrate:local:11`.
+If earlier migrations were already applied and you only need the security changes (sessions, 2FA rate limiting, one-time OAuth state), run `npm run db:migrate:local:12`. This invalidates existing sessions.
 
 Create `.dev.vars` in the project root:
 

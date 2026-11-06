@@ -29,6 +29,7 @@ import { DeletionPanel } from './DeletionPanel'
 import { FiltersSettings } from './FiltersSettings'
 import { PushSettings } from './PushSettings'
 import { SyncPanel } from './SyncPanel'
+import { TwoFactorSettings } from './TwoFactorSettings'
 
 interface SettingsProps {
   accounts: Account[]
@@ -692,7 +693,7 @@ export function Settings({
   const { t, locale, setLocale } = useI18n()
   const [signatureDraft, setSignatureDraft] = useState(defaultSignature)
   const [tab, setTab] = useState<
-    'accounts' | 'general' | 'signatures' | 'filters' | 'notifications' | 'system'
+    'accounts' | 'general' | 'signatures' | 'filters' | 'notifications' | 'security' | 'system'
   >('accounts')
   const tabs = [
     { id: 'accounts' as const, label: t('settings.tabAccounts') },
@@ -700,6 +701,7 @@ export function Settings({
     { id: 'signatures' as const, label: t('settings.tabSignatures') },
     { id: 'filters' as const, label: t('settings.tabFilters') },
     { id: 'notifications' as const, label: t('settings.tabNotifications') },
+    { id: 'security' as const, label: t('settings.tabSecurity') },
     { id: 'system' as const, label: t('settings.tabSystem') },
   ]
 
@@ -919,6 +921,8 @@ export function Settings({
         ) : null}
 
         {tab === 'notifications' ? <PushSettings /> : null}
+
+        {tab === 'security' ? <TwoFactorSettings /> : null}
 
         {tab === 'system' ? (
           <>

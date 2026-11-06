@@ -164,12 +164,23 @@ Key/value store for deployment-wide preferences. Currently used for `default_sig
 
 ## 6. Security model
 
-- **Single shared password:** `APP_PASSWORD` protects the whole deployment. The session is an HMAC-SHA256 token in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` on HTTPS, valid for 30 days.
+- **Single shared password + optional 2FA:** `APP_PASSWORD` protects the whole deployment. Two-factor authentication (TOTP, RFC 6238) can be enabled in Settings → Security; it is **off by default** and works with any authenticator app. Recovery codes are shown once and stored only as SHA-256 hashes.
+- **Sessions:** random 256-bit session IDs; only their SHA-256 hashes are stored in D1 (`sessions`). TTL is 7 days. Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. Logout revokes the session. Deleting the `sessions` table rows invalidates all sessions.
+- **Brute-force protection:** login and 2FA attempts are rate limited per IP in D1 (10 attempts per 15 minutes, then a 15-minute block).
 - **Origin check:** mutating requests with a foreign `Origin` header are rejected.
-- **Credential encryption:** IMAP/SMTP passwords, OAuth refresh tokens and relay API keys are encrypted with AES-256-GCM using `TOKEN_ENC_KEY` (32 raw bytes, base64 encoded).
-- **Key rotation:** changing `TOKEN_ENC_KEY` makes all stored credentials unreadable. Users must re-enter passwords and reconnect OAuth accounts.
+- **OAuth:** one-time state stored in D1 with a 10-minute TTL, plus PKCE (`S256`) for Google, Microsoft and Google Drive.
+- **Credential encryption:** IMAP/SMTP passwords, OAuth refresh tokens and relay API keys are encrypted with AES-256-GCM using `TOKEN_ENC_KEY` (32 raw bytes, base64 encoded). Session/challenge signatures use an HKDF-derived subkey.
+- **Security headers:** CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and `Cross-Origin-Opener-Policy` are set on static assets (`public/_headers`) and API responses (middleware).
+- **Key rotation:** changing `TOKEN_ENC_KEY` makes all stored credentials unreadable and invalidates sessions and pending OAuth states. Users must re-enter passwords and reconnect OAuth accounts.
 - **No multi-tenancy:** there is no per-user isolation. This is intended for personal or small trusted deployments. Put Cloudflare Access in front for stronger authentication.
-- **Secrets:** `.dev.vars` is gitignored. Production secrets belong in the Pages project settings.
+- **Secrets:** `.dev.vars`, `.env` and `.wrangler` are gitignored. Production secrets belong in the Pages project settings.
+
+If you lose both the authenticator and the recovery codes, disable 2FA from a D1 console:
+
+```sql
+DELETE FROM app_settings WHERE key IN ('totp_enabled', 'totp_secret_enc', 'totp_recovery_json');
+DELETE FROM sessions;
+```
 
 ## 7. Authentication per account
 
@@ -248,7 +259,8 @@ npm run dev:api
 ```
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
-- `npm run db:migrate:local` applies all additive migrations (labels, filters, contacts, sync, archive, push, forwarding, deletion) to an existing local database.
+- `npm run db:migrate:local` applies all additive migrations (labels, filters, contacts, sync, archive, push, forwarding, deletion, security) to an existing local database.
+- If you only need the security tables (sessions, 2FA rate limiting, OAuth state), run `npm run db:migrate:local:12`. Existing sessions are invalidated and you will need to sign in again.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

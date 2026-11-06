@@ -161,13 +161,15 @@ If the database already existed before labels and signatures were added, apply t
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/011_filter_forwarding.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive, push, filter-based forwarding, provider deletion logs and the per-account automatic-sync flag.
+That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/012_security.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive, push, filter-based forwarding, provider deletion logs, the per-account automatic-sync flag, and the security tables (sessions, login rate limiting, one-time OAuth state).
 
 If earlier migrations were already applied, run only the missing one:
 
 ```bash
-npm run db:migrate:remote:11
+npm run db:migrate:remote:12
 ```
+
+Migration `012` also invalidates existing sessions: users must sign in again. Two-factor authentication is available in Settings → Security and is disabled by default.
 
 ### 1.6 Web Push notifications (optional)
 
@@ -376,7 +378,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 |---|---|
 | `database_id` placeholder error | Replace the placeholder in `wrangler.toml` with the real D1 ID |
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:11` |
+| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` / `sessions` / `login_attempts` / `oauth_states` | Run `npm run db:migrate:remote`; if earlier migrations were already applied, run `npm run db:migrate:remote:12` |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` / `auto_sync` / `delete_after_archive` / `forward_to_json` | Run `npm run db:migrate:remote`, or apply the missing `006`–`011` migrations in order |
 | 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, or site not served over HTTPS |
 | 500 on every API call | Missing `DB` binding or missing secrets |

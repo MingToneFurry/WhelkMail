@@ -23,7 +23,12 @@ export const DRIVE_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
 ].join(' ')
 
-export function buildAuthorizeUrl(env: Env, redirectUri: string, state: string): string {
+export function buildAuthorizeUrl(
+  env: Env,
+  redirectUri: string,
+  state: string,
+  codeChallenge?: string,
+): string {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', env.GOOGLE_CLIENT_ID)
   url.searchParams.set('redirect_uri', redirectUri)
@@ -33,20 +38,33 @@ export function buildAuthorizeUrl(env: Env, redirectUri: string, state: string):
   url.searchParams.set('prompt', 'consent')
   url.searchParams.set('include_granted_scopes', 'true')
   url.searchParams.set('state', state)
+  if (codeChallenge) {
+    url.searchParams.set('code_challenge', codeChallenge)
+    url.searchParams.set('code_challenge_method', 'S256')
+  }
   return url.toString()
 }
 
-export async function exchangeCode(env: Env, code: string, redirectUri: string): Promise<TokenResponse> {
+export async function exchangeCode(
+  env: Env,
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string | null,
+): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    code,
+    client_id: env.GOOGLE_CLIENT_ID,
+    client_secret: env.GOOGLE_CLIENT_SECRET,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+  })
+  if (codeVerifier) {
+    body.set('code_verifier', codeVerifier)
+  }
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-    }),
+    body,
   })
   const data = (await response.json()) as TokenResponse & { error?: string; error_description?: string }
   if (!response.ok || !data.access_token) {

@@ -3,6 +3,9 @@ import type { AccountRow } from './db'
 import type { Env } from './env'
 import { moveToTrash } from './mail/imap'
 import { parseImapMessageId } from './mail/ids'
+import { getStorage } from './storage'
+import { DriveStorage } from './storage/drive'
+import { R2Storage } from './storage/r2'
 import type { ImapMessageRow } from './sync'
 
 interface DeletionLogRow {
@@ -91,5 +94,58 @@ export async function deleteArchivedMessage(
       error instanceof Error ? error.message : String(error),
     )
     return 'failed'
+  }
+}
+
+export async function purgeAccountStorage(env: Env, account: AccountRow): Promise<void> {
+  const keys = new Set<string>()
+  try {
+    const messages = await env.DB.prepare('SELECT storage_key FROM messages WHERE account_id = ?')
+      .bind(account.id)
+      .all<{ storage_key: string }>()
+    for (const row of messages.results) {
+      if (row.storage_key) {
+        keys.add(row.storage_key)
+      }
+    }
+    const archived = await env.DB.prepare(
+      'SELECT archive_key FROM imap_messages WHERE account_id = ? AND archive_key IS NOT NULL',
+    )
+      .bind(account.id)
+      .all<{ archive_key: string }>()
+    for (const row of archived.results) {
+      if (row.archive_key) {
+        keys.add(row.archive_key)
+      }
+    }
+  } catch {
+    return
+  }
+  if (keys.size === 0) {
+    return
+  }
+  let storage
+  try {
+    if (account.kind === 'imap') {
+      storage =
+        account.imap_archive_driver === 'drive'
+          ? account.drive_refresh_token_enc
+            ? new DriveStorage(env, account)
+            : null
+          : env.BUCKET
+            ? new R2Storage(env)
+            : null
+    } else {
+      storage = await getStorage(env, account)
+    }
+  } catch {
+    return
+  }
+  if (!storage) {
+    return
+  }
+  const list = [...keys]
+  for (let index = 0; index < list.length; index += 20) {
+    await Promise.allSettled(list.slice(index, index + 20).map((key) => storage.remove(key)))
   }
 }
