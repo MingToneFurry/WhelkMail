@@ -111,7 +111,7 @@ Short version:
    Add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` and a random `CRON_SECRET` to the Pages project, then set the same `CRON_SECRET` on the cron worker and deploy it with `npm run cron:deploy`.
 6. Deploy and open the Pages URL.
 
-A Workers Paid plan is recommended: IMAP/SMTP TLS handshakes exceed the free plan CPU budget.
+A Workers Paid plan is recommended: IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
 
 ## Configuration
 
@@ -146,7 +146,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD`; this is a personal / small-team tool, not a multi-tenant service.
-- Workers Paid is recommended because IMAP/SMTP TLS handshakes exceed the free plan CPU budget.
+- Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
 - Google OAuth uses the restricted `https://mail.google.com/` scope. A public production app needs Google verification (CASA); personal/testing apps can use OAuth in Testing mode, where refresh tokens expire after 7 days. App passwords remain available as an alternative.
 
 ## License
