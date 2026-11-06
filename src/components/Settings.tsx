@@ -210,7 +210,30 @@ function AccountCard({
 
       {isImap ? (
         <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs">
-          <label className="flex cursor-pointer items-start gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-medium text-slate-700">
+                {account.driveConnected
+                  ? t('settings.driveConnected')
+                  : t('settings.driveNotConnected')}
+              </p>
+              <p className="text-muted">
+                {account.driveConnected
+                  ? t('settings.driveFolderReady')
+                  : t('settings.driveAuthNeeded')}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onConnectDrive(account.id)}
+              className="rounded-lg border border-line bg-white px-2.5 py-1.5 hover:border-slate-300 disabled:opacity-50"
+            >
+              {account.driveConnected ? t('settings.reconnectDrive') : t('settings.connectDrive')}
+            </button>
+          </div>
+
+          <label className="mt-3 flex cursor-pointer items-start gap-2">
             <input
               type="checkbox"
               checked={account.archiveImapBodies}
@@ -264,15 +287,6 @@ function AccountCard({
                 >
                   {t('settings.drive')}
                 </button>
-                {!account.driveConnected ? (
-                  <button
-                    type="button"
-                    onClick={() => onConnectDrive(account.id)}
-                    className="rounded-lg border border-line bg-white px-2.5 py-1.5 hover:border-slate-300"
-                  >
-                    {t('settings.connectDrive')}
-                  </button>
-                ) : null}
               </div>
             </div>
           ) : null}
