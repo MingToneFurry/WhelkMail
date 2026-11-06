@@ -79,6 +79,7 @@ const en: Record<string, string> = {
   'list.notSent': 'not sent',
   'list.noSubject': '(no subject)',
   'list.account': 'account',
+  'list.syncing': 'Updating…',
 
   'reading.select': 'Select a message',
   'reading.from': 'From:',
@@ -570,6 +571,7 @@ const it: Record<string, string> = {
   'list.notSent': 'non inviata',
   'list.noSubject': '(senza oggetto)',
   'list.account': 'account',
+  'list.syncing': 'Aggiornamento…',
 
   'reading.select': 'Seleziona un messaggio',
   'reading.from': 'Da:',

@@ -6,6 +6,18 @@ import { getImapArchiveStorage, getStorage } from '../storage'
 import { fetchMessage, markMessageSeen } from './imap'
 import { parseImapMessageId, parseRelayMessageId } from './ids'
 
+async function markMirrorRead(env: Env, id: string): Promise<void> {
+  try {
+    await env.DB.prepare(
+      'UPDATE imap_messages SET unread = 0, updated_at = ? WHERE id = ?',
+    )
+      .bind(new Date().toISOString(), id)
+      .run()
+  } catch {
+    // The mirror may not exist yet; the next sync will reconcile it.
+  }
+}
+
 export interface LoadedRaw {
   bytes: Uint8Array
   account: AccountRow
@@ -38,6 +50,7 @@ export async function loadRaw(
             if (markRead && imapId.folder === 'inbox') {
               try {
                 await markMessageSeen(env, account, imapId.folder, imapId.uid)
+                await markMirrorRead(env, id)
               } catch {
                 // non-blocking
               }
@@ -52,6 +65,9 @@ export async function loadRaw(
       }
     }
     const bytes = await fetchMessage(env, account, imapId.folder, imapId.uid, markRead)
+    if (markRead && imapId.folder === 'inbox') {
+      await markMirrorRead(env, id)
+    }
     return { bytes, account, folder: imapId.folder }
   }
 

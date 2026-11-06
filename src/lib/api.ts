@@ -220,7 +220,7 @@ export const api = {
     accountId: string,
     folder: Folder,
     labelId?: string | null,
-  ): Promise<{ messages: MessageSummary[]; errors: AccountError[] }> {
+  ): Promise<{ messages: MessageSummary[]; errors: AccountError[]; syncing?: boolean }> {
     const search = new URLSearchParams({ accountId, folder })
     if (labelId) {
       search.set('labelId', labelId)

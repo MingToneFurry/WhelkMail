@@ -99,7 +99,9 @@ export default function App() {
   const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null)
   const [composeKey, setComposeKey] = useState(0)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const syncRefreshCount = useRef(0)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -199,6 +201,10 @@ export default function App() {
   }, [t])
 
   useEffect(() => {
+    syncRefreshCount.current = 0
+  }, [selectedAccountId, folder, selectedLabelId])
+
+  useEffect(() => {
     if (auth !== 'ok') {
       return
     }
@@ -212,6 +218,7 @@ export default function App() {
         }
         setMessages(response.messages)
         setListErrors(response.errors)
+        setSyncingMessages(Boolean(response.syncing))
         setSelectedMessageId((current) =>
           current && response.messages.some((item) => item.id === current) ? current : null,
         )
@@ -220,6 +227,7 @@ export default function App() {
         if (cancelled) {
           return
         }
+        setSyncingMessages(false)
         if (error instanceof ApiError && error.isUnauthorized) {
           setAuth('needed')
           return
@@ -235,6 +243,21 @@ export default function App() {
       cancelled = true
     }
   }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey])
+
+  useEffect(() => {
+    if (!syncingMessages) {
+      syncRefreshCount.current = 0
+      return
+    }
+    if (syncRefreshCount.current >= 3) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      syncRefreshCount.current += 1
+      setRefreshKey((key) => key + 1)
+    }, 4000)
+    return () => window.clearTimeout(timer)
+  }, [syncingMessages])
 
   useEffect(() => {
     if (!notice) {
@@ -901,6 +924,7 @@ export default function App() {
                   labels={labels}
                   selectedId={selectedMessageId}
                   loading={loadingMessages}
+                  syncing={syncingMessages}
                   folder={folder}
                   labelName={selectedLabel?.name ?? null}
                   className={selectedMessageId ? 'hidden md:flex' : ''}
@@ -960,6 +984,7 @@ export default function App() {
                 labels={labels}
                 selectedId={selectedMessageId}
                 loading={loadingMessages}
+                syncing={syncingMessages}
                 folder={folder}
                 labelName={selectedLabel?.name ?? null}
                 fullWidth

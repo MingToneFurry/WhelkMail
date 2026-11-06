@@ -1,4 +1,4 @@
-import { AlertCircle, Inbox, Paperclip } from 'lucide-react'
+import { AlertCircle, Inbox, Loader2, Paperclip } from 'lucide-react'
 import type { Folder, Label, MessageSummary } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { cn, formatDate, initials, labelStyle } from '../lib/utils'
@@ -8,6 +8,7 @@ interface MailListProps {
   labels: Label[]
   selectedId: string | null
   loading: boolean
+  syncing?: boolean
   folder: Folder
   labelName?: string | null
   fullWidth?: boolean
@@ -28,6 +29,7 @@ export function MailList({
   labels,
   selectedId,
   loading,
+  syncing = false,
   folder,
   labelName,
   fullWidth = false,
@@ -64,7 +66,15 @@ export function MailList({
     >
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4 text-sm">
         <span className="font-medium">{title}</span>
-        <span className="text-xs text-muted">{messages.length}</span>
+        <span className="flex items-center gap-2 text-xs text-muted">
+          {syncing ? (
+            <span className="flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin" />
+              {t('list.syncing')}
+            </span>
+          ) : null}
+          <span>{messages.length}</span>
+        </span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

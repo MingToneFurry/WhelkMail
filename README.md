@@ -180,12 +180,12 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 
 ## Limitations
 
-- No IMAP IDLE: the list refreshes on navigation, after sending, or on manual reload. Sync can be started manually from Settings or enabled per account for the cron worker; new-mail notifications come from the same worker.
+- No IMAP IDLE: folder lists are served from the D1 mirror and a background sync refreshes new mail and flags. The client auto-refreshes a few times when a sync is in progress. Sync can also be started manually from Settings and runs every 5 minutes for accounts with automatic sync enabled (new IMAP accounts enable it by default).
 - Web Push requires VAPID keys, the separate cron worker under `worker/`, and the `CRON_SECRET` secret shared by Pages and the worker.
 - HTML bodies are displayed as extracted text; remote content is never loaded.
-- The live fetch returns the newest 30 messages per folder; it is merged with up to 100 mirrored messages. Search is client-side over the loaded set.
+- The first open of an account bootstraps the newest messages from the provider; afterwards the folder list comes from D1. Sync uses UIDNEXT and bounded backfill windows instead of scanning every UID on each run. Search is client-side over the loaded set.
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
-- Filters run when the inbox is loaded and when the cron worker syncs new inbox messages. Matching uses From/To/Subject/snippet, not the full message body.
+- Filters run when the inbox is loaded and when a sync ingests new inbox messages. Matching uses From/To/Subject/snippet, not the full message body.
 - Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync.
 - No alias-based "send as" yet: the sender is the account address.
 - Single shared `APP_PASSWORD` (with optional TOTP); this is a personal / small-team tool, not a multi-tenant service.

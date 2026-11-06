@@ -60,28 +60,67 @@ async function resolveSpecialFolder(
   return fallback
 }
 
+async function persistFolder(
+  env: Env,
+  account: AccountRow,
+  field: 'sent_folder' | 'drafts_folder',
+  value: string,
+): Promise<void> {
+  if (field === 'sent_folder' ? account.sent_folder === value : account.drafts_folder === value) {
+    return
+  }
+  try {
+    await env.DB.prepare(`UPDATE accounts SET ${field} = ? WHERE id = ?`)
+      .bind(value, account.id)
+      .run()
+    if (field === 'sent_folder') {
+      account.sent_folder = value
+    } else {
+      account.drafts_folder = value
+    }
+  } catch {
+    // Folder resolution must keep working even if the schema is outdated.
+  }
+}
+
 export async function resolveSentFolder(
   connection: ImapConnection,
   account: AccountRow,
+  env?: Env,
 ): Promise<string> {
   if (account.sent_folder && account.sent_folder !== 'Sent') {
     return account.sent_folder
   }
-  return resolveSpecialFolder(
+  const resolved = await resolveSpecialFolder(
     connection,
     '\\Sent',
     account.sent_folder || 'Sent',
     /(^|[./])(sent|sent items|sent mail|sent messages|inviati|inviate|invio|posta inviata|inviata)$/i,
   )
+  if (env) {
+    await persistFolder(env, account, 'sent_folder', resolved)
+  }
+  return resolved
 }
 
-export async function resolveDraftsFolder(connection: ImapConnection): Promise<string> {
-  return resolveSpecialFolder(
+export async function resolveDraftsFolder(
+  connection: ImapConnection,
+  account?: AccountRow,
+  env?: Env,
+): Promise<string> {
+  if (account?.drafts_folder) {
+    return account.drafts_folder
+  }
+  const resolved = await resolveSpecialFolder(
     connection,
     '\\Drafts',
-    'Drafts',
+    account?.drafts_folder || 'Drafts',
     /(^|[./])(draft|drafts|draft messages|bozza|bozze)$/i,
   )
+  if (env && account) {
+    await persistFolder(env, account, 'drafts_folder', resolved)
+  }
+  return resolved
 }
 
 export async function resolveTrashFolder(connection: ImapConnection): Promise<string> {
@@ -190,6 +229,7 @@ async function appendWithCreate(
 }
 
 async function targetFolder(
+  env: Env,
   connection: ImapConnection,
   account: AccountRow,
   folder: Folder,
@@ -198,27 +238,27 @@ async function targetFolder(
     return 'INBOX'
   }
   if (folder === 'sent') {
-    return resolveSentFolder(connection, account)
+    return resolveSentFolder(connection, account, env)
   }
-  return resolveDraftsFolder(connection)
+  return resolveDraftsFolder(connection, account, env)
 }
 
 export async function resolveFolderName(
+  env: Env,
   connection: ImapConnection,
   account: AccountRow,
   folder: Folder,
 ): Promise<string> {
-  return targetFolder(connection, account, folder)
+  return targetFolder(env, connection, account, folder)
 }
 
 async function selectForRead(
   connection: ImapConnection,
   folder: string,
   allowCreate: boolean,
-): Promise<boolean> {
+): Promise<{ uidNext: number | null; exists: number | null } | null> {
   try {
-    await connection.select(folder)
-    return true
+    return await connection.selectWithDetails(folder)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     if (!MISSING_FOLDER.test(detail)) {
@@ -233,10 +273,9 @@ async function selectForRead(
       // ignore; try selecting again in case it already exists
     }
     try {
-      await connection.select(folder)
-      return true
+      return await connection.selectWithDetails(folder)
     } catch {
-      return false
+      return null
     }
   }
 }
@@ -248,13 +287,16 @@ export async function listFolder(
   limit = 30,
 ): Promise<ImapHeader[]> {
   return withImap(env, account, async (connection) => {
-    const target = await targetFolder(connection, account, folder)
+    const target = await targetFolder(env, connection, account, folder)
     const selected = await selectForRead(connection, target, folder !== 'inbox')
     if (!selected) {
       return []
     }
-    const uids = await connection.searchAll()
-    return connection.fetchHeaders(uids.slice(-limit))
+    let uids = await connection.searchRecentUids(limit, selected.uidNext)
+    if (uids.length === 0 && (selected.exists ?? 1) > 0) {
+      uids = (await connection.searchAll()).slice(-limit)
+    }
+    return connection.fetchHeaders(uids)
   })
 }
 
@@ -268,7 +310,7 @@ export async function listFolderByUids(
     return []
   }
   return withImap(env, account, async (connection) => {
-    const target = await targetFolder(connection, account, folder)
+    const target = await targetFolder(env, connection, account, folder)
     const selected = await selectForRead(connection, target, false)
     if (!selected) {
       return []
@@ -285,7 +327,7 @@ export async function fetchMessage(
   markRead = false,
 ): Promise<Uint8Array> {
   return withImap(env, account, async (connection) => {
-    const target = await targetFolder(connection, account, folder)
+    const target = await targetFolder(env, connection, account, folder)
     await connection.select(target)
     const bytes = await connection.fetchFull(uid)
     if (markRead && folder === 'inbox') {
@@ -306,7 +348,7 @@ export async function markMessageSeen(
   uid: number,
 ): Promise<void> {
   await withImap(env, account, async (connection) => {
-    const target = await targetFolder(connection, account, folder)
+    const target = await targetFolder(env, connection, account, folder)
     await connection.select(target)
     await connection.markSeen(uid)
   })
@@ -318,7 +360,7 @@ export async function appendToSent(
   message: Uint8Array,
 ): Promise<{ folder: string }> {
   return withImap(env, account, async (connection) => {
-    const folder = await resolveSentFolder(connection, account)
+    const folder = await resolveSentFolder(connection, account, env)
     const result = await appendWithCreate(connection, folder, message, '(\\Seen)', 'sent')
     return { folder: result.folder }
   })
@@ -330,12 +372,15 @@ export async function saveDraft(
   message: Uint8Array,
 ): Promise<{ uid: number }> {
   return withImap(env, account, async (connection) => {
-    const folder = await resolveDraftsFolder(connection)
+    const folder = await resolveDraftsFolder(connection, account, env)
     const result = await appendWithCreate(connection, folder, message, '(\\Draft \\Seen)', 'draft')
     if (result.uid) {
       return { uid: result.uid }
     }
-    await connection.select(result.folder)
+    const details = await connection.selectWithDetails(result.folder)
+    if (details.uidNext && details.uidNext > 1) {
+      return { uid: details.uidNext - 1 }
+    }
     const uids = await connection.searchAll()
     if (uids.length === 0) {
       throw new Error('Bozza non trovata dopo APPEND')
@@ -350,7 +395,7 @@ export async function deleteDraft(
   uid: number,
 ): Promise<void> {
   await withImap(env, account, async (connection) => {
-    const folder = await resolveDraftsFolder(connection)
+    const folder = await resolveDraftsFolder(connection, account, env)
     await connection.select(folder)
     await connection.deleteMessage(uid)
   })
@@ -363,7 +408,7 @@ export async function moveToTrash(
   uid: number,
 ): Promise<string> {
   return withImap(env, account, async (connection) => {
-    const source = await targetFolder(connection, account, folder)
+    const source = await targetFolder(env, connection, account, folder)
     await connection.select(source)
     const trash = await resolveTrashFolder(connection)
     if (trash === source) {
