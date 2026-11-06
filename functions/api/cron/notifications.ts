@@ -80,6 +80,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       folders.add('inbox')
       folders.add('sent')
       folders.add('draft')
+      folders.add('spam')
     }
     if (folders.size === 0) {
       continue

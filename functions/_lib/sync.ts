@@ -8,13 +8,13 @@ import type {
 import type { AccountRow } from './db'
 import type { Env } from './env'
 import type { ImapConnection, ImapHeader } from './imap/client'
-import { withImap, resolveFolderName } from './mail/imap'
+import { MISSING_FOLDER, withImap, resolveFolderName } from './mail/imap'
 import { applyAccountLabel, applyFilters } from './filters'
 import { getImapArchiveStorage, type StorageAdapter } from './storage'
 import { imapMessageId } from './mail/ids'
 import { dateOf, parseHeaders, toMailbox, toMailboxes } from './mail/parse'
 
-export const SYNC_FOLDERS: Folder[] = ['inbox', 'sent', 'draft']
+export const SYNC_FOLDERS: Folder[] = ['inbox', 'sent', 'draft', 'spam']
 const CHUNK_SIZE = 40
 const BACKFILL_WINDOW = 400
 const FLAG_WINDOW = 300
@@ -432,7 +432,21 @@ export async function runSyncChunk(
 
   await withImap(env, account, async (connection) => {
     const target = await resolveFolderName(env, connection, account, folder)
-    const details = await connection.selectWithDetails(target)
+    let details
+    try {
+      details = await connection.selectWithDetails(target)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      if (folder !== 'spam' || !MISSING_FOLDER.test(detail)) {
+        throw error
+      }
+      try {
+        await connection.create(target)
+      } catch {
+        // It may already exist.
+      }
+      details = await connection.selectWithDetails(target)
+    }
     uidValidity = details.uidValidity
     const uidNext = details.uidNext
 

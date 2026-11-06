@@ -63,10 +63,16 @@ async function resolveSpecialFolder(
 async function persistFolder(
   env: Env,
   account: AccountRow,
-  field: 'sent_folder' | 'drafts_folder',
+  field: 'sent_folder' | 'drafts_folder' | 'spam_folder',
   value: string,
 ): Promise<void> {
-  if (field === 'sent_folder' ? account.sent_folder === value : account.drafts_folder === value) {
+  const current =
+    field === 'sent_folder'
+      ? account.sent_folder
+      : field === 'drafts_folder'
+        ? account.drafts_folder
+        : account.spam_folder
+  if (current === value) {
     return
   }
   try {
@@ -75,8 +81,10 @@ async function persistFolder(
       .run()
     if (field === 'sent_folder') {
       account.sent_folder = value
-    } else {
+    } else if (field === 'drafts_folder') {
       account.drafts_folder = value
+    } else {
+      account.spam_folder = value
     }
   } catch {
     // Folder resolution must keep working even if the schema is outdated.
@@ -123,6 +131,26 @@ export async function resolveDraftsFolder(
   return resolved
 }
 
+export async function resolveSpamFolder(
+  connection: ImapConnection,
+  account?: AccountRow,
+  env?: Env,
+): Promise<string> {
+  if (account?.spam_folder) {
+    return account.spam_folder
+  }
+  const resolved = await resolveSpecialFolder(
+    connection,
+    '\\Junk',
+    account?.spam_folder || 'Spam',
+    /(^|[./])(spam|junk|junk e-?mail|bulk mail|posta indesiderata|indesiderata|spazzatura)$/i,
+  )
+  if (env && account) {
+    await persistFolder(env, account, 'spam_folder', resolved)
+  }
+  return resolved
+}
+
 export async function resolveTrashFolder(connection: ImapConnection): Promise<string> {
   return resolveSpecialFolder(
     connection,
@@ -132,7 +160,7 @@ export async function resolveTrashFolder(connection: ImapConnection): Promise<st
   )
 }
 
-const MISSING_FOLDER = /TRYCREATE|NONEXISTENT|doesn't exist|does not exist|Mailbox doesn't exist/i
+export const MISSING_FOLDER = /TRYCREATE|NONEXISTENT|doesn't exist|does not exist|Mailbox doesn't exist/i
 
 function uniqueFolders(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))]
@@ -240,6 +268,9 @@ async function targetFolder(
   if (folder === 'sent') {
     return resolveSentFolder(connection, account, env)
   }
+  if (folder === 'spam') {
+    return resolveSpamFolder(connection, account, env)
+  }
   return resolveDraftsFolder(connection, account, env)
 }
 
@@ -330,7 +361,7 @@ export async function fetchMessage(
     const target = await targetFolder(env, connection, account, folder)
     await connection.select(target)
     const bytes = await connection.fetchFull(uid)
-    if (markRead && folder === 'inbox') {
+    if (markRead && (folder === 'inbox' || folder === 'spam')) {
       try {
         await connection.markSeen(uid)
       } catch {
@@ -401,34 +432,54 @@ export async function deleteDraft(
   })
 }
 
-export async function moveToTrash(
+export type MoveTarget = 'inbox' | 'spam' | 'trash'
+
+export async function moveMessages(
   env: Env,
   account: AccountRow,
   folder: Folder,
-  uid: number,
+  uids: number[],
+  target: MoveTarget,
 ): Promise<string> {
+  if (uids.length === 0) {
+    return ''
+  }
   return withImap(env, account, async (connection) => {
     const source = await targetFolder(env, connection, account, folder)
     await connection.select(source)
-    const trash = await resolveTrashFolder(connection)
-    if (trash === source) {
-      throw new Error('La cartella Trash coincide con la cartella di origine')
+    const destination =
+      target === 'inbox'
+        ? 'INBOX'
+        : target === 'spam'
+          ? await resolveSpamFolder(connection, account, env)
+          : await resolveTrashFolder(connection)
+    if (destination === source) {
+      throw new Error('La cartella di destinazione coincide con quella di origine')
     }
     try {
-      await connection.copy(uid, trash)
+      await connection.copyMany(uids, destination)
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       if (!MISSING_FOLDER.test(detail)) {
         throw error
       }
       try {
-        await connection.create(trash)
+        await connection.create(destination)
       } catch {
         // It may already exist.
       }
-      await connection.copy(uid, trash)
+      await connection.copyMany(uids, destination)
     }
-    await connection.deleteMessage(uid)
-    return trash
+    await connection.deleteMany(uids)
+    return destination
   })
+}
+
+export async function moveToTrash(
+  env: Env,
+  account: AccountRow,
+  folder: Folder,
+  uid: number,
+): Promise<string> {
+  return moveMessages(env, account, folder, [uid], 'trash')
 }

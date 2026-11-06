@@ -309,7 +309,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const folderParam = url.searchParams.get('folder')
   const labelId = url.searchParams.get('labelId')
   const folder: Folder =
-    folderParam === 'sent' ? 'sent' : folderParam === 'draft' ? 'draft' : 'inbox'
+    folderParam === 'sent'
+      ? 'sent'
+      : folderParam === 'draft'
+        ? 'draft'
+        : folderParam === 'spam'
+          ? 'spam'
+          : 'inbox'
 
   let accounts: AccountRow[]
   if (accountId === 'all') {

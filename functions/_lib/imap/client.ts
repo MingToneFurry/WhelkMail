@@ -400,16 +400,31 @@ export class ImapConnection {
   }
 
   async deleteMessage(uid: number): Promise<void> {
-    await this.command(`UID STORE ${uid} +FLAGS (\\Deleted)`)
+    await this.deleteMany([uid])
+  }
+
+  async deleteMany(uids: number[]): Promise<void> {
+    if (uids.length === 0) {
+      return
+    }
+    const set = uids.join(',')
+    await this.command(`UID STORE ${set} +FLAGS (\\Deleted)`)
     try {
-      await this.command(`UID EXPUNGE ${uid}`)
+      await this.command(`UID EXPUNGE ${set}`)
     } catch {
       await this.command('EXPUNGE')
     }
   }
 
   async copy(uid: number, folder: string): Promise<void> {
-    await this.command(`UID COPY ${uid} ${quote(folder)}`)
+    await this.copyMany([uid], folder)
+  }
+
+  async copyMany(uids: number[], folder: string): Promise<void> {
+    if (uids.length === 0) {
+      return
+    }
+    await this.command(`UID COPY ${uids.join(',')} ${quote(folder)}`)
   }
 
   async create(folder: string): Promise<void> {

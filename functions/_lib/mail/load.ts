@@ -47,7 +47,7 @@ export async function loadRaw(
           const object = await archiveStorage.get(mirror.archive_key)
           if (object) {
             const bytes = new Uint8Array(await new Response(object.body).arrayBuffer())
-            if (markRead && imapId.folder === 'inbox') {
+            if (markRead && (imapId.folder === 'inbox' || imapId.folder === 'spam')) {
               try {
                 await markMessageSeen(env, account, imapId.folder, imapId.uid)
                 await markMirrorRead(env, id)
@@ -65,7 +65,7 @@ export async function loadRaw(
       }
     }
     const bytes = await fetchMessage(env, account, imapId.folder, imapId.uid, markRead)
-    if (markRead && imapId.folder === 'inbox') {
+    if (markRead && (imapId.folder === 'inbox' || imapId.folder === 'spam')) {
       await markMirrorRead(env, id)
     }
     return { bytes, account, folder: imapId.folder }

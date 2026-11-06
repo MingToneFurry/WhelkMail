@@ -42,16 +42,24 @@ Key constraints:
 ### List messages
 
 1. `GET /api/messages?accountId=all&folder=inbox`
-2. For each IMAP account: connect, authenticate, `SELECT` the folder, `UID SEARCH ALL`, keep the last 30 UIDs, `UID FETCH` headers plus `BODYSTRUCTURE`. `BODYSTRUCTURE` is parsed locally to detect attachments without downloading message bodies.
-3. Headers are parsed with `postal-mime`; results from all accounts are merged and sorted.
-4. Relay accounts contribute their D1 `messages` rows.
+2. The list is served from the D1 mirror first. If the folder has never been synced, the request bootstraps the newest headers from IMAP; otherwise a stale folder returns the cached list immediately and schedules a background sync.
+3. The sync reads `UIDNEXT` from `SELECT` and fetches new UIDs plus bounded backfill windows instead of running `UID SEARCH ALL` on every pass. `BODYSTRUCTURE` is parsed locally to detect attachments without downloading message bodies.
+4. Headers are parsed with `postal-mime`; results from all accounts are merged and sorted. Relay accounts contribute their D1 `messages` rows.
 
 ### Read a message
 
 1. `GET /api/messages/:id`
 2. The ID encodes the account, folder and UID (`i_<account>.<folder>.<uid>`) or a relay row (`r_<uuid>`).
 3. The raw MIME is fetched from IMAP or storage and parsed.
-4. Text, HTML and attachment metadata are returned. The message is marked `\Seen` for inbox items.
+4. Text, HTML and attachment metadata are returned. The message is marked `\Seen` for Inbox and Spam items.
+5. HTML is rendered by the client in a sandboxed iframe with a restrictive CSP; scripts and forms are disabled. Remote images are blocked by default and can be enabled per message. `cid:` images are rewritten to the authenticated attachment endpoint.
+
+### Message actions
+
+1. `POST /api/messages/actions` with `{ ids, action: "delete" | "spam" | "move", target?: "inbox" | "spam" | "trash" }`.
+2. IMAP messages are grouped by account and folder; one connection copies the UIDs to the target with `UID COPY` and removes them from the source with `UID STORE +FLAGS (\Deleted)` plus `UID EXPUNGE`.
+3. Delete moves the message to the provider Trash; spam moves it to the `\Junk` folder; not-spam moves it back to Inbox.
+4. The D1 mirror is updated and the source/target folders are queued for sync. Moved rows stay in D1 until the target sync transfers labels through `stable_key`, then the source sync prunes them.
 
 ### Send
 
@@ -104,11 +112,11 @@ Important fields:
 - `secret_enc`: encrypted password or OAuth refresh token
 - `access_token_enc`, `access_token_expires_at`
 - `oauth_provider`: currently `microsoft`
-- `sent_folder`, `auto_saves_sent`
+- `sent_folder`, `drafts_folder`, `spam_folder`, `auto_saves_sent`
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash
-- `auto_sync`: opt-in automatic background sync for Inbox, Sent and Drafts via the cron worker
+- `auto_sync`: opt-in automatic background sync for Inbox, Sent, Drafts and Spam via the cron worker
 - `storage_driver`: `provider`, `drive` or `r2`
 - `relay_provider`, `relay_api_key_enc`, `relay_api_secret_enc`, `relay_domain`, `relay_region`
 - `drive_*` fields for the optional Drive archive
@@ -137,9 +145,9 @@ Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index
 
 The sync is resumable and chunked (40 metadata messages per request, 8 when body archiving is enabled). It reads `UIDNEXT` from `SELECT`, fetches new UIDs above `max_uid`, and backfills older messages through bounded UID windows instead of running `UID SEARCH ALL` on every pass. Each run also refreshes flags for the most recent window, so read/unread changes made by other clients land in D1. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned after backfill when the provider message count differs from D1; archived objects are removed unless provider cleanup is enabled, in which case the archive is preserved.
 
-The folder list reads from `imap_messages` first. Opening a folder does not block on IMAP: if the mirror is stale, the request returns the cached list immediately and schedules a background sync; the frontend refreshes a few times while that sync runs. IMAP is only read synchronously on the first open of an account (empty mirror), then the sync fills D1. Sent and Drafts folder names are resolved once and stored in `accounts.sent_folder` / `accounts.drafts_folder`.
+The folder list reads from `imap_messages` first. Opening a folder does not block on IMAP: if the mirror is stale, the request returns the cached list immediately and schedules a background sync; the frontend refreshes a few times while that sync runs. IMAP is only read synchronously on the first open of an account (empty mirror), then the sync fills D1. Sent, Drafts and Spam folder names are resolved once and stored in `accounts.sent_folder` / `accounts.drafts_folder` / `accounts.spam_folder`.
 
-`accounts.auto_sync` enables the cron worker to advance Inbox, Sent and Drafts every 5 minutes. Each run processes one bounded chunk per folder and resumes on the next run. New IMAP accounts enable it by default; existing accounts can still rely on the sync scheduled when a folder is opened.
+`accounts.auto_sync` enables the cron worker to advance Inbox, Sent, Drafts and Spam every 5 minutes. Each run processes one bounded chunk per folder and resumes on the next run. New IMAP accounts enable it by default; existing accounts can still rely on the sync scheduled when a folder is opened.
 
 `accounts.archive_imap_bodies` is optional; `accounts.imap_archive_driver` selects `r2` or `drive`. R2 requires a bound `BUCKET`; Drive requires the account's Google Drive OAuth connection. The sync stores the raw EML under `imap/<account>/<folder>/<uidvalidity>/<folder>-<uid>.eml` and records `archived`/`archive_key` in `imap_messages`. With Drive, `archive_key` is the Drive file id. Reading and attachment/download endpoints use the archive when present and fall back to IMAP otherwise. When disabled, bodies and attachments stay on the provider.
 
@@ -217,7 +225,7 @@ IMAP accounts use external storage only when body archiving is enabled per accou
 
 Messages carry `accountId`, `accountName` and `accountEmail`. The unified view shows a deterministic color label per connected address, and the account bar filters by address. This is address-level labeling, not alias-level labeling.
 
-Custom labels are separate and user-defined, shared across accounts. They can be created from the sidebar or from the filter editor. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent and Drafts across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
+Custom labels are separate and user-defined, shared across accounts. They can be created from the sidebar or from the filter editor. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent, Drafts and Spam across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
 
 Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created.
 
@@ -510,9 +518,9 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 ## 17. Known limitations
 
 - No IMAP IDLE. Metadata sync is manual/chunked or opt-in automatic via the cron worker; Web Push also depends on that worker.
-- The list shows the newest live 30 messages merged with up to 100 mirrored messages; search is client-side over the loaded set.
+- Folder lists are served from the D1 mirror (up to 100 messages); the first open of an account bootstraps from IMAP. Search is client-side over the loaded set.
 - No IMAP server-side search UI beyond the latest page.
-- HTML bodies are stripped to text; remote images and tracking pixels are not loaded.
+- HTML bodies are rendered in a sandboxed frame; remote images and tracking pixels are blocked until enabled per message. Inline `cid:` images require an attachment request, which is cheap with R2/Drive archiving but re-reads the message over IMAP when archiving is disabled.
 - Attachments are fetched by re-reading the full message on each download.
 - No alias-based send-as; the sender is the account address.
 - Autosave requires the provider to accept `APPEND` in the Drafts folder; without `APPENDUID`, the new UID is resolved with a search, which can be ambiguous with concurrent clients.

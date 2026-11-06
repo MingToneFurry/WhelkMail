@@ -12,10 +12,16 @@ interface SyncPanelProps {
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
 }
 
-const FOLDERS: Folder[] = ['inbox', 'sent', 'draft']
+const FOLDERS: Folder[] = ['inbox', 'sent', 'draft', 'spam']
 
 function folderLabel(folder: Folder, t: (key: string) => string): string {
-  return folder === 'inbox' ? t('list.inbox') : folder === 'sent' ? t('list.sent') : t('list.drafts')
+  return folder === 'inbox'
+    ? t('list.inbox')
+    : folder === 'sent'
+      ? t('list.sent')
+      : folder === 'spam'
+        ? t('list.spam')
+        : t('list.drafts')
 }
 
 export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
