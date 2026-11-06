@@ -9,9 +9,9 @@ This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do 
 | Cloudflare resource | Purpose |
 |---|---|
 | Pages project | Static UI + Pages Functions (`functions/`) |
-| D1 database | Accounts, relay archive metadata, drafts metadata |
+| D1 database | Accounts, settings, IMAP sync metadata, relay archive/drafts metadata |
 | Secrets | App password, encryption key, optional OAuth and relay keys |
-| R2 bucket (optional) | Sent/draft archive for send-only relay accounts |
+| R2 bucket (optional) | Sent/draft archive for relay accounts; optional IMAP body/attachment archive |
 | Custom domain (optional) | HTTPS hostname for the app |
 
 ## Before you start
@@ -281,7 +281,7 @@ Important: `https://mail.google.com/` is a **restricted** Google scope.
 - A Google Workspace **Internal** app avoids verification but only works inside that organization.
 - If OAuth is not configured, use an app password with 2-Step Verification enabled.
 
-### 3.2 Google Drive OAuth (relay archive, optional)
+### 3.2 Google Drive OAuth (relay and IMAP archive, optional)
 
 1. Google Cloud Console → enable the Google Drive API.
 2. OAuth consent screen → **External**.
@@ -292,6 +292,8 @@ Important: `https://mail.google.com/` is a **restricted** Google scope.
    - `http://localhost:8788/api/drive/oauth/callback`
 6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 7. Set the consent screen to **In production** to avoid 7-day refresh-token expiry. `drive.file` is non-sensitive, so no CASA assessment is required.
+
+The same credentials serve IMAP accounts that enable **Archive bodies and attachments** in Settings. They are separate from the Gmail mail client (`GOOGLE_MAIL_CLIENT_ID`/`GOOGLE_MAIL_CLIENT_SECRET`).
 
 ### 3.3 Microsoft OAuth (Outlook / Microsoft 365)
 
@@ -320,7 +322,7 @@ Supported providers: SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmar
 
 ## 4. Optional R2 archive
 
-R2 is only used by send-only relay accounts. IMAP accounts keep everything on the mail provider.
+R2 is used by send-only relay accounts and by IMAP accounts that enable the optional body/attachment archive. By default IMAP accounts keep everything on the mail provider.
 
 1. **R2 Object Storage → Create bucket**.
 2. Pages project → **Settings → Bindings** → add an R2 bucket binding named `BUCKET`.
@@ -336,7 +338,7 @@ If the binding is absent, the R2 option is hidden in the UI.
 - Sending adds a copy to the provider Sent folder (or the app appends it when `auto_saves_sent` is off).
 - A draft can be saved, reopened and deleted.
 - Two accounts produce colored labels and a unified inbox.
-- Optional: Drive/R2 archive works for relay accounts.
+- Optional: Drive/R2 archive works for relay accounts and for IMAP accounts with body archiving enabled.
 - Optional: OAuth reconnect works after a token refresh.
 
 ## 6. Operations

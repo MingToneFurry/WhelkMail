@@ -22,12 +22,12 @@ Browser (React/Vite)
         v
 Cloudflare Pages Functions (Workers runtime)
         |
-        +-- D1 (accounts, relay archive metadata, drafts)
+        +-- D1 (accounts, message metadata, relay archive, drafts)
         +-- IMAP over cloudflare:sockets (TLS / STARTTLS)
         +-- SMTP over cloudflare:sockets (TLS / STARTTLS)
-        +-- OAuth: Google and Microsoft (XOAUTH2), Google Drive (relay archive)
+        +-- OAuth: Google and Microsoft (XOAUTH2), Google Drive (archive)
         +-- HTTP relay APIs (send-only accounts)
-        +-- R2 binding (optional, relay archive)
+        +-- R2 binding (optional, relay/IMAP archive)
 ```
 
 Key constraints:
@@ -115,7 +115,7 @@ Important fields:
 
 ### `messages`
 
-Used for relay accounts only: sent copies and drafts. IMAP messages are read live from the provider and are not mirrored into D1.
+Used for relay accounts: sent copies and drafts. IMAP messages are read live from the provider; the optional sync mirrors only their metadata into `imap_messages`, while full bodies stay on the provider unless archiving is enabled.
 
 Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, storage key, attachment metadata and status.
 
@@ -198,7 +198,7 @@ Archive storage:
 - **Google Drive:** per-user OAuth with `drive.file`; files live in a `MailClient` folder. 15 GB free for personal accounts. Service accounts have no storage quota and cannot be used as a free bucket.
 - **Cloudflare R2:** optional binding named `BUCKET`. When the binding is absent, R2 is hidden in the UI.
 
-IMAP accounts never use external storage: attachments, Sent copies and drafts stay on the mail provider.
+IMAP accounts use external storage only when body archiving is enabled per account: by default attachments, Sent copies and drafts stay on the mail provider. The same Drive/R2 destinations can be used for that optional archive ("Archive bodies and attachments" in the account's sync section).
 
 ## 9. Account chips and custom labels
 
@@ -355,7 +355,7 @@ Optional:
 
 | Name | Type | Notes |
 |---|---|---|
-| `GOOGLE_CLIENT_ID` | Secret | Google Drive archive for relay accounts |
+| `GOOGLE_CLIENT_ID` | Secret | Google Drive archive for relay and IMAP accounts |
 | `GOOGLE_CLIENT_SECRET` | Secret | Google OAuth client secret |
 | `GOOGLE_MAIL_CLIENT_ID` | Secret | Google OAuth client for IMAP/SMTP |
 | `GOOGLE_MAIL_CLIENT_SECRET` | Secret | Google OAuth secret for IMAP/SMTP |
@@ -397,7 +397,7 @@ IMAP and SMTP TLS handshakes plus authentication frequently exceed the free Work
 
 ### 12.7 Google Drive OAuth (optional)
 
-Only needed for relay accounts that archive on Drive.
+Used by relay accounts that archive on Drive and by IMAP accounts that enable **Archive bodies and attachments** in their sync settings. These are Drive credentials, separate from the Gmail mail client (`GOOGLE_MAIL_CLIENT_ID`/`GOOGLE_MAIL_CLIENT_SECRET`); without them the Connect Drive button returns `oauth_not_configured`.
 
 1. Google Cloud Console → enable the Google Drive API.
 2. OAuth consent screen → External.

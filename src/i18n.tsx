@@ -52,6 +52,8 @@ const en: Record<string, string> = {
   'topbar.settings': 'Settings',
   'topbar.logout': 'Sign out',
   'topbar.menu': 'Open menu',
+  'topbar.accounts': 'Accounts',
+  'topbar.accountMenu': 'Account menu',
 
   'list.inbox': 'Inbox',
   'list.sent': 'Sent',
@@ -118,6 +120,12 @@ const en: Record<string, string> = {
   'compose.saveFailed': 'Saving draft failed',
 
   'settings.title': 'Settings',
+  'settings.tabAccounts': 'Accounts',
+  'settings.tabGeneral': 'General',
+  'settings.tabSignatures': 'Signatures',
+  'settings.tabFilters': 'Filters and labels',
+  'settings.tabNotifications': 'Notifications',
+  'settings.tabSystem': 'System',
   'settings.imap': 'IMAP',
   'settings.smtp': 'SMTP',
   'settings.user': 'User: {value}',
@@ -493,6 +501,8 @@ const it: Record<string, string> = {
   'topbar.settings': 'Impostazioni',
   'topbar.logout': 'Esci',
   'topbar.menu': 'Apri menu',
+  'topbar.accounts': 'Account',
+  'topbar.accountMenu': 'Menu account',
 
   'list.inbox': 'Posta in arrivo',
   'list.sent': 'Inviati',
@@ -559,6 +569,12 @@ const it: Record<string, string> = {
   'compose.saveFailed': 'Salvataggio bozza fallito',
 
   'settings.title': 'Impostazioni',
+  'settings.tabAccounts': 'Account',
+  'settings.tabGeneral': 'Generale',
+  'settings.tabSignatures': 'Firme',
+  'settings.tabFilters': 'Filtri ed etichette',
+  'settings.tabNotifications': 'Notifiche',
+  'settings.tabSystem': 'Sistema',
   'settings.imap': 'IMAP',
   'settings.smtp': 'SMTP',
   'settings.user': 'Utente: {value}',
