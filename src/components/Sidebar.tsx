@@ -89,7 +89,7 @@ export function Sidebar({
       ) : null}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col gap-2 overflow-y-auto bg-canvas px-3 py-4 shadow-xl transition-transform md:static md:z-auto md:w-60 md:translate-x-0 md:bg-transparent md:shadow-none',
+          'fixed inset-y-0 left-0 z-50 flex w-64 max-w-full shrink-0 flex-col gap-2 overflow-y-auto bg-canvas px-3 py-4 shadow-xl transition-transform md:static md:z-auto md:w-60 md:translate-x-0 md:bg-transparent md:shadow-none',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >

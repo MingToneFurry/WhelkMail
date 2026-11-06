@@ -216,7 +216,7 @@ export function ReadingPane({
                     <Tag size={14} />
                     {t('reading.labels')}
                   </summary>
-                  <div className="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-line bg-white p-2 shadow-lg">
+                  <div className="absolute right-0 z-20 mt-1 w-60 max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-white p-2 shadow-lg">
                     {availableLabels.length === 0 ? (
                       <p className="px-2 py-1 text-xs text-muted">{t('reading.noLabels')}</p>
                     ) : (

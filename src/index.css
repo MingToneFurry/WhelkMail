@@ -43,3 +43,17 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@media (max-width: 767px) {
+  html {
+    font-size: 150%;
+  }
+
+  .text-\[11px\] {
+    font-size: 0.6875rem;
+  }
+
+  .text-\[10px\] {
+    font-size: 0.625rem;
+  }
+}

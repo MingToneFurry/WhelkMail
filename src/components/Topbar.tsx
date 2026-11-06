@@ -105,7 +105,7 @@ export function Topbar({
           {menuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg"
+              className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg"
             >
               <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                 {t('topbar.accounts')}
