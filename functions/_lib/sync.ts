@@ -586,6 +586,13 @@ async function runSyncChunkLocked(
       backfillDone = false
     }
 
+    if (backfillDone && details.exists !== null && row && row.synced < details.exists) {
+      backfillDone = false
+      console.log(
+        `[sync] ${account.id}/${folder} resuming incomplete backfill mirror=${row.synced} total=${details.exists}`,
+      )
+    }
+
     let uidsToFetch: number[] = []
     let phase: 'new' | 'backfill' | 'idle' = 'idle'
 
@@ -809,7 +816,7 @@ async function runSyncChunkLocked(
       } else {
         try {
           const lowest = await connection.firstUid()
-          if (lowest === null || lowest >= minUid) {
+          if (lowest !== null && lowest >= minUid) {
             backfillDone = true
           } else {
             hasOlder = true
