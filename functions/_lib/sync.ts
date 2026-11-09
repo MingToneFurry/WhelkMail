@@ -18,7 +18,7 @@ import { isSchemaError } from './schema'
 export const SYNC_FOLDERS: Folder[] = ['inbox', 'sent', 'draft', 'spam']
 const CHUNK_SIZE = 40
 const BACKFILL_WINDOW = 400
-const FLAG_WINDOW = 300
+const FLAG_WINDOW = 120
 
 export interface SyncRow {
   account_id: string

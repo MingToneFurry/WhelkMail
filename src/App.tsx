@@ -134,39 +134,36 @@ export default function App() {
       setAccounts(accountsResponse.accounts)
       setStorage(storageResponse)
       setHealth(healthResponse)
-      try {
-        const labelsResponse = await api.labels()
-        setLabels(labelsResponse.labels)
-      } catch (error) {
-        if (error instanceof ApiError && error.isUnauthorized) {
-          throw error
+      const optional = async <T,>(promise: Promise<T>): Promise<T | null> => {
+        try {
+          return await promise
+        } catch (error) {
+          if (error instanceof ApiError && error.isUnauthorized) {
+            throw error
+          }
+          return null
         }
       }
-      try {
-        const settingsResponse = await api.settings()
+      const [labelsResponse, settingsResponse, filtersResponse, contactsResponse] =
+        await Promise.all([
+          optional(api.labels()),
+          optional(api.settings()),
+          optional(api.filters()),
+          optional(api.contacts()),
+        ])
+      if (labelsResponse) {
+        setLabels(labelsResponse.labels)
+      }
+      if (settingsResponse) {
         setDefaultSignature(settingsResponse.defaultSignature)
         setSignatureMode(settingsResponse.signatureMode)
         setAllowRemoteImages(settingsResponse.allowRemoteImages)
-      } catch (error) {
-        if (error instanceof ApiError && error.isUnauthorized) {
-          throw error
-        }
       }
-      try {
-        const filtersResponse = await api.filters()
+      if (filtersResponse) {
         setFilters(filtersResponse.filters)
-      } catch (error) {
-        if (error instanceof ApiError && error.isUnauthorized) {
-          throw error
-        }
       }
-      try {
-        const contactsResponse = await api.contacts()
+      if (contactsResponse) {
         setContacts(contactsResponse.contacts)
-      } catch (error) {
-        if (error instanceof ApiError && error.isUnauthorized) {
-          throw error
-        }
       }
       setAuth('ok')
     } catch (error) {
@@ -305,6 +302,9 @@ export default function App() {
           .join('|')
         if (syncSignatureRef.current === '') {
           syncSignatureRef.current = signature
+          // The first poll may already come after a very fast background sync,
+          // so always refresh once to pick up messages written to the mirror.
+          setRefreshKey((key) => key + 1)
         } else if (signature !== syncSignatureRef.current) {
           syncSignatureRef.current = signature
           setRefreshKey((key) => key + 1)
