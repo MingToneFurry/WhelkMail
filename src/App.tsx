@@ -105,7 +105,7 @@ export default function App() {
   const [listLoaded, setListLoaded] = useState(false)
   const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const syncRefreshCount = useRef(0)
+  const syncSignatureRef = useRef('')
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -206,7 +206,7 @@ export default function App() {
   }, [t])
 
   useEffect(() => {
-    syncRefreshCount.current = 0
+    syncSignatureRef.current = ''
     setListLoaded(false)
     setMessages([])
     setSelectedIds([])
@@ -259,19 +259,92 @@ export default function App() {
   }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey])
 
   useEffect(() => {
-    if (!syncingMessages) {
-      syncRefreshCount.current = 0
+    if (!syncingMessages || auth !== 'ok') {
       return
     }
-    if (syncRefreshCount.current >= 20) {
-      return
+    let cancelled = false
+    let timer: number | null = null
+    let attempt = 0
+
+    function schedule(delay: number) {
+      if (cancelled) {
+        return
+      }
+      timer = window.setTimeout(() => {
+        void poll()
+      }, delay)
     }
-    const timer = window.setTimeout(() => {
-      syncRefreshCount.current += 1
-      setRefreshKey((key) => key + 1)
-    }, 4000)
-    return () => window.clearTimeout(timer)
-  }, [syncingMessages, refreshKey])
+
+    async function poll() {
+      if (cancelled) {
+        return
+      }
+      if (document.visibilityState === 'hidden') {
+        schedule(15000)
+        return
+      }
+      try {
+        const overview = await api.syncOverview()
+        if (cancelled) {
+          return
+        }
+        const signature = overview.accounts
+          .map(
+            (account) =>
+              `${account.accountId}:${account.folders
+                .map((state) => `${state.folder}:${state.status}:${state.maxUid}`)
+                .join(',')}`,
+          )
+          .join('|')
+        const finished = !overview.syncing
+        if (signature !== syncSignatureRef.current || finished) {
+          syncSignatureRef.current = signature
+          setRefreshKey((key) => key + 1)
+        }
+        if (finished) {
+          setSyncingMessages(false)
+          return
+        }
+        attempt += 1
+        schedule(Math.min(15000, 4000 + attempt * 2000))
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+        if (error instanceof ApiError && error.isUnauthorized) {
+          setAuth('needed')
+          return
+        }
+        attempt += 1
+        if (attempt > 20) {
+          setSyncingMessages(false)
+          return
+        }
+        schedule(Math.min(30000, 5000 + attempt * 5000))
+      }
+    }
+
+    function onVisibility() {
+      if (document.visibilityState !== 'visible' || cancelled) {
+        return
+      }
+      if (timer !== null) {
+        window.clearTimeout(timer)
+        timer = null
+      }
+      void poll()
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    schedule(4000)
+    return () => {
+      cancelled = true
+      if (timer !== null) {
+        window.clearTimeout(timer)
+      }
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [syncingMessages, auth])
 
   useEffect(() => {
     if (!notice) {

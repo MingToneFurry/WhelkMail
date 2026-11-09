@@ -8,6 +8,7 @@ import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
 import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
 import {
+  cleanupExpiredSyncLocks,
   imapMessageSummary,
   markSyncError,
   runSyncChunk,
@@ -203,6 +204,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   await cleanupBodyCache(context.env).catch(() => undefined)
+  await cleanupExpiredSyncLocks(context.env).catch(() => undefined)
 
   if (gone.size > 0) {
     await context.env.DB.batch(

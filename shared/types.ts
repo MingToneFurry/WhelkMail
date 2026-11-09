@@ -48,6 +48,18 @@ export interface SyncResult {
   hasMore: boolean
 }
 
+export interface AccountSyncOverview {
+  accountId: string
+  email: string
+  syncing: boolean
+  folders: MailboxSyncState[]
+}
+
+export interface SyncOverview {
+  accounts: AccountSyncOverview[]
+  syncing: boolean
+}
+
 export interface PushSubscriptionInput {
   endpoint: string
   keys: {

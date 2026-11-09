@@ -22,6 +22,7 @@ import type {
   PushSubscriptionInput,
   SendPayload,
   StorageOptions,
+  SyncOverview,
   TotpEnableResult,
   TotpSetup,
   TwoFactorStatus,
@@ -120,6 +121,9 @@ export const api = {
     id: string,
   ): Promise<{ folders: MailboxSyncState[]; hasMore: boolean }> {
     return request(`/api/accounts/${id}/sync`)
+  },
+  syncOverview(): Promise<SyncOverview> {
+    return request('/api/sync')
   },
   runSync(
     id: string,
