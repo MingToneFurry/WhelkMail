@@ -107,6 +107,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const syncSignatureRef = useRef('')
   const syncAdvanceIndexRef = useRef(0)
+  const syncAdvanceAtRef = useRef(0)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -209,6 +210,7 @@ export default function App() {
   useEffect(() => {
     syncSignatureRef.current = ''
     syncAdvanceIndexRef.current = 0
+    syncAdvanceAtRef.current = 0
     setListLoaded(false)
     setMessages([])
     setSelectedIds([])
@@ -267,6 +269,7 @@ export default function App() {
     let cancelled = false
     let timer: number | null = null
     let attempt = 0
+    syncAdvanceAtRef.current = Date.now()
 
     function schedule(delay: number) {
       if (cancelled) {
@@ -314,9 +317,13 @@ export default function App() {
               (state) => state.folder === folder && state.status === 'partial',
             ),
         )
-        if (partialAccounts.length > 0) {
+        if (
+          partialAccounts.length > 0 &&
+          Date.now() - syncAdvanceAtRef.current >= 30_000
+        ) {
           const index = syncAdvanceIndexRef.current % partialAccounts.length
           syncAdvanceIndexRef.current += 1
+          syncAdvanceAtRef.current = Date.now()
           void api.runSync(partialAccounts[index].accountId, folder).catch(() => undefined)
         }
         attempt += 1
