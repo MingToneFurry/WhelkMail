@@ -106,8 +106,6 @@ export default function App() {
   const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const syncSignatureRef = useRef('')
-  const syncAdvanceIndexRef = useRef(0)
-  const syncAdvanceAtRef = useRef(0)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -209,8 +207,6 @@ export default function App() {
 
   useEffect(() => {
     syncSignatureRef.current = ''
-    syncAdvanceIndexRef.current = 0
-    syncAdvanceAtRef.current = 0
     setListLoaded(false)
     setMessages([])
     setSelectedIds([])
@@ -269,7 +265,6 @@ export default function App() {
     let cancelled = false
     let timer: number | null = null
     let attempt = 0
-    syncAdvanceAtRef.current = Date.now()
 
     function schedule(delay: number) {
       if (cancelled) {
@@ -297,34 +292,19 @@ export default function App() {
           .map(
             (account) =>
               `${account.accountId}:${account.folders
-                .map((state) => `${state.folder}:${state.status}:${state.maxUid}`)
+                .map((state) => `${state.folder}:${state.maxUid}`)
                 .join(',')}`,
           )
           .join('|')
-        const finished = !overview.syncing
-        if (signature !== syncSignatureRef.current || finished) {
+        if (syncSignatureRef.current === '') {
+          syncSignatureRef.current = signature
+        } else if (signature !== syncSignatureRef.current) {
           syncSignatureRef.current = signature
           setRefreshKey((key) => key + 1)
         }
-        if (finished) {
+        if (!overview.syncing) {
           setSyncingMessages(false)
           return
-        }
-        const partialAccounts = overview.accounts.filter(
-          (account) =>
-            (selectedAccountId === 'all' || account.accountId === selectedAccountId) &&
-            account.folders.some(
-              (state) => state.folder === folder && state.status === 'partial',
-            ),
-        )
-        if (
-          partialAccounts.length > 0 &&
-          Date.now() - syncAdvanceAtRef.current >= 30_000
-        ) {
-          const index = syncAdvanceIndexRef.current % partialAccounts.length
-          syncAdvanceIndexRef.current += 1
-          syncAdvanceAtRef.current = Date.now()
-          void api.runSync(partialAccounts[index].accountId, folder).catch(() => undefined)
         }
         attempt += 1
         schedule(Math.min(15000, 4000 + attempt * 2000))
@@ -365,7 +345,7 @@ export default function App() {
       }
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [syncingMessages, auth, selectedAccountId, folder])
+  }, [syncingMessages, auth])
 
   useEffect(() => {
     if (!notice) {

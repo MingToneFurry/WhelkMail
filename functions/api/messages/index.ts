@@ -269,7 +269,7 @@ async function loadByLabel(
   return { messages, errors }
 }
 
-const SYNC_TTL_MS = 60_000
+const SYNC_TTL_MS = 5 * 60_000
 const BACKFILL_RETRY_MS = 8_000
 const syncInFlight = new Set<string>()
 
@@ -360,9 +360,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     try {
       let loaded: MessageSummary[]
       let needSync = false
+      let syncState: MailboxSyncState | null = null
       if (account.kind === 'imap') {
         let mirrored: MessageSummary[] = []
-        let syncState: MailboxSyncState | null = null
         const mirrorStartedAt = Date.now()
         try {
           mirrored = await listMirrorMessages(context.env, account, folder)
@@ -459,7 +459,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         }
       }
       console.log(
-        `[messages] ${account.id}/${folder} mirror=${mirrorMs}ms live=${liveMs}ms labels=${Date.now() - accountStartedAt - mirrorMs - liveMs}ms sync=${needSync}`,
+        `[messages] ${account.id}/${folder} mirror=${mirrorMs}ms live=${liveMs}ms labels=${Date.now() - accountStartedAt - mirrorMs - liveMs}ms sync=${needSync || syncState?.status === 'partial'}`,
       )
     } catch (error) {
       errors.push({
