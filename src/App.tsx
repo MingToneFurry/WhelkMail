@@ -16,6 +16,7 @@ import type {
   MailFilter,
   MessageDetail,
   MessageSummary,
+  SearchScope,
   SignatureMode,
   StorageOptions,
 } from '../shared/types'
@@ -68,6 +69,11 @@ export default function App() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [view, setView] = useState<View>('mail')
   const [query, setQuery] = useState('')
+  const [searchScope, setSearchScope] = useState<SearchScope>('all')
+  const [searchResults, setSearchResults] = useState<MessageSummary[] | null>(null)
+  const [searchContacts, setSearchContacts] = useState<Contact[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [addingAccount, setAddingAccount] = useState(false)
   const [readingPane, setReadingPane] = useState(() => {
@@ -106,6 +112,7 @@ export default function App() {
   const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const syncSignatureRef = useRef('')
+  const composeHistoryRef = useRef(false)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -414,39 +421,133 @@ export default function App() {
     }
   }, [selectedMessageId, auth])
 
+  useEffect(() => {
+    const needle = query.trim()
+    if (auth !== 'ok' || !needle) {
+      setSearchResults(null)
+      setSearchContacts([])
+      setSearchLoading(false)
+      setSearchError(null)
+      return
+    }
+    let cancelled = false
+    setSearchLoading(true)
+    const timer = window.setTimeout(() => {
+      api
+        .search({
+          query: needle,
+          accountId: selectedAccountId,
+          folder: searchScope,
+        })
+        .then((response) => {
+          if (cancelled) {
+            return
+          }
+          setSearchResults(response.messages)
+          setSearchContacts(response.contacts)
+          setSearchError(null)
+        })
+        .catch((error: unknown) => {
+          if (cancelled) {
+            return
+          }
+          if (error instanceof ApiError && error.isUnauthorized) {
+            setAuth('needed')
+            return
+          }
+          setSearchResults([])
+          setSearchContacts([])
+          setSearchError(errorText(error, tRef.current))
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setSearchLoading(false)
+          }
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [query, selectedAccountId, searchScope, auth, refreshKey])
+
   const visibleMessages = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    let result = messages
+    const searching = needle.length > 0
+    let result: MessageSummary[]
+    if (searching && searchResults) {
+      result = searchResults
+    } else {
+      result = messages
+      if (needle) {
+        result = result.filter((message) => {
+          const haystack = [
+            message.subject,
+            message.snippet,
+            message.accountEmail,
+            message.from.name ?? '',
+            message.from.email,
+            ...message.to.map((item) => `${item.name ?? ''} ${item.email}`),
+          ]
+            .join(' ')
+            .toLowerCase()
+          return haystack.includes(needle)
+        })
+      }
+    }
     if (hiddenIds.length > 0) {
       result = result.filter((message) => !hiddenIds.includes(message.id))
     }
-    if (needle) {
-      result = result.filter((message) => {
-        const haystack = [
-          message.subject,
-          message.snippet,
-          message.accountEmail,
-          message.from.name ?? '',
-          message.from.email,
-          ...message.to.map((item) => `${item.name ?? ''} ${item.email}`),
-        ]
-          .join(' ')
-          .toLowerCase()
-        return haystack.includes(needle)
-      })
-    }
-    if (selectedLabelId) {
+    if (!searching && selectedLabelId) {
       result = result.filter((message) => message.labelIds.includes(selectedLabelId))
     }
     return result
-  }, [messages, query, selectedLabelId, hiddenIds])
+  }, [messages, query, searchResults, selectedLabelId, hiddenIds])
 
   function openCompose(draft: DraftPayload | null, seed: ComposeSeed | null = null) {
     setComposeDraft(draft)
     setComposeSeed(seed)
     setComposeKey((key) => key + 1)
     setComposeOpen(true)
+    if (!composeHistoryRef.current) {
+      composeHistoryRef.current = true
+      try {
+        window.history.pushState(
+          { ...(window.history.state ?? {}), __whelkmailCompose: true },
+          '',
+        )
+      } catch {
+        composeHistoryRef.current = false
+      }
+    }
   }
+
+  function dismissCompose() {
+    setComposeOpen(false)
+    if (composeHistoryRef.current) {
+      composeHistoryRef.current = false
+      try {
+        window.history.back()
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  useEffect(() => {
+    function onPopState() {
+      if (!composeHistoryRef.current) {
+        return
+      }
+      composeHistoryRef.current = false
+      setComposeOpen(false)
+      setComposeDraft(null)
+      setComposeSeed(null)
+      setRefreshKey((key) => key + 1)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   function replyTo(message: MessageDetail, all: boolean) {
     const sendingAccountId =
@@ -505,7 +606,9 @@ export default function App() {
   }
 
   async function selectMessage(id: string) {
-    const summary = messages.find((item) => item.id === id)
+    const summary =
+      messages.find((item) => item.id === id) ??
+      searchResults?.find((item) => item.id === id)
     if ((summary?.folder ?? folder) === 'draft') {
       try {
         const response = await api.draft(id)
@@ -984,6 +1087,9 @@ export default function App() {
           accounts={accounts}
           selectedAccountId={selectedAccountId}
           query={query}
+          scope={searchScope}
+          searching={searchLoading}
+          onScopeChange={setSearchScope}
           onSelectAccount={(id) => {
             setListLoaded(false)
             setMessages([])
@@ -1083,6 +1189,40 @@ export default function App() {
             onDelete={(id) => void deleteContact(id)}
           />
         ) : (
+          <>
+            {query.trim() && searchError ? (
+              <div className="mx-4 mb-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-brand-strong">
+                {searchError}
+              </div>
+            ) : null}
+            {query.trim() && searchContacts.length > 0 ? (
+              <div className="mx-4 mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs">
+                <span className="font-medium text-slate-700">{t('search.contacts')}</span>
+                {searchContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() =>
+                      openCompose(null, {
+                        accountId: composeAccountId ?? accounts[0]?.id ?? '',
+                        to: [contact.email],
+                        cc: [],
+                        bcc: [],
+                        subject: '',
+                        text: '',
+                      })
+                    }
+                    title={contact.email}
+                    className="flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 hover:bg-slate-200"
+                  >
+                    <span className="font-medium">{contact.name || contact.email}</span>
+                    {contact.name ? (
+                      <span className="text-[10px] text-muted">{contact.email}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           <div className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 overflow-hidden px-0 pb-0 sm:px-4 sm:pb-2 lg:px-6 lg:pb-3">
             {readingPane ? (
               <>
@@ -1094,6 +1234,8 @@ export default function App() {
                   syncing={syncingMessages}
                   folder={folder}
                   labelName={selectedLabel?.name ?? null}
+                  titleOverride={query.trim() ? t('search.resultsTitle', { query: query.trim() }) : null}
+                  showFolder={Boolean(query.trim())}
                   className={selectedMessageId ? 'hidden md:flex' : ''}
                   selectedIds={selectedIds}
                   actionBusy={actionBusy}
@@ -1113,6 +1255,7 @@ export default function App() {
                   loading={detailLoading}
                   error={detailError}
                   allowRemoteImages={allowRemoteImages}
+                  onAlwaysShowImages={() => void changeAllowRemoteImages(true)}
                   rawUrl={selectedMessageId ? api.rawUrl(selectedMessageId) : null}
                   attachmentUrl={(index) =>
                     selectedMessageId ? api.attachmentUrl(selectedMessageId, index) : '#'
@@ -1156,6 +1299,7 @@ export default function App() {
                 loading={detailLoading}
                 error={detailError}
                 allowRemoteImages={allowRemoteImages}
+                onAlwaysShowImages={() => void changeAllowRemoteImages(true)}
                 rawUrl={api.rawUrl(selectedMessageId)}
                 attachmentUrl={(index) => api.attachmentUrl(selectedMessageId, index)}
                 onBack={() => {
@@ -1198,6 +1342,8 @@ export default function App() {
                 syncing={syncingMessages}
                 folder={folder}
                 labelName={selectedLabel?.name ?? null}
+                titleOverride={query.trim() ? t('search.resultsTitle', { query: query.trim() }) : null}
+                showFolder={Boolean(query.trim())}
                 fullWidth
                 selectedIds={selectedIds}
                 actionBusy={actionBusy}
@@ -1213,6 +1359,7 @@ export default function App() {
               />
             )}
           </div>
+          </>
         )}
       </div>
 
@@ -1240,13 +1387,13 @@ export default function App() {
           initialDraft={composeDraft}
           seed={composeSeed}
           onClose={() => {
-            setComposeOpen(false)
+            dismissCompose()
             setComposeDraft(null)
             setComposeSeed(null)
             setRefreshKey((key) => key + 1)
           }}
           onSent={(warning, sentFolder) => {
-            setComposeOpen(false)
+            dismissCompose()
             setComposeDraft(null)
             setComposeSeed(null)
             setFolder('sent')
@@ -1262,7 +1409,7 @@ export default function App() {
             )
           }}
           onSaved={() => {
-            setComposeOpen(false)
+            dismissCompose()
             setComposeDraft(null)
             setComposeSeed(null)
             setFolder('draft')
@@ -1273,7 +1420,7 @@ export default function App() {
             setNotice(t('app.draftSaved'))
           }}
           onDeleted={() => {
-            setComposeOpen(false)
+            dismissCompose()
             setComposeDraft(null)
             setComposeSeed(null)
             setFolder('draft')

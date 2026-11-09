@@ -24,6 +24,8 @@ interface MailListProps {
   syncing?: boolean
   folder: Folder
   labelName?: string | null
+  titleOverride?: string | null
+  showFolder?: boolean
   fullWidth?: boolean
   className?: string
   selectedIds?: string[]
@@ -87,6 +89,8 @@ export function MailList({
   syncing = false,
   folder,
   labelName,
+  titleOverride,
+  showFolder = false,
   fullWidth = false,
   className,
   selectedIds = [],
@@ -103,7 +107,7 @@ export function MailList({
   const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null)
   const gestureRef = useRef<SwipeGesture | null>(null)
   const suppressClickRef = useRef(false)
-  const title = labelName ?? folderName(folder, t)
+  const title = titleOverride ?? labelName ?? folderName(folder, t)
   const empty = labelName
     ? t('list.emptyLabel')
     : folder === 'inbox'
@@ -531,7 +535,7 @@ export function MailList({
                           ? label
                           : t('list.to', { value: label })}
                       </p>
-                      {labelName ? (
+                      {labelName || showFolder ? (
                         <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-muted">
                           {folderName(message.folder, t)}
                         </span>

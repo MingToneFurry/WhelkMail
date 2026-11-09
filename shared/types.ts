@@ -200,6 +200,14 @@ export interface StorageOptions {
   r2: boolean
 }
 
+export type SearchScope = 'all' | 'inbox' | 'sent' | 'draft' | 'spam'
+
+export interface MessageSearchResult {
+  messages: MessageSummary[]
+  contacts: Contact[]
+  errors: { accountId: string; email: string; message: string }[]
+}
+
 export interface AttachmentInput {
   filename: string
   contentType: string

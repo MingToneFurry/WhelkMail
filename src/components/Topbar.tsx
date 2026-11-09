@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, LogOut, Menu, Search, Settings, UserRound } from 'lucide-react'
-import type { Account } from '../../shared/types'
+import { Check, Loader2, LogOut, Menu, Search, Settings, UserRound } from 'lucide-react'
+import type { Account, SearchScope } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { cn } from '../lib/utils'
 
@@ -8,8 +8,11 @@ interface TopbarProps {
   accounts: Account[]
   selectedAccountId: string
   query: string
+  scope: SearchScope
+  searching?: boolean
   onSelectAccount: (id: string) => void
   onQuery: (value: string) => void
+  onScopeChange: (scope: SearchScope) => void
   onOpenSettings: () => void
   onLogout: () => void
   onMenu: () => void
@@ -19,8 +22,11 @@ export function Topbar({
   accounts,
   selectedAccountId,
   query,
+  scope,
+  searching = false,
   onSelectAccount,
   onQuery,
+  onScopeChange,
   onOpenSettings,
   onLogout,
   onMenu,
@@ -67,14 +73,30 @@ export function Topbar({
       >
         <Menu size={20} />
       </button>
-      <div className="flex h-11 max-w-2xl flex-1 items-center gap-3 rounded-full bg-[#eaf1fb] px-4 focus-within:bg-white focus-within:shadow-md">
-        <Search size={18} className="text-muted" />
+      <div className="flex h-11 max-w-2xl flex-1 items-center gap-2 rounded-full bg-[#eaf1fb] px-4 focus-within:bg-white focus-within:shadow-md">
+        <Search size={18} className="shrink-0 text-muted" />
         <input
           value={query}
           onChange={(event) => onQuery(event.target.value)}
           placeholder={t('topbar.searchPlaceholder')}
           className="h-full w-full bg-transparent text-sm outline-none placeholder:text-muted"
         />
+        {searching ? <Loader2 size={15} className="shrink-0 animate-spin text-muted" /> : null}
+        {query.trim() ? (
+          <select
+            value={scope}
+            onChange={(event) => onScopeChange(event.target.value as SearchScope)}
+            aria-label={t('search.scope')}
+            title={t('search.scope')}
+            className="shrink-0 rounded-full bg-white/70 px-2 py-1 text-[11px] text-slate-700 outline-none"
+          >
+            <option value="all">{t('search.scopeAll')}</option>
+            <option value="inbox">{t('search.scopeInbox')}</option>
+            <option value="sent">{t('search.scopeSent')}</option>
+            <option value="draft">{t('search.scopeDrafts')}</option>
+            <option value="spam">{t('search.scopeSpam')}</option>
+          </select>
+        ) : null}
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">

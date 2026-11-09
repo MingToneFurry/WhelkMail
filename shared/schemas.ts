@@ -52,6 +52,10 @@ const relayAccountSchema = z.object({
   relayApiSecret: z.string().trim().max(2000).refine(noControl, 'Invalid characters').optional(),
   relayDomain: z.string().trim().max(255).refine(noControl, 'Invalid characters').optional(),
   relayRegion: z.enum(['us', 'eu']).optional(),
+  smtpHost: host.optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpSecurity: security.optional(),
+  username: safeText(255).optional(),
   incomingLabelName: safeText(40).optional(),
 })
 

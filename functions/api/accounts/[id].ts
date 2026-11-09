@@ -103,6 +103,9 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     if (!providerMeta) {
       return fail('Unsupported relay provider', 400, undefined, 'relay_provider_unsupported')
     }
+    if (providerMeta.manual && (!smtpHost || !smtpPort || !smtpSecurity)) {
+      return fail('SMTP configuration is incomplete', 400, undefined, 'hosts_required')
+    }
     if (providerMeta.needsSecret && !relayApiSecretEnc) {
       return fail('Relay API secret is required', 400, undefined, 'relay_secret_required')
     }

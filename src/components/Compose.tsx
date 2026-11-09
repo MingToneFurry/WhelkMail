@@ -2,6 +2,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
+  ArrowLeft,
   Cloud,
   FileText,
   HardDrive,
@@ -372,12 +373,23 @@ export function Compose({
         onSubmit={submit}
         className="flex h-full w-full max-w-none flex-col rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-2xl"
       >
-        <div className="flex items-center justify-between border-b border-line px-5 py-3">
-          <h2 className="text-sm font-medium">{t('compose.title')}</h2>
+        <div className="flex items-center justify-between border-b border-line px-3 py-2 sm:px-5 sm:py-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleClose()}
+              className="rounded-full p-1.5 text-muted hover:bg-slate-100 sm:hidden"
+              aria-label={t('reading.back')}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h2 className="text-sm font-medium sm:text-base">{t('compose.title')}</h2>
+          </div>
           <button
             type="button"
             onClick={() => void handleClose()}
-            className="rounded-full p-1.5 text-muted hover:bg-slate-100"
+            className="hidden rounded-full p-1.5 text-muted hover:bg-slate-100 sm:block"
+            aria-label={t('common.close')}
           >
             <X size={18} />
           </button>
