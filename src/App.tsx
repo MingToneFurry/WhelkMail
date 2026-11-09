@@ -37,12 +37,86 @@ import { Topbar } from './components/Topbar'
 type View = 'mail' | 'settings' | 'contacts'
 type AuthState = 'loading' | 'needed' | 'ok'
 
+interface MailRoute {
+  view: View
+  folder: Folder
+  labelId: string | null
+  messageId: string | null
+  accountId: string
+}
+
+const FOLDER_PATHS: Record<Folder, string> = {
+  inbox: 'inbox',
+  sent: 'sent',
+  draft: 'drafts',
+  spam: 'spam',
+}
+
+const PATH_FOLDERS: Record<string, Folder> = {
+  inbox: 'inbox',
+  sent: 'sent',
+  drafts: 'draft',
+  draft: 'draft',
+  spam: 'spam',
+}
+
+function parseRoute(): MailRoute {
+  const accountId = new URLSearchParams(window.location.search).get('account') ?? 'all'
+  const segments = window.location.pathname.split('/').filter(Boolean)
+  const head = segments[0] ?? ''
+  if (head === 'settings') {
+    return { view: 'settings', folder: 'inbox', labelId: null, messageId: null, accountId }
+  }
+  if (head === 'contacts') {
+    return { view: 'contacts', folder: 'inbox', labelId: null, messageId: null, accountId }
+  }
+  if (head === 'label' && segments[1]) {
+    return {
+      view: 'mail',
+      folder: 'inbox',
+      labelId: decodeURIComponent(segments[1]),
+      messageId: segments[2] ? decodeURIComponent(segments[2]) : null,
+      accountId,
+    }
+  }
+  return {
+    view: 'mail',
+    folder: PATH_FOLDERS[head] ?? 'inbox',
+    labelId: null,
+    messageId: segments[1] ? decodeURIComponent(segments[1]) : null,
+    accountId,
+  }
+}
+
+function routeUrl(route: MailRoute): string {
+  const params = new URLSearchParams()
+  if (route.accountId !== 'all') {
+    params.set('account', route.accountId)
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  if (route.view === 'settings') {
+    return `/settings${suffix}`
+  }
+  if (route.view === 'contacts') {
+    return `/contacts${suffix}`
+  }
+  if (route.labelId) {
+    const base = `/label/${encodeURIComponent(route.labelId)}`
+    return route.messageId
+      ? `${base}/${encodeURIComponent(route.messageId)}${suffix}`
+      : `${base}${suffix}`
+  }
+  const base = `/${FOLDER_PATHS[route.folder]}`
+  return route.messageId ? `${base}/${encodeURIComponent(route.messageId)}${suffix}` : `${base}${suffix}`
+}
+
 export default function App() {
   const { t } = useI18n()
   const tRef = useRef(t)
   useEffect(() => {
     tRef.current = t
   })
+  const [initialRoute] = useState<MailRoute>(() => parseRoute())
   const [auth, setAuth] = useState<AuthState>('loading')
   const [fatal, setFatal] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -54,20 +128,20 @@ export default function App() {
   const [allowRemoteImages, setAllowRemoteImages] = useState(false)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null)
-  const [folder, setFolder] = useState<Folder>('inbox')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(initialRoute.accountId)
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(initialRoute.labelId)
+  const [folder, setFolder] = useState<Folder>(initialRoute.folder)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [messages, setMessages] = useState<MessageSummary[]>([])
   const [listErrors, setListErrors] = useState<AccountError[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [hiddenIds, setHiddenIds] = useState<string[]>([])
   const [actionBusy, setActionBusy] = useState(false)
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(initialRoute.messageId)
   const [detail, setDetail] = useState<MessageDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
-  const [view, setView] = useState<View>('mail')
+  const [view, setView] = useState<View>(initialRoute.view)
   const [query, setQuery] = useState('')
   const [searchScope, setSearchScope] = useState<SearchScope>('all')
   const [searchResults, setSearchResults] = useState<MessageSummary[] | null>(null)
@@ -118,6 +192,7 @@ export default function App() {
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const routeUrlRef = useRef<string | null>(null)
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null
   const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
@@ -208,6 +283,44 @@ export default function App() {
     const search = params.toString()
     window.history.replaceState({}, '', `${window.location.pathname}${search ? `?${search}` : ''}`)
   }, [t])
+
+  useEffect(() => {
+    const next = routeUrl({
+      view,
+      folder,
+      labelId: selectedLabelId,
+      messageId: selectedMessageId,
+      accountId: selectedAccountId,
+    })
+    const previous = routeUrlRef.current
+    routeUrlRef.current = next
+    const current = `${window.location.pathname}${window.location.search}`
+    if (next === current) {
+      return
+    }
+    if (previous === null) {
+      window.history.replaceState({}, '', next)
+    } else {
+      window.history.pushState({}, '', next)
+    }
+  }, [view, folder, selectedLabelId, selectedMessageId, selectedAccountId])
+
+  useEffect(() => {
+    function onPopState() {
+      const route = parseRoute()
+      routeUrlRef.current = `${window.location.pathname}${window.location.search}`
+      setView(route.view)
+      setFolder(route.folder)
+      setSelectedLabelId(route.labelId)
+      setSelectedMessageId(route.messageId)
+      setSelectedAccountId(route.accountId)
+      setSelectedIds([])
+      setHiddenIds([])
+      setQuery('')
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   useEffect(() => {
     syncSignatureRef.current = ''
@@ -1091,6 +1204,7 @@ export default function App() {
           searching={searchLoading}
           onScopeChange={setSearchScope}
           onSelectAccount={(id) => {
+
             setListLoaded(false)
             setMessages([])
             setSelectedAccountId(id)
@@ -1104,7 +1218,6 @@ export default function App() {
             setQuery(value)
             setSelectedIds([])
           }}
-          onOpenSettings={() => setView('settings')}
           onLogout={() => void logout()}
           onMenu={() => setMobileSidebarOpen(true)}
         />

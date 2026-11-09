@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader2, LogOut, Menu, Search, Settings, UserRound } from 'lucide-react'
+import { Check, Loader2, LogOut, Menu, Search, UserRound } from 'lucide-react'
 import type { Account, SearchScope } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { cn } from '../lib/utils'
@@ -13,7 +13,6 @@ interface TopbarProps {
   onSelectAccount: (id: string) => void
   onQuery: (value: string) => void
   onScopeChange: (scope: SearchScope) => void
-  onOpenSettings: () => void
   onLogout: () => void
   onMenu: () => void
 }
@@ -27,7 +26,6 @@ export function Topbar({
   onSelectAccount,
   onQuery,
   onScopeChange,
-  onOpenSettings,
   onLogout,
   onMenu,
 }: TopbarProps) {
@@ -100,16 +98,6 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          title={t('topbar.settings')}
-          aria-label={t('topbar.settings')}
-          className="rounded-full p-2 text-muted hover:bg-slate-200/60"
-        >
-          <Settings size={20} />
-        </button>
-
         <div className="relative" ref={menuRef}>
           <button
             type="button"
