@@ -3,6 +3,7 @@ import { accountUpdateSchema } from '../../../shared/schemas'
 import { encryptString } from '../../_lib/crypto'
 import { getAccountRow, publicAccount } from '../../_lib/db'
 import { purgeAccountStorage } from '../../_lib/deletion'
+import { backfillAccountLabel } from '../../_lib/filters'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 
@@ -140,6 +141,10 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       id,
     )
     .run()
+
+  if (incomingLabelId && incomingLabelId !== row.incoming_label_id) {
+    await backfillAccountLabel(context.env, id, incomingLabelId)
+  }
 
   const updated = await getAccountRow(context.env, id)
   if (!updated) {

@@ -50,6 +50,7 @@ export default function App() {
   const [filters, setFilters] = useState<MailFilter[]>([])
   const [defaultSignature, setDefaultSignature] = useState('')
   const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
+  const [allowRemoteImages, setAllowRemoteImages] = useState(false)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
@@ -101,7 +102,7 @@ export default function App() {
   const [composeDraft, setComposeDraft] = useState<DraftPayload | null>(null)
   const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null)
   const [composeKey, setComposeKey] = useState(0)
-  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [listLoaded, setListLoaded] = useState(false)
   const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const syncRefreshCount = useRef(0)
@@ -138,6 +139,7 @@ export default function App() {
         const settingsResponse = await api.settings()
         setDefaultSignature(settingsResponse.defaultSignature)
         setSignatureMode(settingsResponse.signatureMode)
+        setAllowRemoteImages(settingsResponse.allowRemoteImages)
       } catch (error) {
         if (error instanceof ApiError && error.isUnauthorized) {
           throw error
@@ -205,6 +207,10 @@ export default function App() {
 
   useEffect(() => {
     syncRefreshCount.current = 0
+    setListLoaded(false)
+    setMessages([])
+    setSelectedIds([])
+    setHiddenIds([])
   }, [selectedAccountId, folder, selectedLabelId])
 
   useEffect(() => {
@@ -212,7 +218,6 @@ export default function App() {
       return
     }
     let cancelled = false
-    setLoadingMessages(true)
     api
       .messages(selectedAccountId, folder, selectedLabelId)
       .then((response) => {
@@ -245,7 +250,7 @@ export default function App() {
       })
       .finally(() => {
         if (!cancelled) {
-          setLoadingMessages(false)
+          setListLoaded(true)
         }
       })
     return () => {
@@ -761,6 +766,8 @@ export default function App() {
   }
 
   function openFolder(next: Folder) {
+    setListLoaded(false)
+    setMessages([])
     setFolder(next)
     setSelectedLabelId(null)
     setView('mail')
@@ -772,6 +779,8 @@ export default function App() {
   }
 
   function selectLabel(id: string | null) {
+    setListLoaded(false)
+    setMessages([])
     setSelectedLabelId(id)
     setView('mail')
     setSelectedMessageId(null)
@@ -787,6 +796,15 @@ export default function App() {
       localStorage.setItem('mc_reading_pane', value ? '1' : '0')
     } catch {
       // ignore
+    }
+  }
+
+  async function changeAllowRemoteImages(value: boolean) {
+    setAllowRemoteImages(value)
+    try {
+      await api.updateSettings({ allowRemoteImages: value })
+    } catch (error) {
+      setSettingsError(errorText(error, tRef.current))
     }
   }
 
@@ -893,6 +911,8 @@ export default function App() {
           selectedAccountId={selectedAccountId}
           query={query}
           onSelectAccount={(id) => {
+            setListLoaded(false)
+            setMessages([])
             setSelectedAccountId(id)
             setSelectedLabelId(null)
             setSelectedMessageId(null)
@@ -968,6 +988,8 @@ export default function App() {
             }}
             readingPane={readingPane}
             onReadingPaneChange={changeReadingPane}
+            allowRemoteImages={allowRemoteImages}
+            onAllowRemoteImagesChange={(value) => void changeAllowRemoteImages(value)}
             defaultSenderNew={defaultSenderNew}
             onDefaultSenderNewChange={changeDefaultSenderNew}
             defaultSenderReply={defaultSenderReply}
@@ -994,7 +1016,7 @@ export default function App() {
                   messages={visibleMessages}
                   labels={labels}
                   selectedId={selectedMessageId}
-                  loading={loadingMessages}
+                  loading={!listLoaded}
                   syncing={syncingMessages}
                   folder={folder}
                   labelName={selectedLabel?.name ?? null}
@@ -1006,6 +1028,9 @@ export default function App() {
                   onAction={(action, target) =>
                     void runMessageAction(selectedIds, action, target)
                   }
+                  onMessageAction={(id, action, target) =>
+                    void runMessageAction([id], action, target)
+                  }
                   onSelect={(id) => void selectMessage(id)}
                 />
                 <ReadingPane
@@ -1013,6 +1038,7 @@ export default function App() {
                   labels={labels}
                   loading={detailLoading}
                   error={detailError}
+                  allowRemoteImages={allowRemoteImages}
                   rawUrl={selectedMessageId ? api.rawUrl(selectedMessageId) : null}
                   attachmentUrl={(index) =>
                     selectedMessageId ? api.attachmentUrl(selectedMessageId, index) : '#'
@@ -1055,6 +1081,7 @@ export default function App() {
                 labels={labels}
                 loading={detailLoading}
                 error={detailError}
+                allowRemoteImages={allowRemoteImages}
                 rawUrl={api.rawUrl(selectedMessageId)}
                 attachmentUrl={(index) => api.attachmentUrl(selectedMessageId, index)}
                 onBack={() => {
@@ -1093,7 +1120,7 @@ export default function App() {
                 messages={visibleMessages}
                 labels={labels}
                 selectedId={selectedMessageId}
-                loading={loadingMessages}
+                loading={!listLoaded}
                 syncing={syncingMessages}
                 folder={folder}
                 labelName={selectedLabel?.name ?? null}
@@ -1104,6 +1131,9 @@ export default function App() {
                 onToggleSelectAll={toggleSelectAll}
                 onAction={(action, target) =>
                   void runMessageAction(selectedIds, action, target)
+                }
+                onMessageAction={(id, action, target) =>
+                  void runMessageAction([id], action, target)
                 }
                 onSelect={(id) => void selectMessage(id)}
               />

@@ -29,6 +29,7 @@ interface ReadingPaneProps {
   labels: Label[]
   loading: boolean
   error: string | null
+  allowRemoteImages?: boolean
   rawUrl: string | null
   attachmentUrl: (index: number) => string
   onBack?: () => void
@@ -82,6 +83,7 @@ export function ReadingPane({
   labels,
   loading,
   error,
+  allowRemoteImages = false,
   rawUrl,
   attachmentUrl,
   onBack,
@@ -105,7 +107,7 @@ export function ReadingPane({
   const hasImages =
     /(?:src|srcset)\s*=\s*["']?[^"'\s>]*(?:https?:|\/\/|cid:)/i.test(html) ||
     /url\(\s*["']?(?:https?:|\/\/|cid:)/i.test(html)
-  const showImages = imageState.id === message?.id ? imageState.show : false
+  const showImages = imageState.id === message?.id ? imageState.show : allowRemoteImages
   const frameHeight = frameState.id === message?.id ? frameState.height : 420
   const cidMap = new Map<string, string>()
   for (const attachment of message?.attachments ?? []) {

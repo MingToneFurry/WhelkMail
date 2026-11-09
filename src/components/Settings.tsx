@@ -51,6 +51,8 @@ interface SettingsProps {
   onAddAccount: () => void
   readingPane: boolean
   onReadingPaneChange: (value: boolean) => void
+  allowRemoteImages: boolean
+  onAllowRemoteImagesChange: (value: boolean) => void
   defaultSenderNew: string
   onDefaultSenderNewChange: (value: string) => void
   defaultSenderReply: string
@@ -679,6 +681,8 @@ export function Settings({
   onAddAccount,
   readingPane,
   onReadingPaneChange,
+  allowRemoteImages,
+  onAllowRemoteImagesChange,
   defaultSenderNew,
   onDefaultSenderNewChange,
   defaultSenderReply,
@@ -793,6 +797,16 @@ export function Settings({
                 />
                 {t('settings.readingPane')}
               </label>
+              <label className="mt-3 flex items-center gap-2 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={allowRemoteImages}
+                  onChange={(event) => onAllowRemoteImagesChange(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                {t('settings.remoteImages')}
+              </label>
+              <p className="mt-1 text-[11px] text-muted">{t('settings.remoteImagesHint')}</p>
             </div>
 
             <div className="mt-3 rounded-2xl border border-line bg-white p-5">

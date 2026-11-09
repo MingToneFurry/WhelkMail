@@ -660,11 +660,11 @@ async function runSyncChunkLocked(
           account.id,
           parsed.map((item) => ({ id: item.id, stableKey: item.stableKey, folder })),
         )
+        const summaries = parsed.map((item) => imapMessageSummary(item.row, account))
         if (folder === 'inbox') {
-          const summaries = parsed.map((item) => imapMessageSummary(item.row, account))
           await applyFilters(env, account.id, summaries)
-          await applyAccountLabel(env, account.id, account.incoming_label_id, summaries)
         }
+        await applyAccountLabel(env, account.id, account.incoming_label_id, summaries)
       }
 
       if (archiveStorage && parsed.length > 0) {

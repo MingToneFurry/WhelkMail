@@ -109,6 +109,7 @@ export type SignatureMode = 'shared' | 'per_account'
 export interface AppSettings {
   defaultSignature: string
   signatureMode: SignatureMode
+  allowRemoteImages: boolean
 }
 
 export interface Mailbox {

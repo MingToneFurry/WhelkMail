@@ -361,7 +361,7 @@ export function Compose({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-white sm:items-center sm:bg-black/30 sm:p-6"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           void handleClose()
@@ -370,7 +370,7 @@ export function Compose({
     >
       <form
         onSubmit={submit}
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        className="flex h-full w-full max-w-none flex-col rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <h2 className="text-sm font-medium">{t('compose.title')}</h2>
