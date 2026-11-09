@@ -106,6 +106,7 @@ export default function App() {
   const [syncingMessages, setSyncingMessages] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const syncSignatureRef = useRef('')
+  const syncAdvanceIndexRef = useRef(0)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [settingsBusyId, setSettingsBusyId] = useState<string | null>(null)
@@ -207,6 +208,7 @@ export default function App() {
 
   useEffect(() => {
     syncSignatureRef.current = ''
+    syncAdvanceIndexRef.current = 0
     setListLoaded(false)
     setMessages([])
     setSelectedIds([])
@@ -305,6 +307,18 @@ export default function App() {
           setSyncingMessages(false)
           return
         }
+        const partialAccounts = overview.accounts.filter(
+          (account) =>
+            (selectedAccountId === 'all' || account.accountId === selectedAccountId) &&
+            account.folders.some(
+              (state) => state.folder === folder && state.status === 'partial',
+            ),
+        )
+        if (partialAccounts.length > 0) {
+          const index = syncAdvanceIndexRef.current % partialAccounts.length
+          syncAdvanceIndexRef.current += 1
+          void api.runSync(partialAccounts[index].accountId, folder).catch(() => undefined)
+        }
         attempt += 1
         schedule(Math.min(15000, 4000 + attempt * 2000))
       } catch (error) {
@@ -344,7 +358,7 @@ export default function App() {
       }
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [syncingMessages, auth])
+  }, [syncingMessages, auth, selectedAccountId, folder])
 
   useEffect(() => {
     if (!notice) {
