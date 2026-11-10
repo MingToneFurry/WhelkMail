@@ -1,4 +1,4 @@
-const CACHE = 'whelkmail-v2'
+const CACHE = 'whelkmail-v3'
 const SHELL = [
   '/',
   '/favicon.svg',
@@ -20,9 +20,22 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+    Promise.all([
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
+        ),
+      // Drop notifications left behind by the previous version, which tagged
+      // them per message: a surviving extra notification makes Android group
+      // them and show the grouping icon instead of the badge.
+      self.registration.getNotifications().then((existing) => {
+        for (const notification of existing) {
+          notification.close()
+        }
+      }),
+    ])
+      .catch(() => undefined)
       .then(() => self.clients.claim()),
   )
 })
@@ -69,6 +82,23 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+// Notifications are serialised and every other one is dismissed first: Android
+// shows a second notification as a group whose status bar icon is the grouping
+// indicator (two empty squares) instead of the app badge.
+let notificationQueue = Promise.resolve()
+
+function showSingleNotification(title, options) {
+  notificationQueue = notificationQueue
+    .then(async () => {
+      const existing = await self.registration.getNotifications()
+      const stale = existing.filter((item) => !options.tag || item.tag !== options.tag)
+      await Promise.all(stale.map((item) => item.close()))
+      await self.registration.showNotification(title, options)
+    })
+    .catch(() => undefined)
+  return notificationQueue
+}
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {
@@ -91,7 +121,7 @@ self.addEventListener('push', (event) => {
   if (tag && payload.renotify) {
     options.renotify = true
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(showSingleNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
