@@ -39,9 +39,16 @@ tree=$(git rev-parse "$SOURCE^{tree}")
 parent=$(git rev-parse "$REMOTE/$TARGET")
 commit=$(git commit-tree "$tree" -p "$parent" -m "$MESSAGE")
 
+# Keep the snapshot reachable even if the push fails (missing credentials, no
+# network): the next run replaces it and a plain
+#   git push public public-release:main
+# is enough once authentication works.
+git update-ref refs/heads/public-release "$commit"
+
 echo "publishing $SOURCE -> $REMOTE/$TARGET"
 echo "  tree   $tree"
 echo "  parent $parent"
+echo "  commit $commit (ref public-release)"
 git --no-pager diff --stat "$parent" "$commit" | tail -n 20
 echo
 git push "$REMOTE" "$commit:$TARGET"

@@ -104,6 +104,14 @@ The script refuses to run if `wrangler.toml`, `worker/wrangler.toml` or
 (so the public history stays linear and pushes are fast-forwards) and pushes
 the tree of `SOURCE`.
 
+The snapshot commit is also stored in the local `public-release` branch. If the
+push fails (for example because no credentials are available), nothing is lost:
+re-run the script or push the prepared commit directly with
+
+```bash
+git push public public-release:main
+```
+
 Before publishing, make sure the public tree is installable:
 
 ```bash
