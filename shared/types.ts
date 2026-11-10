@@ -302,6 +302,7 @@ export interface AccountCreateInput {
   password?: string
   autoSavesSent?: boolean
   storageDriver?: StorageDriver
+  sentCopyAccountId?: string
   relayProvider?: string
   relayApiKey?: string
   relayApiSecret?: string

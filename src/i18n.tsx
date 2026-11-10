@@ -475,6 +475,8 @@ const en: Record<string, string> = {
   'onboarding.creating': 'Creating...',
   'onboarding.imapHint': 'Direct IMAP/SMTP connection from the Cloudflare Worker.',
   'onboarding.relayHint': 'Send via HTTP relay, archive on Drive/R2.',
+  'onboarding.sentCopyTargetEmpty':
+    'No connected IMAP account yet: add one first to also keep sent mail in a real mailbox.',
   'onboarding.hostsRequired': 'IMAP and SMTP hosts are required',
   'onboarding.passwordRequired': 'Enter the password or app password',
   'onboarding.oauthNotConfigured': 'Microsoft OAuth is not configured on the server',
@@ -1023,6 +1025,8 @@ const it: Record<string, string> = {
   'onboarding.creating': 'Creazione...',
   'onboarding.imapHint': 'Connessione diretta IMAP/SMTP dal Worker Cloudflare.',
   'onboarding.relayHint': 'Invio via relay HTTP, archivio su Drive/R2.',
+  'onboarding.sentCopyTargetEmpty':
+    'Nessun account IMAP collegato: aggiungine uno per tenere le inviate anche in una casella reale.',
   'onboarding.hostsRequired': 'Host IMAP e SMTP obbligatori',
   'onboarding.passwordRequired': 'Inserisci la password o la password per app',
   'onboarding.oauthNotConfigured': 'OAuth Microsoft non è configurato sul server',

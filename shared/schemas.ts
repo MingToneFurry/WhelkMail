@@ -47,6 +47,7 @@ const relayAccountSchema = z.object({
   email,
   displayName: safeText(120),
   storageDriver: z.enum(['drive', 'r2']).default('drive'),
+  sentCopyAccountId: z.string().min(1).max(64).optional(),
   relayProvider: safeText(40).default('smtp2go'),
   relayApiKey: z.string().trim().min(1).max(2000).refine(noControl, 'Invalid characters').optional(),
   relayApiSecret: z.string().trim().max(2000).refine(noControl, 'Invalid characters').optional(),
