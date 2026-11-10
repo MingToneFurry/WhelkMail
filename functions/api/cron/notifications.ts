@@ -7,7 +7,7 @@ import { pruneMirroredMetadata } from '../../_lib/retention'
 import { applyAccountLabel, applyFilters } from '../../_lib/filters'
 import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
-import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
+import { mailNotification, pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
 import {
   cleanupExpiredSyncLocks,
   imapMessageSummary,
@@ -159,13 +159,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         )
 
         if (notify && notifyEnabled && pushFolders.has(folder)) {
-          const title = row.from_name || row.from_email || account.display_name
-          const payload = {
-            title,
+          const payload = mailNotification({
+            messageId: row.id,
+            title: row.from_name || row.from_email || account.display_name,
             body: row.subject || '(nessun oggetto)',
-            url: `/?message=${encodeURIComponent(row.id)}`,
-            tag: row.id,
-          }
+          })
           for (const subscription of subscriptions.results) {
             if (gone.has(subscription.endpoint)) {
               continue

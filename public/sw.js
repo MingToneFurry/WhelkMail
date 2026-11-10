@@ -77,14 +77,19 @@ self.addEventListener('push', (event) => {
     payload = {}
   }
   const title = payload.title || 'WhelkMail'
+  const tag = payload.tag || undefined
   const options = {
     body: payload.body || '',
     // Android masks the badge into a monochrome silhouette in the status bar and
     // only renders bitmaps there, so both assets are PNG (see scripts/generate-icons.mjs).
     icon: payload.icon || '/notification-icon.png',
     badge: payload.badge || '/notification-badge.png',
-    data: { url: payload.url || '/', tag: payload.tag || undefined },
-    tag: payload.tag || undefined,
+    data: { url: payload.url || '/', tag },
+    tag,
+  }
+  // `renotify` is only meaningful (and only valid) together with a tag.
+  if (tag && payload.renotify) {
+    options.renotify = true
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })

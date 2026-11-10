@@ -12,9 +12,37 @@ export interface PushPayload {
   body: string
   url?: string
   tag?: string
+  /** Alert again when a notification replaces one with the same tag. */
+  renotify?: boolean
   /** Optional overrides for the notification images (must be bitmaps on Android). */
   icon?: string
   badge?: string
+}
+
+/**
+ * Single notification slot for the whole app.
+ *
+ * Using the message id as tag made every new mail a separate notification. From
+ * the second one Android collapses them into a group and replaces the badge in
+ * the status bar with the grouping indicator, so the icon looked broken. One
+ * stable tag keeps a single notification that gets updated with the latest mail.
+ */
+export const NOTIFICATION_TAG = 'whelkmail'
+
+export interface MailNotificationInput {
+  messageId: string
+  title: string
+  body: string
+}
+
+export function mailNotification(input: MailNotificationInput): PushPayload {
+  return {
+    title: input.title,
+    body: input.body,
+    url: `/?message=${encodeURIComponent(input.messageId)}`,
+    tag: NOTIFICATION_TAG,
+    renotify: true,
+  }
 }
 
 const encoder = new TextEncoder()
