@@ -205,6 +205,10 @@ const en: Record<string, string> = {
   'settings.sentClient': 'The client saves it via IMAP (recommended for other providers)',
   'settings.sentHint':
     'Choose “provider” only if your mail service already stores sent messages in Sent. If unsure, choose “client”.',
+  'settings.sentCopyTarget': 'Also append the sent copy to',
+  'settings.sentCopyTargetNone': 'No other account',
+  'settings.sentCopyTargetHint':
+    'The copy stays on Drive or R2 as usual; the same message is also saved in the Sent folder of the account you pick here. Only connected IMAP accounts are listed.',
   'settings.updatePassword': 'Update password / app password',
   'settings.savePassword': 'Save password',
   'settings.testConnection': 'Test connection',
@@ -747,6 +751,10 @@ const it: Record<string, string> = {
   'settings.sentClient': 'La salva il client via IMAP (consigliato per gli altri provider)',
   'settings.sentHint':
     'Scegli “provider” solo se il servizio mette già le email inviate in Sent. Se non sei sicuro, scegli “client”.',
+  'settings.sentCopyTarget': 'Copia le inviate anche nella cartella inviate di',
+  'settings.sentCopyTargetNone': 'Nessun altro account',
+  'settings.sentCopyTargetHint':
+    'La copia resta su Drive o R2 come sempre; lo stesso messaggio viene salvato anche nella cartella inviate dell’account scelto qui. Compaiono solo gli account IMAP collegati.',
   'settings.updatePassword': 'Aggiorna password / app password',
   'settings.savePassword': 'Salva password',
   'settings.testConnection': 'Verifica connessione',
