@@ -7,13 +7,7 @@ import { pruneMirroredMetadata } from '../../_lib/retention'
 import { applyAccountLabel, applyFilters } from '../../_lib/filters'
 import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
-import {
-  digestNotification,
-  pushConfigured,
-  sendWebPush,
-  type MailNotificationItem,
-  type PushSubscriptionRecord,
-} from '../../_lib/push'
+import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
 import {
   cleanupExpiredSyncLocks,
   imapMessageSummary,
@@ -65,7 +59,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   ).all<{ id: string }>()
   const hasForwarding = forwardingFilters.results.length > 0
   const gone = new Set<string>()
-  const pendingMail: MailNotificationItem[] = []
   let sent = 0
   let forwarded = 0
   let deleted = 0
@@ -166,11 +159,29 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         )
 
         if (notify && notifyEnabled && pushFolders.has(folder)) {
-          pendingMail.push({
-            messageId: row.id,
-            title: row.from_name || row.from_email || account.display_name,
+          const title = row.from_name || row.from_email || account.display_name
+          const payload = {
+            title,
             body: row.subject || '(nessun oggetto)',
-          })
+            url: `/?message=${encodeURIComponent(row.id)}`,
+            tag: row.id,
+          }
+          for (const subscription of subscriptions.results) {
+            if (gone.has(subscription.endpoint)) {
+              continue
+            }
+            try {
+              const result = await sendWebPush(context.env, subscription, payload)
+              if (result.ok) {
+                sent += 1
+              }
+              if (result.gone) {
+                gone.add(subscription.endpoint)
+              }
+            } catch {
+              // Keep processing the remaining subscriptions.
+            }
+          }
         }
       }
     }
@@ -189,28 +200,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         if (result === 'done') {
           deleted += 1
         }
-      }
-    }
-  }
-
-  // One push per cron run: a separate notification per message makes Android
-  // group them and the status bar loses the app badge.
-  if (notify && pendingMail.length > 0) {
-    const payload = digestNotification(pendingMail)
-    for (const subscription of subscriptions.results) {
-      if (gone.has(subscription.endpoint)) {
-        continue
-      }
-      try {
-        const result = await sendWebPush(context.env, subscription, payload)
-        if (result.ok) {
-          sent += 1
-        }
-        if (result.gone) {
-          gone.add(subscription.endpoint)
-        }
-      } catch {
-        // Keep processing the remaining subscriptions.
       }
     }
   }

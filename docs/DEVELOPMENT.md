@@ -146,12 +146,6 @@ on a transparent background. The badge drops the thin decorative strokes of the
 logo: at status bar size they only add noise. After changing the files, bump
 `CACHE` in `public/sw.js` so installed clients pick up the new assets.
 
-Notifications use a single slot (`whelkmail`): the service worker dismisses any
-other notification before showing the new one, and clears leftovers from the
-previous version when it activates. With two notifications Android groups them
-and the status bar icon becomes the grouping indicator (two empty squares)
-instead of the badge.
-
 ## Where things live
 
 | Path | Contents |

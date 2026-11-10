@@ -12,71 +12,9 @@ export interface PushPayload {
   body: string
   url?: string
   tag?: string
-  /** Alert again when a notification replaces one with the same tag. */
-  renotify?: boolean
   /** Optional overrides for the notification images (must be bitmaps on Android). */
   icon?: string
   badge?: string
-}
-
-/**
- * Single notification slot for the whole app.
- *
- * Using the message id as tag made every new mail a separate notification. From
- * the second one Android collapses them into a group and replaces the badge in
- * the status bar with the grouping indicator, so the icon looked broken. One
- * stable tag keeps a single notification that gets updated with the latest mail.
- */
-export const NOTIFICATION_TAG = 'whelkmail'
-
-export interface MailNotificationInput {
-  messageId: string
-  title: string
-  body: string
-}
-
-export type MailNotificationItem = MailNotificationInput
-
-/** How many senders the digest body lists before it stops growing. */
-const DIGEST_LINES = 4
-
-export function mailNotification(input: MailNotificationInput): PushPayload {
-  return {
-    title: input.title,
-    body: input.body,
-    url: `/?message=${encodeURIComponent(input.messageId)}`,
-    tag: NOTIFICATION_TAG,
-    renotify: true,
-  }
-}
-
-/**
- * One notification for every message found in the same cron run.
- *
- * Android draws the grouping indicator (the stacked squares) as soon as an app
- * has more than one notification, and web push cannot provide the group summary
- * that native apps use to keep their own icon. Putting the messages in a single
- * notification is the only way to keep the badge while still showing all of
- * them, so the body lists the senders and opens the newest message.
- */
-export function digestNotification(items: MailNotificationItem[]): PushPayload {
-  if (items.length === 0) {
-    throw new Error('digestNotification requires at least one message')
-  }
-  const latest = items[items.length - 1]
-  if (items.length === 1) {
-    return mailNotification(latest)
-  }
-  const lines = items
-    .slice(-DIGEST_LINES)
-    .map((item) => `${item.title}: ${item.body}`)
-  return {
-    title: `${items.length} nuovi messaggi`,
-    body: lines.join('\n'),
-    url: `/?message=${encodeURIComponent(latest.messageId)}`,
-    tag: NOTIFICATION_TAG,
-    renotify: true,
-  }
 }
 
 const encoder = new TextEncoder()

@@ -1,4 +1,4 @@
-const CACHE = 'whelkmail-v3'
+const CACHE = 'whelkmail-v2'
 const SHELL = [
   '/',
   '/favicon.svg',
@@ -20,22 +20,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    Promise.all([
-      caches
-        .keys()
-        .then((keys) =>
-          Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
-        ),
-      // Drop notifications left behind by the previous version, which tagged
-      // them per message: a surviving extra notification makes Android group
-      // them and show the grouping icon instead of the badge.
-      self.registration.getNotifications().then((existing) => {
-        for (const notification of existing) {
-          notification.close()
-        }
-      }),
-    ])
-      .catch(() => undefined)
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   )
 })
@@ -82,23 +69,6 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
-// Notifications are serialised and every other one is dismissed first: Android
-// shows a second notification as a group whose status bar icon is the grouping
-// indicator (two empty squares) instead of the app badge.
-let notificationQueue = Promise.resolve()
-
-function showSingleNotification(title, options) {
-  notificationQueue = notificationQueue
-    .then(async () => {
-      const existing = await self.registration.getNotifications()
-      const stale = existing.filter((item) => !options.tag || item.tag !== options.tag)
-      await Promise.all(stale.map((item) => item.close()))
-      await self.registration.showNotification(title, options)
-    })
-    .catch(() => undefined)
-  return notificationQueue
-}
-
 self.addEventListener('push', (event) => {
   let payload = {}
   try {
@@ -107,21 +77,16 @@ self.addEventListener('push', (event) => {
     payload = {}
   }
   const title = payload.title || 'WhelkMail'
-  const tag = payload.tag || undefined
   const options = {
     body: payload.body || '',
     // Android masks the badge into a monochrome silhouette in the status bar and
     // only renders bitmaps there, so both assets are PNG (see scripts/generate-icons.mjs).
     icon: payload.icon || '/notification-icon.png',
     badge: payload.badge || '/notification-badge.png',
-    data: { url: payload.url || '/', tag },
-    tag,
+    data: { url: payload.url || '/', tag: payload.tag || undefined },
+    tag: payload.tag || undefined,
   }
-  // `renotify` is only meaningful (and only valid) together with a tag.
-  if (tag && payload.renotify) {
-    options.renotify = true
-  }
-  event.waitUntil(showSingleNotification(title, options))
+  event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
