@@ -326,7 +326,7 @@ For send-only accounts:
 2. Verify the sending domain with the provider (SPF and DKIM).
 3. Copy the provider API key.
 4. Paste it in the account creation form or in Settings.
-5. Optional: in Settings → Accounts, pick an IMAP account under **Also append the sent copy to**. Every message sent from the relay account is then also appended to that mailbox's Sent folder, on top of the Drive/R2 archive.
+5. Choose where the sent copies and drafts go: **Google Drive**, **R2** or **another account's mailbox**. The third option appends every message to the Sent folder (and every draft to the Drafts folder) of a connected IMAP account instead of storing them on Drive/R2; it is an alternative, not an addition.
 
 Supported providers: SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmark.
 
