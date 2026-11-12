@@ -28,6 +28,8 @@ interface ReadingPaneProps {
   message: MessageDetail | null
   /** Other messages of the conversation, oldest first. */
   thread?: MessageSummary[]
+  /** Loading another message of the same conversation: keep the pane in place. */
+  switching?: boolean
   onSelectMessage?: (id: string) => void
   labels: Label[]
   loading: boolean
@@ -121,6 +123,7 @@ function ToolbarButton({
 export function ReadingPane({
   message,
   thread = [],
+  switching = false,
   onSelectMessage,
   labels,
   loading,
@@ -300,6 +303,12 @@ export function ReadingPane({
         </div>
       </div>
 
+      {switching ? (
+        <div className="h-0.5 w-full shrink-0 overflow-hidden bg-transparent">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-brand/60" />
+        </div>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[900px] px-4 py-4 sm:px-8 sm:py-6">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -330,7 +339,10 @@ export function ReadingPane({
           <div className="mt-4">
             {stack.map((item) =>
               item.id === message.id ? (
-                <div key={item.id} className="border-t border-line/70 pt-4 first:border-t-0 first:pt-0">
+                <div
+                  key={item.id}
+                  className="thread-message-in border-t border-line/70 pt-4 first:border-t-0 first:pt-0"
+                >
               <div className="mt-4 flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand-strong">
                   {initials(senderName)}

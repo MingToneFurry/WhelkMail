@@ -147,6 +147,7 @@ export default function App() {
   const [detail, setDetail] = useState<MessageDetail | null>(null)
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailSwitching, setDetailSwitching] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [view, setView] = useState<View>(initialRoute.view)
   const [query, setQuery] = useState('')
@@ -522,7 +523,19 @@ export default function App() {
       return
     }
     let cancelled = false
-    setDetailLoading(true)
+    // Moving inside the same conversation must not blank the pane: keep what is
+    // on screen and show a thin progress line until the new body arrives.
+    const sameThread = Boolean(
+      detail &&
+        summaryThreadKey(selectedMessageId) &&
+        detail.threadKey === summaryThreadKey(selectedMessageId),
+    )
+    if (sameThread) {
+      setDetailSwitching(true)
+    } else {
+      setDetailLoading(true)
+      setThreadMessages([])
+    }
     setDetailError(null)
     api
       .message(selectedMessageId)
@@ -536,6 +549,10 @@ export default function App() {
         const threadKey = response.message.threadKey ?? summaryThreadKey(selectedMessageId)
         if (!threadKey) {
           setThreadMessages([])
+          return
+        }
+        if (sameThread) {
+          // Already showing the conversation: leave the stack alone.
           return
         }
         api
@@ -564,6 +581,7 @@ export default function App() {
       .finally(() => {
         if (!cancelled) {
           setDetailLoading(false)
+          setDetailSwitching(false)
         }
       })
     return () => {
@@ -1546,6 +1564,7 @@ export default function App() {
                   onSelectMessage={(id) => void selectMessage(id)}
                   labels={labels}
                   loading={detailLoading}
+                  switching={detailSwitching}
                   error={detailError}
                   allowRemoteImages={allowRemoteImages}
                   onAlwaysShowImages={() => void changeAllowRemoteImages(true)}
@@ -1592,6 +1611,7 @@ export default function App() {
                 onSelectMessage={(id) => void selectMessage(id)}
                 labels={labels}
                 loading={detailLoading}
+                switching={detailSwitching}
                 error={detailError}
                 allowRemoteImages={allowRemoteImages}
                 onAlwaysShowImages={() => void changeAllowRemoteImages(true)}
