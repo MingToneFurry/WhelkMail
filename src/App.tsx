@@ -347,6 +347,11 @@ export default function App() {
     if (auth !== 'ok') {
       return
     }
+    // Settings and Contacts do not need the mail list: fetching it there was pure
+    // load (and could compete with the panels' requests).
+    if (view !== 'mail') {
+      return
+    }
     let cancelled = false
     const requestStartedAt = performance.now()
     console.log(

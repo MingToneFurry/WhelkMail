@@ -132,6 +132,8 @@ export interface MailThread {
   folder: Folder
   /** Newest message of the conversation in this folder. */
   latest: MessageSummary
+  /** Date used for ordering and for the cursor (same value as the SQL MAX). */
+  lastAt: string
   total: number
   unread: number
   /** Distinct senders, oldest first: the list shows them Gmail-style. */
