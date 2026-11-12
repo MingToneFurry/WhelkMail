@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  mergeThreadsBySubject,
   normalizeMessageId,
+  normalizeSubject,
   referenceIds,
   threadKeyFor,
 } from '../functions/_lib/mail/thread-key'
@@ -52,5 +54,45 @@ describe('threadKeyFor', () => {
   it('uses the stable fallback when the message has no Message-ID', () => {
     expect(threadKeyFor({ ...base, messageId: null })).toBe('hash:1')
     expect(threadKeyFor({ ...base, messageId: '', fallback: 'mid:abc' })).toBe('mid:abc')
+  })
+})
+
+describe('normalizeSubject', () => {
+  it('strips reply and forward prefixes, repeatedly', () => {
+    expect(normalizeSubject('Re: Fattura 12')).toBe('fattura 12')
+    expect(normalizeSubject('RE: Re[2]: Rif: Fattura 12')).toBe('fattura 12')
+    expect(normalizeSubject('R:   Preventivo')).toBe('preventivo')
+    expect(normalizeSubject('AW: Angebot')).toBe('angebot')
+    expect(normalizeSubject('Fwd: I: Fattura 12')).toBe('fattura 12')
+    expect(normalizeSubject('Fattura 12')).toBe('fattura 12')
+  })
+
+  it('collapses whitespace and handles empty input', () => {
+    expect(normalizeSubject('  Fattura    12 ')).toBe('fattura 12')
+    expect(normalizeSubject(null)).toBe('')
+    expect(normalizeSubject('   ')).toBe('')
+  })
+})
+
+describe('mergeThreadsBySubject', () => {
+  it('puts replies without headers back into the conversation', () => {
+    const rows = [
+      { id: 'a', subject: 'Fattura 12', threadKey: 'mid-a@x', sentAt: '2026-01-01T10:00:00.000Z' },
+      { id: 'b', subject: 'Re: Fattura 12', threadKey: null, sentAt: '2026-01-02T10:00:00.000Z' },
+      { id: 'c', subject: 'R: Fattura 12', threadKey: 'mid-c@x', sentAt: '2026-01-03T10:00:00.000Z' },
+    ]
+    expect([...mergeThreadsBySubject(rows)]).toEqual([
+      ['b', 'mid-a@x'],
+      ['c', 'mid-a@x'],
+    ])
+  })
+
+  it('leaves single messages and unrelated subjects alone', () => {
+    const rows = [
+      { id: 'a', subject: 'Fattura 12', threadKey: 'mid-a@x', sentAt: '2026-01-01T10:00:00.000Z' },
+      { id: 'b', subject: 'Preventivo', threadKey: null, sentAt: '2026-01-02T10:00:00.000Z' },
+      { id: 'c', subject: '', threadKey: null, sentAt: '2026-01-03T10:00:00.000Z' },
+    ]
+    expect(mergeThreadsBySubject(rows).size).toBe(0)
   })
 })

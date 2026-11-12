@@ -12,7 +12,12 @@ import type { ImapConnection, ImapHeader } from './imap/client'
 import { MISSING_FOLDER, withImap, resolveFolderName } from './mail/imap'
 import { applyAccountLabel, applyFilters } from './filters'
 import { archiveUpdateStatement } from './mail/archive-update'
-import { normalizeMessageId, referenceIds, threadKeyFor } from './mail/thread-key'
+import {
+  normalizeMessageId,
+  normalizeSubject,
+  referenceIds,
+  threadKeyFor,
+} from './mail/thread-key'
 import { archiveStorageCandidates, getImapArchiveStorage } from './storage'
 import { imapMessageId } from './mail/ids'
 import { bodyText, dateOf, parseFull, parseHeaders, toMailbox, toMailboxes } from './mail/parse'
@@ -492,6 +497,7 @@ interface ThreadCandidate {
   messageId: string | null
   inReplyTo: string | null
   references: string | null
+  subject: string | null
 }
 
 /**
@@ -555,6 +561,35 @@ async function resolveThreadKeys(
     }
   }
 
+  // A reply that lost its References still shares the subject of its thread: use
+  // the conversation already stored for that subject, the way Gmail does.
+  const subjectKeys = new Map<string, string>()
+  const subjects = new Set<string>()
+  for (const candidate of candidates) {
+    const normalized = normalizeSubject(candidate.subject)
+    if (!normalized) {
+      continue
+    }
+    subjects.add(normalized)
+    subjects.add((candidate.subject ?? '').trim().toLowerCase())
+  }
+  const subjectList = [...subjects].slice(0, 100)
+  if (subjectList.length > 0) {
+    const placeholders = subjectList.map(() => '?').join(', ')
+    const rows = await env.DB.prepare(
+      `SELECT subject, COALESCE(thread_key, stable_key) AS key FROM imap_messages
+       WHERE account_id = ? AND lower(subject) IN (${placeholders})`,
+    )
+      .bind(accountId, ...subjectList)
+      .all<{ subject: string; key: string }>()
+    for (const row of rows.results) {
+      const normalized = normalizeSubject(row.subject)
+      if (normalized && !subjectKeys.has(normalized)) {
+        subjectKeys.set(normalized, row.key)
+      }
+    }
+  }
+
   const repairs = new Map<string, string>()
   for (const candidate of candidates) {
     const variants = variantsFor(candidate)
@@ -564,13 +599,14 @@ async function resolveThreadKeys(
     if (parent && !parent.threadKey && legacyRoot) {
       repairs.set(parent.stableKey, legacyRoot)
     }
+    const subjectKey = parent ? null : subjectKeys.get(normalizeSubject(candidate.subject)) ?? null
     keys.set(
       candidate.id,
       threadKeyFor({
         messageId: candidate.messageId,
         inReplyTo: candidate.inReplyTo,
         references: candidate.references,
-        parentKey: parent?.threadKey ?? legacyRoot,
+        parentKey: parent?.threadKey ?? legacyRoot ?? subjectKey,
         fallback: candidate.stableKey,
       }),
     )
@@ -624,6 +660,7 @@ export async function backfillThreadKeys(
       messageId: email.messageId ?? row.message_id,
       inReplyTo: email.inReplyTo ?? null,
       references: email.references ?? null,
+      subject: email.subject ?? null,
     })
   }
   const keys = await resolveThreadKeys(env, account.id, candidates)
@@ -922,6 +959,7 @@ async function runSyncChunkLocked(
             messageId: item.row.message_id,
             inReplyTo: item.inReplyTo,
             references: item.references,
+            subject: item.row.subject,
           })),
         )
         for (const item of parsed) {
