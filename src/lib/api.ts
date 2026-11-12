@@ -205,6 +205,12 @@ export const api = {
     }
     return request(`/api/threads?${search.toString()}`)
   },
+  threadsPending(): Promise<{ accounts: { accountId: string; email: string; pending: number }[] }> {
+    return request('/api/threads/rebuild')
+  },
+  rebuildThreads(accountId: string): Promise<{ updated: number; pending: number }> {
+    return request('/api/threads/rebuild', { method: 'POST', body: JSON.stringify({ accountId }) })
+  },
   threadMessages(accountId: string, threadKey: string): Promise<{ messages: MessageSummary[] }> {
     const search = new URLSearchParams({ accountId, threadKey })
     return request(`/api/threads/messages?${search.toString()}`)

@@ -30,6 +30,7 @@ import { FiltersSettings } from './FiltersSettings'
 import { PushSettings } from './PushSettings'
 import { RetentionSettings } from './RetentionSettings'
 import { StorageCleanupPanel } from './StorageCleanupPanel'
+import { ThreadsPanel } from './ThreadsPanel'
 import { SyncPanel } from './SyncPanel'
 import { TwoFactorSettings } from './TwoFactorSettings'
 
@@ -1124,6 +1125,7 @@ export function Settings({
             </div>
 
             <StorageCleanupPanel />
+            <ThreadsPanel />
 
             <button
               type="button"

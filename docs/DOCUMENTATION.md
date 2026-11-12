@@ -100,6 +100,7 @@ Key constraints:
 4. `GET /api/threads/messages?accountId=&threadKey=` returns the whole conversation (Inbox, Sent and Spam of that account, drafts excluded), oldest first, so your replies appear inside the thread. The reading pane stacks one header row per message (sender, snippet, date) with the opened message expanded below it: clicking another row loads that message in place.
 5. `thread_key` is the Message-ID of the root, computed by `threadKeyFor()` (`References[0]` → `In-Reply-To` → own Message-ID). Replies written in the app send `In-Reply-To`/`References`, so their copies thread in any client. A parent row without a key is repaired in the same batch, and a bounded sync phase re-reads only the headers of rows still missing one.
 6. Not threaded yet: search results and label views stay flat, and deleting a thread row acts on the newest message shown.
+7. Settings → System → **Conversations** shows how many mirrored messages still have no key per account and rebuilds them in bulk (`GET/POST /api/threads/rebuild`, headers only, 200 messages per call), for mailboxes with a long history where the incremental pass would take too long.
 
 ### Drafts
 

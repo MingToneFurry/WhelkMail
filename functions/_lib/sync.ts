@@ -592,7 +592,7 @@ async function resolveThreadKeys(
  * Rows mirrored before threading existed have no key. Reading their headers (not
  * the bodies) is enough to place them, a few per sync run.
  */
-async function backfillThreadKeys(
+export async function backfillThreadKeys(
   env: Env,
   connection: ImapConnection,
   account: AccountRow,
