@@ -349,6 +349,9 @@ export default function App() {
     }
     let cancelled = false
     const requestStartedAt = performance.now()
+    console.log(
+      `[list] start folder=${folder} account=${selectedAccountId} label=${selectedLabelId ?? '-'} refresh=${refreshKey} view=${view}`,
+    )
     const request = api
       .threads({ accountId: selectedAccountId, folder, labelId: selectedLabelId })
       .then((response) => {
@@ -390,6 +393,9 @@ export default function App() {
           setAuth('needed')
           return
         }
+        console.warn(
+          `[list] failed after ${Math.round(performance.now() - requestStartedAt)}ms: ${errorText(error, tRef.current)}`,
+        )
         setListErrors([
           {
             accountId: 'list',
@@ -406,7 +412,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey])
+  }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey, view])
 
   useEffect(() => {
     if (!syncingMessages || auth !== 'ok') {
@@ -1241,6 +1247,7 @@ export default function App() {
     setListLoaded(false)
     setMessages([])
     setFolder(next)
+    setRefreshKey((key) => key + 1)
     setSelectedLabelId(null)
     setView('mail')
     setSelectedMessageId(null)
@@ -1254,6 +1261,7 @@ export default function App() {
     setListLoaded(false)
     setMessages([])
     setSelectedLabelId(id)
+    setRefreshKey((key) => key + 1)
     setView('mail')
     setSelectedMessageId(null)
     setDetail(null)
@@ -1406,10 +1414,10 @@ export default function App() {
           searching={searchLoading}
           onScopeChange={setSearchScope}
           onSelectAccount={(id) => {
-
             setListLoaded(false)
             setMessages([])
             setSelectedAccountId(id)
+            setRefreshKey((key) => key + 1)
             setSelectedLabelId(null)
             setSelectedMessageId(null)
             setDetail(null)
