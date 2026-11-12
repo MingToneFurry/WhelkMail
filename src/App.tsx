@@ -428,10 +428,9 @@ export default function App() {
         }
         const signature = syncSignature(overview)
         if (syncSignatureRef.current === '') {
+          // First poll only records the state: refreshing here made every return
+          // to the list fetch twice for nothing.
           syncSignatureRef.current = signature
-          // The first poll may already come after a very fast background sync,
-          // so always refresh once to pick up messages written to the mirror.
-          setRefreshKey((key) => key + 1)
         } else if (signature !== syncSignatureRef.current) {
           syncSignatureRef.current = signature
           setRefreshKey((key) => key + 1)
