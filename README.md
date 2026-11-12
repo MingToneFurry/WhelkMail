@@ -211,7 +211,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Filters run when the inbox is loaded and when a sync ingests new inbox messages. Matching uses From/To/Subject/snippet, not the full message body.
 - Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They only act on new incoming messages detected after the initial sync.
 - No alias-based "send as" yet: the sender is the account address.
-- Send-only accounts that keep sent copies and drafts in an IMAP mailbox (`storage_driver = 'imap'`) have no Drive/R2 fallback: while that account is disconnected, saving a draft fails until you reconnect it or switch the relay account back to Drive/R2. The draft is appended as a real message, so it appears both in the relay account's Drafts (D1 row) and in the target account's Drafts folder.
+- Send-only accounts that keep sent copies and drafts in an IMAP mailbox (`storage_driver = 'imap'`) have no Drive/R2 fallback: while that account is disconnected, saving a draft fails until you reconnect it or switch the relay account back to Drive/R2. The draft is also appended to that mailbox as a real message, but its mirrored copy is filtered out of the Drafts list and of draft searches, so it is listed once, under the relay account.
 - Single shared `APP_PASSWORD` (with optional TOTP); this is a personal / small-team tool, not a multi-tenant service.
 - Login rate limiting is per IP and best-effort, not a substitute for Cloudflare Access or a WAF.
 - Account deletion removes D1 rows and makes a best-effort cleanup of R2/Drive objects referenced in D1; it never deletes mail from the provider.
