@@ -420,6 +420,7 @@ const en: Record<string, string> = {
   'settings.threads': 'Conversations',
   'settings.threadsHint':
     'Messages stored before conversations existed are grouped a few per sync run. This rebuilds the grouping from the headers only, without downloading bodies.',
+  'settings.threadsStats': '{messages} messages · {threads} conversations',
   'settings.threadsPending': '{count} messages still to group',
   'settings.threadsRebuild': 'Rebuild',
   'settings.threadsRebuilt': '{updated} messages grouped, {pending} left',
@@ -1013,6 +1014,7 @@ const it: Record<string, string> = {
   'settings.threads': 'Conversazioni',
   'settings.threadsHint':
     'I messaggi salvati prima delle conversazioni vengono raggruppati a poco a poco a ogni sync. Qui la ricostruzione usa solo le intestazioni, senza scaricare i corpi.',
+  'settings.threadsStats': '{messages} messaggi · {threads} conversazioni',
   'settings.threadsPending': '{count} messaggi ancora da raggruppare',
   'settings.threadsRebuild': 'Ricostruisci',
   'settings.threadsRebuilt': '{updated} messaggi raggruppati, {pending} rimasti',

@@ -9,15 +9,31 @@ import { backfillThreadKeys, SYNC_FOLDERS } from '../../_lib/sync'
 const BUDGET = 200
 const BATCH = 50
 
-async function pendingByAccount(env: Env): Promise<{ accountId: string; email: string; pending: number }[]> {
+interface AccountThreadStats {
+  accountId: string
+  email: string
+  pending: number
+  messages: number
+  threads: number
+}
+
+async function pendingByAccount(env: Env): Promise<AccountThreadStats[]> {
   const accounts = (await listAccountRows(env)).filter((row) => row.kind === 'imap')
-  const counts = new Map<string, number>()
+  const counts = new Map<string, { pending: number; messages: number; threads: number }>()
   try {
     const rows = await env.DB.prepare(
-      'SELECT account_id, COUNT(*) AS pending FROM imap_messages WHERE thread_key IS NULL GROUP BY account_id',
-    ).all<{ account_id: string; pending: number }>()
+      `SELECT account_id,
+              COUNT(*) AS messages,
+              COUNT(DISTINCT COALESCE(thread_key, stable_key)) AS threads,
+              SUM(CASE WHEN thread_key IS NULL THEN 1 ELSE 0 END) AS pending
+       FROM imap_messages GROUP BY account_id`,
+    ).all<{ account_id: string; messages: number; threads: number; pending: number }>()
     for (const row of rows.results) {
-      counts.set(row.account_id, row.pending)
+      counts.set(row.account_id, {
+        pending: row.pending ?? 0,
+        messages: row.messages ?? 0,
+        threads: row.threads ?? 0,
+      })
     }
   } catch (error) {
     if (isSchemaError(error)) {
@@ -25,13 +41,16 @@ async function pendingByAccount(env: Env): Promise<{ accountId: string; email: s
     }
     throw error
   }
-  return accounts
-    .map((account) => ({
+  return accounts.map((account) => {
+    const stats = counts.get(account.id) ?? { pending: 0, messages: 0, threads: 0 }
+    return {
       accountId: account.id,
       email: account.email,
-      pending: counts.get(account.id) ?? 0,
-    }))
-    .filter((entry) => entry.pending > 0)
+      pending: stats.pending,
+      messages: stats.messages,
+      threads: stats.threads,
+    }
+  })
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {

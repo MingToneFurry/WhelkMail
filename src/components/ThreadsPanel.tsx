@@ -8,6 +8,8 @@ interface Pending {
   accountId: string
   email: string
   pending: number
+  messages: number
+  threads: number
 }
 
 /**
@@ -69,17 +71,25 @@ export function ThreadsPanel() {
               <span className="min-w-0">
                 <span className="block truncate font-medium text-slate-700">{entry.email}</span>
                 <span className="text-muted">
-                  {t('settings.threadsPending', { count: entry.pending })}
+                  {t('settings.threadsStats', {
+                    messages: entry.messages,
+                    threads: entry.threads,
+                  })}
+                  {entry.pending > 0
+                    ? ` · ${t('settings.threadsPending', { count: entry.pending })}`
+                    : ''}
                 </span>
               </span>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void rebuild(entry.accountId)}
-                className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {busy === entry.accountId ? t('common.loading') : t('settings.threadsRebuild')}
-              </button>
+              {entry.pending > 0 ? (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void rebuild(entry.accountId)}
+                  className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {busy === entry.accountId ? t('common.loading') : t('settings.threadsRebuild')}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

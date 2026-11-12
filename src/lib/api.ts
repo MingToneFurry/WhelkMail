@@ -205,7 +205,9 @@ export const api = {
     }
     return request(`/api/threads?${search.toString()}`)
   },
-  threadsPending(): Promise<{ accounts: { accountId: string; email: string; pending: number }[] }> {
+  threadsPending(): Promise<{
+    accounts: { accountId: string; email: string; pending: number; messages: number; threads: number }[]
+  }> {
     return request('/api/threads/rebuild')
   },
   rebuildThreads(accountId: string): Promise<{ updated: number; pending: number }> {
