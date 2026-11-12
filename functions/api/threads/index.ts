@@ -103,17 +103,16 @@ async function accountThreads(
     return { groups: [], threads }
   }
   const placeholders = keys.map(() => '?').join(', ')
-  // A conversation is loaded whole: in a label view the row shows every message
-  // of the thread, exactly like opening the label in Gmail.
-  const folderClause = scope.kind === 'folder' ? ' AND folder = ?' : ''
-  const folderParam = scope.kind === 'folder' ? [scope.folder] : []
-
+  // The scoped query picks *which* conversations are on the page; the rows are
+  // then loaded from every folder of the account (drafts excluded), so a thread
+  // you already answered shows the reply too and the count is the real one — the
+  // same way Gmail counts the whole conversation in the Inbox.
   const imapMessages = await env.DB.prepare(
-    `SELECT * FROM imap_messages WHERE account_id = ?${folderClause}
+    `SELECT * FROM imap_messages WHERE account_id = ? AND folder <> 'draft'
        AND COALESCE(thread_key, stable_key) IN (${placeholders})
      ORDER BY sent_at ASC`,
   )
-    .bind(account.id, ...folderParam, ...keys)
+    .bind(account.id, ...keys)
     .all<ImapMessageRow>()
   for (const row of imapMessages.results) {
     const key = row.thread_key ?? row.stable_key
@@ -121,11 +120,11 @@ async function accountThreads(
   }
 
   const relayMessages = await env.DB.prepare(
-    `SELECT * FROM messages WHERE account_id = ?${folderClause}
+    `SELECT * FROM messages WHERE account_id = ? AND folder <> 'draft'
        AND COALESCE(thread_key, 'r:' || id) IN (${placeholders})
      ORDER BY sent_at ASC`,
   )
-    .bind(account.id, ...folderParam, ...keys)
+    .bind(account.id, ...keys)
     .all<MessageRow>()
   for (const row of relayMessages.results) {
     const key = row.thread_key ?? `r:${row.id}`
