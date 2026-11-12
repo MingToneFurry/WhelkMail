@@ -214,6 +214,9 @@ export function ReadingPane({
     )
   }
 
+  // Gmail shows the conversation as a stack: the opened message expanded in
+  // place, the others as one-line headers you can click to open.
+  const stack = thread.length > 0 ? thread : [message]
   const senderName = message.from.name?.trim() || message.from.email || t('list.unknownSender')
   const toMe = message.to.some(
     (item) => item.email.toLowerCase() === message.accountEmail.toLowerCase(),
@@ -299,46 +302,6 @@ export function ReadingPane({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[900px] px-4 py-4 sm:px-8 sm:py-6">
-          {thread.length > 1 ? (
-            <div className="mb-4 overflow-hidden rounded-xl border border-line">
-              {thread.map((item) => {
-                const current = item.id === message.id
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    disabled={current}
-                    onClick={() => onSelectMessage?.(item.id)}
-                    title={`${displayAddress(item.from)} · ${formatDate(item.date, locale)}`}
-                    className={cn(
-                      'flex w-full items-center gap-2 border-b border-line/70 px-3 py-2 text-left last:border-b-0',
-                      current ? 'bg-brand-soft/60' : 'bg-white hover:bg-slate-50',
-                    )}
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
-                      {initials(item.from.name ?? item.from.email)}
-                    </span>
-                    <span
-                      className={cn(
-                        'shrink-0 text-xs',
-                        item.unread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700',
-                        current ? 'text-brand-strong' : '',
-                      )}
-                    >
-                      {item.from.name?.trim() || item.from.email}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted">
-                      {item.snippet}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-muted">
-                      {formatDate(item.date, locale)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : null}
-
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
             <h1 className="min-w-0 flex-1 text-xl font-normal leading-tight text-slate-900 sm:text-2xl">
               {message.subject || t('list.noSubject')}
@@ -364,159 +327,191 @@ export function ReadingPane({
             </div>
           ) : null}
 
-          <div className="mt-4 flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand-strong">
-              {initials(senderName)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="truncate text-sm font-medium text-slate-900">{senderName}</span>
-                <span className="truncate text-xs text-muted">&lt;{message.from.email}&gt;</span>
-              </div>
-              <details className="relative">
-                <summary className="mt-0.5 flex w-fit max-w-full cursor-pointer list-none items-center gap-1 text-xs text-muted hover:text-slate-700">
-                  <span className="truncate">{recipientSummary}</span>
-                  <ChevronDown size={12} className="shrink-0" />
-                </summary>
-                <div className="absolute left-0 z-30 mt-1 w-80 max-w-[calc(100vw-3rem)] rounded-xl border border-line bg-white p-3 text-xs shadow-lg">
-                  <p>
-                    <span className="font-medium text-slate-600">{t('reading.from')}</span>{' '}
-                    {displayAddress(message.from)}
-                  </p>
-                  <p className="mt-1">
-                    <span className="font-medium text-slate-600">{t('reading.to')}</span>{' '}
-                    {message.to.map((item) => displayAddress(item)).join(', ') || '—'}
-                  </p>
-                  {message.cc.length > 0 ? (
-                    <p className="mt-1">
-                      <span className="font-medium text-slate-600">{t('reading.cc')}</span>{' '}
-                      {message.cc.map((item) => displayAddress(item)).join(', ')}
-                    </p>
-                  ) : null}
-                  <p className="mt-1">
-                    <span className="font-medium text-slate-600">{t('reading.date')}</span>{' '}
-                    {formatDate(message.date, locale)}
-                  </p>
-                  <p className="mt-1">
-                    <span className="font-medium text-slate-600">{t('reading.size')}</span>{' '}
-                    {formatBytes(message.size)}
-                  </p>
+          <div className="mt-4">
+            {stack.map((item) =>
+              item.id === message.id ? (
+                <div key={item.id} className="border-t border-line/70 pt-4 first:border-t-0 first:pt-0">
+              <div className="mt-4 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand-strong">
+                  {initials(senderName)}
                 </div>
-              </details>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden pt-1 text-xs text-muted sm:inline">
-                {formatDate(message.date, locale)}
-              </span>
-              <button
-                type="button"
-                onClick={() => onReply(false)}
-                className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <Reply size={14} />
-                <span className="hidden sm:inline">{t('reading.reply')}</span>
-              </button>
-            </div>
-          </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="truncate text-sm font-medium text-slate-900">{senderName}</span>
+                    <span className="truncate text-xs text-muted">&lt;{message.from.email}&gt;</span>
+                  </div>
+                  <details className="relative">
+                    <summary className="mt-0.5 flex w-fit max-w-full cursor-pointer list-none items-center gap-1 text-xs text-muted hover:text-slate-700">
+                      <span className="truncate">{recipientSummary}</span>
+                      <ChevronDown size={12} className="shrink-0" />
+                    </summary>
+                    <div className="absolute left-0 z-30 mt-1 w-80 max-w-[calc(100vw-3rem)] rounded-xl border border-line bg-white p-3 text-xs shadow-lg">
+                      <p>
+                        <span className="font-medium text-slate-600">{t('reading.from')}</span>{' '}
+                        {displayAddress(message.from)}
+                      </p>
+                      <p className="mt-1">
+                        <span className="font-medium text-slate-600">{t('reading.to')}</span>{' '}
+                        {message.to.map((item) => displayAddress(item)).join(', ') || '—'}
+                      </p>
+                      {message.cc.length > 0 ? (
+                        <p className="mt-1">
+                          <span className="font-medium text-slate-600">{t('reading.cc')}</span>{' '}
+                          {message.cc.map((item) => displayAddress(item)).join(', ')}
+                        </p>
+                      ) : null}
+                      <p className="mt-1">
+                        <span className="font-medium text-slate-600">{t('reading.date')}</span>{' '}
+                        {formatDate(message.date, locale)}
+                      </p>
+                      <p className="mt-1">
+                        <span className="font-medium text-slate-600">{t('reading.size')}</span>{' '}
+                        {formatBytes(message.size)}
+                      </p>
+                    </div>
+                  </details>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="hidden pt-1 text-xs text-muted sm:inline">
+                    {formatDate(message.date, locale)}
+                  </span>
+                </div>
+              </div>
 
-          <div className="mt-5">
-            {html ? (
-              <>
-                {hasImages && !showImages ? (
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <span>{t('reading.imagesBlocked')}</span>
-                    <span className="flex items-center gap-2">
-                      {onAlwaysShowImages ? (
+              <div className="mt-5">
+                {html ? (
+                  <>
+                    {hasImages && !showImages ? (
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        <span>{t('reading.imagesBlocked')}</span>
+                        <span className="flex items-center gap-2">
+                          {onAlwaysShowImages ? (
+                            <button
+                              type="button"
+                              onClick={onAlwaysShowImages}
+                              className="rounded-lg px-2 py-1 font-medium text-amber-900 underline hover:bg-amber-100"
+                            >
+                              {t('reading.alwaysShowImages')}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setImageState({ id: message.id, show: true })}
+                            className="rounded-lg bg-amber-900 px-2.5 py-1 font-medium text-white hover:bg-amber-800"
+                          >
+                            {t('reading.showImages')}
+                          </button>
+                        </span>
+                      </div>
+                    ) : null}
+                    {hasImages && showImages ? (
+                      <div className="mb-2 flex justify-end">
                         <button
                           type="button"
-                          onClick={onAlwaysShowImages}
-                          className="rounded-lg px-2 py-1 font-medium text-amber-900 underline hover:bg-amber-100"
+                          onClick={() => setImageState({ id: message.id, show: false })}
+                          className="text-xs text-muted underline hover:text-slate-700"
                         >
-                          {t('reading.alwaysShowImages')}
+                          {t('reading.hideImages')}
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => setImageState({ id: message.id, show: true })}
-                        className="rounded-lg bg-amber-900 px-2.5 py-1 font-medium text-white hover:bg-amber-800"
+                      </div>
+                    ) : null}
+                    <iframe
+                      ref={frameRef}
+                      title={message.subject || t('list.noSubject')}
+                      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                      srcDoc={emailDocument(html, showImages, cidMap)}
+                      onLoad={() => {
+                        const doc = frameRef.current?.contentDocument
+                        if (!doc) {
+                          return
+                        }
+                        const resize = () => {
+                          setFrameState({
+                            id: message.id,
+                            height: Math.min(20000, Math.max(320, doc.documentElement.scrollHeight + 8)),
+                          })
+                        }
+                        resize()
+                        for (const image of Array.from(doc.images)) {
+                          image.addEventListener('load', resize)
+                        }
+                      }}
+                      style={{ height: `${frameHeight}px` }}
+                      className="w-full border-0 bg-white"
+                    />
+                  </>
+                ) : message.text ? (
+                  <div className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{message.text}</div>
+                ) : (
+                  <p className="text-sm text-muted">{t('reading.noText')}</p>
+                )}
+              </div>
+
+              {message.attachments.length > 0 ? (
+                <div className="mt-6 border-t border-line pt-4">
+                  <p className="mb-2 text-xs font-medium text-muted">
+                    {t('reading.attachments', { count: message.attachments.length })}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {message.attachments.map((attachment) => (
+                      <a
+                        key={`${attachment.index}-${attachment.filename}`}
+                        href={attachmentUrl(attachment.index)}
+                        className="flex w-60 max-w-full items-center gap-3 rounded-lg border border-line bg-white px-3 py-2 hover:border-slate-300 hover:bg-slate-50"
                       >
-                        {t('reading.showImages')}
-                      </button>
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                          <FileText size={18} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-medium text-slate-800">
+                            {attachment.filename}
+                          </span>
+                          <span className="block text-[10px] text-muted">
+                            {formatBytes(attachment.size)}
+                          </span>
+                        </span>
+                        <Download size={15} className="shrink-0 text-muted" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+
+                </div>
+              ) : (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelectMessage?.(item.id)}
+                  title={`${displayAddress(item.from)} · ${formatDate(item.date, locale)}`}
+                  className="flex w-full items-start gap-3 border-t border-line/70 py-3 text-left hover:bg-slate-50"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
+                    {initials(item.from.name ?? item.from.email)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span
+                        className={cn(
+                          'truncate text-sm',
+                          item.unread ? 'font-semibold text-slate-900' : 'text-slate-800',
+                        )}
+                      >
+                        {item.from.name?.trim() || item.from.email}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted">
+                        {formatDate(item.date, locale)}
+                      </span>
                     </span>
-                  </div>
-                ) : null}
-                {hasImages && showImages ? (
-                  <div className="mb-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setImageState({ id: message.id, show: false })}
-                      className="text-xs text-muted underline hover:text-slate-700"
-                    >
-                      {t('reading.hideImages')}
-                    </button>
-                  </div>
-                ) : null}
-                <iframe
-                  ref={frameRef}
-                  title={message.subject || t('list.noSubject')}
-                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                  srcDoc={emailDocument(html, showImages, cidMap)}
-                  onLoad={() => {
-                    const doc = frameRef.current?.contentDocument
-                    if (!doc) {
-                      return
-                    }
-                    const resize = () => {
-                      setFrameState({
-                        id: message.id,
-                        height: Math.min(20000, Math.max(320, doc.documentElement.scrollHeight + 8)),
-                      })
-                    }
-                    resize()
-                    for (const image of Array.from(doc.images)) {
-                      image.addEventListener('load', resize)
-                    }
-                  }}
-                  style={{ height: `${frameHeight}px` }}
-                  className="w-full border-0 bg-white"
-                />
-              </>
-            ) : message.text ? (
-              <div className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{message.text}</div>
-            ) : (
-              <p className="text-sm text-muted">{t('reading.noText')}</p>
+                    <span className="mt-0.5 block truncate text-xs text-muted">
+                      {item.snippet || item.subject || t('list.noSubject')}
+                    </span>
+                  </span>
+                </button>
+              ),
             )}
           </div>
-
-          {message.attachments.length > 0 ? (
-            <div className="mt-6 border-t border-line pt-4">
-              <p className="mb-2 text-xs font-medium text-muted">
-                {t('reading.attachments', { count: message.attachments.length })}
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {message.attachments.map((attachment) => (
-                  <a
-                    key={`${attachment.index}-${attachment.filename}`}
-                    href={attachmentUrl(attachment.index)}
-                    className="flex w-60 max-w-full items-center gap-3 rounded-lg border border-line bg-white px-3 py-2 hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                      <FileText size={18} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium text-slate-800">
-                        {attachment.filename}
-                      </span>
-                      <span className="block text-[10px] text-muted">
-                        {formatBytes(attachment.size)}
-                      </span>
-                    </span>
-                    <Download size={15} className="shrink-0 text-muted" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
             <button
