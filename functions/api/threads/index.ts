@@ -9,7 +9,8 @@ import {
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
 import { isSchemaError } from '../../_lib/schema'
-import { imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
+import { getSyncState, imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
+import { needsBackgroundSync, runBackgroundSync } from '../../_lib/sync-trigger'
 import {
   clampPageSize,
   compareByDateDesc,
@@ -84,19 +85,21 @@ async function accountThreads(
        FROM imap_messages m WHERE ${imapWhere}
        GROUP BY key${before ? ' HAVING last_at < ? OR (last_at = ? AND key < ?)' : ''}
        ORDER BY last_at DESC, key DESC LIMIT ?`
-  const imapRows = await env.DB.prepare(imapSql)
-    .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
-    .all<GroupRow>()
-  groups.push(...imapRows.results)
-
   const relaySql = `SELECT COALESCE(m.thread_key, 'r:' || m.id) AS key, MAX(m.sent_at) AS last_at, COUNT(*) AS total, 0 AS unread
        FROM messages m WHERE ${relayWhere}
        GROUP BY key${before ? ' HAVING last_at < ? OR (last_at = ? AND key < ?)' : ''}
        ORDER BY last_at DESC, key DESC LIMIT ?`
-  const relayRows = await env.DB.prepare(relaySql)
-    .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
-    .all<GroupRow>()
-  groups.push(...relayRows.results)
+  // The two scopes (mirrored mail, relay rows) are independent: one round trip
+  // instead of two, which matters on a cold Worker with a remote D1.
+  const [imapRows, relayRows] = await Promise.all([
+    env.DB.prepare(imapSql)
+      .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
+      .all<GroupRow>(),
+    env.DB.prepare(relaySql)
+      .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
+      .all<GroupRow>(),
+  ])
+  groups.push(...imapRows.results, ...relayRows.results)
 
   const keys = [...new Set(groups.map((group) => group.key))].slice(0, 60)
   if (keys.length === 0) {
@@ -107,25 +110,27 @@ async function accountThreads(
   // then loaded from every folder of the account (drafts excluded), so a thread
   // you already answered shows the reply too and the count is the real one — the
   // same way Gmail counts the whole conversation in the Inbox.
-  const imapMessages = await env.DB.prepare(
-    `SELECT * FROM imap_messages WHERE account_id = ? AND folder <> 'draft'
+  const [imapMessages, relayMessages] = await Promise.all([
+    env.DB.prepare(
+      `SELECT * FROM imap_messages WHERE account_id = ? AND folder <> 'draft'
        AND COALESCE(thread_key, stable_key) IN (${placeholders})
-     ORDER BY sent_at ASC`,
-  )
-    .bind(account.id, ...keys)
-    .all<ImapMessageRow>()
+     ORDER BY sent_at ASC LIMIT 600`,
+    )
+      .bind(account.id, ...keys)
+      .all<ImapMessageRow>(),
+    env.DB.prepare(
+      `SELECT * FROM messages WHERE account_id = ? AND folder <> 'draft'
+       AND COALESCE(thread_key, 'r:' || id) IN (${placeholders})
+     ORDER BY sent_at ASC LIMIT 600`,
+    )
+      .bind(account.id, ...keys)
+      .all<MessageRow>(),
+  ])
   for (const row of imapMessages.results) {
     const key = row.thread_key ?? row.stable_key
     addThreadRow(threads, key, row, row.from_name, row.from_email, Boolean(row.unread))
   }
 
-  const relayMessages = await env.DB.prepare(
-    `SELECT * FROM messages WHERE account_id = ? AND folder <> 'draft'
-       AND COALESCE(thread_key, 'r:' || id) IN (${placeholders})
-     ORDER BY sent_at ASC`,
-  )
-    .bind(account.id, ...keys)
-    .all<MessageRow>()
   for (const row of relayMessages.results) {
     const key = row.thread_key ?? `r:${row.id}`
     addThreadRow(threads, key, row, row.from_name, row.from_email, false)
@@ -194,6 +199,7 @@ async function labelIdsFor(env: Env, ids: string[]): Promise<Map<string, string[
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
+  const startedAt = Date.now()
   const url = new URL(context.request.url)
   const accountId = url.searchParams.get('accountId') ?? 'all'
   const labelId = url.searchParams.get('labelId')
@@ -222,16 +228,48 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const errors: { accountId: string; email: string; message: string }[] = []
   const threads: MailThread[] = []
+  let syncing = false
 
-  for (const account of accounts) {
+  // Accounts are independent: query them together instead of one after the other.
+  const perAccount = await Promise.all(
+    accounts.map(async (account) => {
+      try {
+        if (scope.kind === 'folder') {
+          // Same refresh policy as the flat list: the response never waits for
+          // IMAP, the sync runs in the background and the client polls for it.
+          const state = await getSyncState(context.env, account.id, scope.folder)
+          if (needsBackgroundSync(state) || state?.status === 'partial') {
+            syncing = true
+            context.waitUntil(runBackgroundSync(context.env, account, scope.folder))
+          }
+        }
+        const loaded = await accountThreads(context.env, account, scope, limit, before)
+        return { account, loaded, error: null as string | null }
+      } catch (error) {
+        if (isSchemaError(error)) {
+          throw error
+        }
+        return {
+          account,
+          loaded: null,
+          error: error instanceof Error ? error.message : 'Errore',
+        }
+      }
+    }),
+  )
+
+  for (const result of perAccount) {
+    const account = result.account
+    if (result.error || !result.loaded) {
+      errors.push({
+        accountId: account.id,
+        email: account.email,
+        message: result.error ?? 'Errore',
+      })
+      continue
+    }
     try {
-      const { groups, threads: rows } = await accountThreads(
-        context.env,
-        account,
-        scope,
-        limit,
-        before,
-      )
+      const { groups, threads: rows } = result.loaded
       for (const group of groups) {
         const entry = rows.get(group.key)
         if (!entry) {
@@ -256,7 +294,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       }
     } catch (error) {
       if (isSchemaError(error)) {
-        // Databases created before migration 024 have no thread_key column.
         return fail(
           'Run the database migration for conversation grouping',
           503,
@@ -288,5 +325,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       ? encodePageCursor({ date: last.latest.date, id: last.threadKey })
       : null
 
-  return json({ threads: page, errors, nextCursor })
+  console.log(
+    `[threads] accounts=${accounts.length} folder=${labelId ? 'label' : folder} rows=${threads.length} page=${page.length} ms=${Date.now() - startedAt}`,
+  )
+  return json({ threads: page, errors, syncing, nextCursor })
 }

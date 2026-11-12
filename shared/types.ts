@@ -141,6 +141,8 @@ export interface MailThread {
 export interface ThreadListResult {
   threads: MailThread[]
   errors: { accountId: string; email: string; message: string }[]
+  /** A background sync was scheduled: the client polls and refreshes. */
+  syncing?: boolean
   nextCursor: string | null
 }
 
