@@ -348,14 +348,20 @@ export default function App() {
       return
     }
     let cancelled = false
+    const requestStartedAt = performance.now()
     const request = api
       .threads({ accountId: selectedAccountId, folder, labelId: selectedLabelId })
-      .then((response) => ({
-        messages: response.threads.map(threadSummary),
-        nextCursor: response.nextCursor,
-        errors: response.errors,
-        syncing: false,
-      }))
+      .then((response) => {
+        console.log(
+          `[list] folder=${folder} account=${selectedAccountId} threads=${response.threads.length} syncing=${Boolean(response.syncing)} ms=${Math.round(performance.now() - requestStartedAt)}`,
+        )
+        return {
+          messages: response.threads.map(threadSummary),
+          nextCursor: response.nextCursor,
+          errors: response.errors,
+          syncing: Boolean(response.syncing),
+        }
+      })
     request
       .then((response) => {
         if (cancelled) {
@@ -384,7 +390,13 @@ export default function App() {
           setAuth('needed')
           return
         }
-        setSettingsError(errorText(error, tRef.current))
+        setListErrors([
+          {
+            accountId: 'list',
+            email: selectedAccountId === 'all' ? t('common.allAccounts') : '',
+            message: errorText(error, tRef.current),
+          },
+        ])
       })
       .finally(() => {
         if (!cancelled) {
@@ -1419,6 +1431,17 @@ export default function App() {
                 {error.email}: {error.message}
               </p>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setListErrors([])
+                setListLoaded(false)
+                setRefreshKey((key) => key + 1)
+              }}
+              className="mt-1.5 rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100"
+            >
+              {t('common.retry')}
+            </button>
           </div>
         ) : null}
 
