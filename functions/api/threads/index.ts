@@ -10,7 +10,7 @@ import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
 import { isSchemaError } from '../../_lib/schema'
 import { getSyncState, imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
-import { needsBackgroundSync, runBackgroundSync } from '../../_lib/sync-trigger'
+import { needsBackgroundSync } from '../../_lib/sync-trigger'
 import {
   clampPageSize,
   compareByDateDesc,
@@ -261,18 +261,20 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     accounts.map(async (account) => {
       try {
         let accountSyncing = false
+        let accountStale = false
         if (scope.kind === 'folder') {
           const state = await getSyncState(context.env, account.id, scope.folder)
           accountSyncing = state?.status === 'partial'
-          if (needsBackgroundSync(state) || accountSyncing) {
-            accountSyncing = true
-            // Never awaited: the response is served from D1 and the fetch happens
-            // in the background, one chunk per folder at most.
-            context.waitUntil(runBackgroundSync(context.env, account, scope.folder))
-          }
+          accountStale = needsBackgroundSync(state)
         }
         const loaded = await accountThreads(context.env, account, scope, limit, before)
-        return { account, loaded, syncing: accountSyncing, error: null as string | null }
+        return {
+          account,
+          loaded,
+          syncing: accountSyncing,
+          stale: accountStale,
+          error: null as string | null,
+        }
       } catch (error) {
         if (isSchemaError(error)) {
           throw error
@@ -281,6 +283,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           account,
           loaded: null,
           syncing: false,
+          stale: false,
           error: error instanceof Error ? error.message : 'Errore',
         }
       }
@@ -290,6 +293,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   // Each account reports its own state: a shared variable let the last account
   // overwrite the others, so a running sync could look finished.
   syncing = perAccount.some((result) => result.syncing)
+  // Folders whose mirror is old. The browser asks for a sync *after* the list is
+  // on screen: doing that here kept the response waiting behind IMAP work.
+  const staleAccounts = scope.kind === 'folder'
+    ? perAccount.filter((result) => result.stale).map((result) => result.account.id)
+    : []
 
   for (const result of perAccount) {
     const account = result.account
@@ -367,5 +375,5 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   console.log(
     `[threads] accounts=${accounts.length} folder=${labelId ? 'label' : folder} rows=${threads.length} page=${page.length} ms=${Date.now() - startedAt}`,
   )
-  return json({ threads: page, errors, syncing, nextCursor })
+  return json({ threads: page, errors, syncing, staleAccounts, nextCursor })
 }

@@ -143,8 +143,10 @@ export interface MailThread {
 export interface ThreadListResult {
   threads: MailThread[]
   errors: { accountId: string; email: string; message: string }[]
-  /** A background sync was scheduled: the client polls and refreshes. */
+  /** A background sync is running (state reported by the sync lock). */
   syncing?: boolean
+  /** Accounts whose mirror is stale: the client asks for a sync after painting. */
+  staleAccounts?: string[]
   nextCursor: string | null
 }
 
