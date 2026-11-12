@@ -16,6 +16,7 @@ import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/pa
 import { isSchemaError } from '../../_lib/schema'
 import {
   clampPageSize,
+  compareByDateDesc,
   decodePageCursor,
   pageOf,
   type PageCursor,
@@ -365,11 +366,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   if (labelId) {
     const { messages, errors } = await loadByLabel(context.env, accounts, labelId, limit, before)
-    messages.sort(
-      (left, right) =>
-        new Date(right.date).getTime() - new Date(left.date).getTime() ||
-        left.id.localeCompare(right.id),
-    )
+    messages.sort(compareByDateDesc)
     const page = pageOf(messages, limit)
     return json({ messages: page.items, errors, nextCursor: page.nextCursor })
   }
@@ -466,11 +463,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
   }
 
-  messages.sort(
-    (left, right) =>
-      new Date(right.date).getTime() - new Date(left.date).getTime() ||
-      left.id.localeCompare(right.id),
-  )
+  messages.sort(compareByDateDesc)
   const page = pageOf(messages, limit)
   return json({ messages: page.items, errors, syncing, nextCursor: page.nextCursor })
 }

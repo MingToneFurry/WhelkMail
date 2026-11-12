@@ -13,6 +13,7 @@ import { isSchemaError } from '../../_lib/schema'
 import { imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
 import {
   clampPageSize,
+  compareByDateDesc,
   decodePageCursor,
   pageOf,
   type PageCursor,
@@ -168,11 +169,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
   }
 
-  messages.sort(
-    (left, right) =>
-      new Date(right.date).getTime() - new Date(left.date).getTime() ||
-      left.id.localeCompare(right.id),
-  )
+  messages.sort(compareByDateDesc)
   const page = pageOf(messages, limit)
   await searchLabels(context.env, page.items)
 
