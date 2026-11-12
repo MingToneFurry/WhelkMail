@@ -13,7 +13,7 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react'
-import type { Label, MessageDetail } from '../../shared/types'
+import type { Label, MessageDetail, MessageSummary } from '../../shared/types'
 import { useI18n } from '../i18n'
 import {
   cn,
@@ -26,6 +26,9 @@ import {
 
 interface ReadingPaneProps {
   message: MessageDetail | null
+  /** Other messages of the conversation, oldest first. */
+  thread?: MessageSummary[]
+  onSelectMessage?: (id: string) => void
   labels: Label[]
   loading: boolean
   error: string | null
@@ -117,6 +120,8 @@ function ToolbarButton({
 
 export function ReadingPane({
   message,
+  thread = [],
+  onSelectMessage,
   labels,
   loading,
   error,
@@ -291,6 +296,38 @@ export function ReadingPane({
           <span className="hidden sm:inline">{formatDate(message.date, locale)}</span>
         </div>
       </div>
+
+      {thread.length > 1 ? (
+        <div className="shrink-0 border-b border-line bg-slate-50/70 px-4 py-2 sm:px-6">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            {t('reading.conversation', { count: thread.length })}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {thread.map((item) => {
+              const current = item.id === message.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={current}
+                  onClick={() => onSelectMessage?.(item.id)}
+                  title={`${displayAddress(item.from)} · ${formatDate(item.date, locale)}`}
+                  className={cn(
+                    'flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]',
+                    current
+                      ? 'border-brand bg-brand-soft text-brand-strong'
+                      : 'border-line bg-white text-slate-700 hover:border-slate-300',
+                  )}
+                >
+                  <span className="font-medium">{initials(item.from.name ?? item.from.email)}</span>
+                  <span className="max-w-[9rem] truncate">{item.subject || t('list.noSubject')}</span>
+                  <span className="text-muted">{formatDate(item.date, locale)}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[900px] px-4 py-4 sm:px-8 sm:py-6">

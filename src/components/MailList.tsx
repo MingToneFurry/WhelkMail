@@ -685,6 +685,19 @@ export function MailList({
                   </div>
                   <div className="flex flex-col items-end gap-1 text-[11px] text-muted">
                     <span>{formatDate(message.date, locale)}</span>
+                    {(message.threadCount ?? 0) > 1 ? (
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                          (message.threadUnread ?? 0) > 0
+                            ? 'bg-brand-soft text-brand-strong'
+                            : 'bg-slate-100 text-muted',
+                        )}
+                        title={t('list.threadCount', { count: message.threadCount ?? 0 })}
+                      >
+                        {message.threadCount}
+                      </span>
+                    ) : null}
                     {message.hasAttachments ? (
                       <span className="flex items-center gap-0.5">
                         <Paperclip size={12} />

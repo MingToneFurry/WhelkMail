@@ -40,6 +40,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 
 - Message list with a full-width reading view or an optional right-side reading pane, plus Gmail-style multi-select for delete, move and spam actions.
 - Inbox, Sent, Drafts and Spam with autosave and reopenable drafts.
+- Gmail-style conversations: messages of the same thread are listed once with a count, and the reading pane shows the whole conversation (your replies included) as collapsible chips. Threads are per account; search and label views stay flat.
 - HTML bodies in a sandboxed frame with optional remote images; attachment indicators from `BODYSTRUCTURE` without downloading the body up front.
 - Installable PWA, mobile drawer layout and Web Push notifications with per-account/folder preferences.
 - English by default, Italian available; the dictionary is extensible.

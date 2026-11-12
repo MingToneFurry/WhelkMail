@@ -91,6 +91,7 @@ const en: Record<string, string> = {
   'list.unknownSender': '(unknown sender)',
   'list.to': 'To: {value}',
   'list.draft': 'draft',
+  'list.threadCount': '{count} messages in this conversation',
   'list.notSent': 'not sent',
   'list.noSubject': '(no subject)',
   'list.account': 'account',
@@ -106,6 +107,7 @@ const en: Record<string, string> = {
   'list.moveSpam': 'Spam',
   'list.moveTrash': 'Trash',
 
+  'reading.conversation': 'Conversation · {count} messages',
   'reading.select': 'Select a message',
   'reading.from': 'From:',
   'reading.to': 'To:',
@@ -663,6 +665,7 @@ const it: Record<string, string> = {
   'list.unknownSender': '(mittente sconosciuto)',
   'list.to': 'A: {value}',
   'list.draft': 'bozza',
+  'list.threadCount': '{count} messaggi in questa conversazione',
   'list.notSent': 'non inviata',
   'list.noSubject': '(senza oggetto)',
   'list.account': 'account',
@@ -678,6 +681,7 @@ const it: Record<string, string> = {
   'list.moveSpam': 'Spam',
   'list.moveTrash': 'Cestino',
 
+  'reading.conversation': 'Conversazione · {count} messaggi',
   'reading.select': 'Seleziona un messaggio',
   'reading.from': 'Da:',
   'reading.to': 'A:',

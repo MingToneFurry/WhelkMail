@@ -92,6 +92,15 @@ Key constraints:
    The alias step is what makes a forwarding domain work like Gmail: mail addressed to `EMAIL@DOMAIN.IT` and forwarded to `EMAIL@PROVIDER.IT` keeps that address in the headers, so the reply leaves from the domain account.
 2. Everything else is the normal send flow, so the reply leaves through the chosen account's own SMTP/relay and its copy follows that account's destination. Addresses of both accounts are excluded from To/Cc to avoid replying to yourself.
 
+### Conversations
+
+1. `GET /api/threads?accountId=&folder=` returns one row per conversation. The group key is `COALESCE(thread_key, stable_key)`, so messages mirrored before threading existed stay visible until the backfill reaches them.
+2. Pagination is a keyset cursor on `(last message date, thread key)`: the query groups per folder, `HAVING last_at < ? OR (last_at = ? AND key < ?)` and returns at most a page of conversations; the newest message of each visible thread is then loaded to build the row (sender, subject, snippet, unread count, attachment flag, labels).
+3. Threads are per account: the same subject on two mailboxes stays two conversations. The unified view lists both, never merges them.
+4. `GET /api/threads/messages?accountId=&threadKey=` returns the whole conversation (Inbox, Sent and Spam of that account, drafts excluded), oldest first, so your replies appear inside the thread.
+5. `thread_key` is the Message-ID of the root, computed by `threadKeyFor()` (`References[0]` → `In-Reply-To` → own Message-ID). Replies written in the app send `In-Reply-To`/`References`, so their copies thread in any client. A parent row without a key is repaired in the same batch, and a bounded sync phase re-reads only the headers of rows still missing one.
+6. Not threaded yet: search results and label views stay flat, and deleting a thread row acts on the newest message shown.
+
 ### Drafts
 
 - **IMAP:** `APPEND` to the `\Drafts` folder with `\Draft \Seen`; delete with `UID STORE +FLAGS (\Deleted)` + `EXPUNGE`.
@@ -172,7 +181,7 @@ When a relay account stores copies in an IMAP mailbox, `storage_key` holds a poi
 
 Each row keeps the driver that actually wrote its copy: `storageForDriver(env, account, row.storage_driver)` is used for reading and for deleting objects, while `getStorage(env, account)` is only used to write new ones. Changing the destination of an account (Drive → R2 → mailbox) therefore leaves the historical copies readable and deletable, and a rescue copy written after a failed APPEND is readable even though the account points at a mailbox.
 
-Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, storage key, attachment metadata and status.
+Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, storage key, attachment metadata, conversation key and status.
 
 ### `labels` and `message_labels`
 
@@ -188,7 +197,7 @@ Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index
 
 ### `imap_sync` and `imap_messages`
 
-`imap_messages` mirrors IMAP message metadata (headers, flags, size, attachment flag) in D1. `imap_sync` stores the per-account/per-folder cursor: `uid_validity`, `max_uid`, `min_uid`, `backfill_done`, status, error, counts and last sync time.
+`imap_messages` mirrors IMAP message metadata (headers, flags, size, attachment flag, conversation key) in D1. `imap_sync` stores the per-account/per-folder cursor: `uid_validity`, `max_uid`, `min_uid`, `backfill_done`, status, error, counts and last sync time.
 
 The sync is resumable and chunked (40 metadata messages per request, 8 when body archiving is enabled). It reads `UIDNEXT` from `SELECT`, fetches new UIDs above `max_uid`, and backfills older messages through bounded UID windows instead of running `UID SEARCH ALL` on every pass. Each run also refreshes flags for the most recent window, so read/unread changes made by other clients land in D1. A folder synced in `partial` state keeps receiving backfill chunks after a short retry interval, independently of the 60-second refresh of new mail. A row in `imap_sync_locks` (with a 5-minute expiry and an owner token) prevents two Workers isolates from running the same folder at the same time; the owner renews the expiry during long phases and only the owner can release it. Expired locks are removed by the cron worker. If the lock table or owner column is missing the sync still runs unlocked. A changed `UIDVALIDITY` resets the folder mirror. `stable_key` is the RFC `Message-ID` (or a deterministic hash fallback) and is used to transfer labels when a message moves between folders. Deleted/expunged messages are pruned after backfill when the provider message count differs from D1; archived objects are removed unless provider cleanup is enabled, in which case the archive is preserved.
 
