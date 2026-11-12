@@ -22,6 +22,7 @@ const en: Record<string, string> = {
   'common.language': 'Language',
   'labels.all': 'All',
   'labels.new': 'New label',
+  'labels.edit': 'Edit label “{name}”',
   'labels.name': 'Label name',
   'labels.create': 'Create label',
   'labels.empty': 'No labels yet',
@@ -150,6 +151,8 @@ const en: Record<string, string> = {
   'compose.provider': 'Provider',
   'compose.attachmentsTooLarge': 'Attachments too large: {limit} MB limit',
   'compose.invalidAddress': 'Invalid address: {address}',
+  'compose.closeWithoutSaving':
+    'The draft could not be saved. Close the message and discard it?',
   'compose.recipientRequired': 'Add at least one recipient',
   'compose.accountRequired': 'Select a sender account',
   'compose.driveNotConnected':
@@ -572,6 +575,7 @@ const it: Record<string, string> = {
   'common.language': 'Lingua',
   'labels.all': 'Tutti',
   'labels.new': 'Nuova etichetta',
+  'labels.edit': 'Modifica etichetta “{name}”',
   'labels.name': 'Nome etichetta',
   'labels.create': 'Crea etichetta',
   'labels.empty': 'Nessuna etichetta',
@@ -700,6 +704,8 @@ const it: Record<string, string> = {
   'compose.provider': 'Provider',
   'compose.attachmentsTooLarge': 'Allegati troppo grandi: limite {limit} MB',
   'compose.invalidAddress': 'Indirizzo non valido: {address}',
+  'compose.closeWithoutSaving':
+    'La bozza non è stata salvata. Chiudere il messaggio e scartarlo?',
   'compose.recipientRequired': 'Inserisci almeno un destinatario',
   'compose.accountRequired': 'Seleziona un account mittente',
   'compose.driveNotConnected':
