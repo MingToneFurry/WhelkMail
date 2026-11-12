@@ -531,7 +531,9 @@ export default function App() {
           return
         }
         setDetail(response.message)
-        const threadKey = response.message.threadKey
+        // The row in the list already knows the conversation; fall back to it when
+        // an older cached detail response does not carry the key yet.
+        const threadKey = response.message.threadKey ?? summaryThreadKey(selectedMessageId)
         if (!threadKey) {
           setThreadMessages([])
           return
@@ -692,6 +694,16 @@ export default function App() {
     } finally {
       setLoadingMore(false)
     }
+  }
+
+  /** Conversation key of a message already listed, if any. */
+  function summaryThreadKey(id: string | null): string | null {
+    if (!id) {
+      return null
+    }
+    const found =
+      messages.find((item) => item.id === id) ?? searchResults?.find((item) => item.id === id)
+    return found?.threadKey ?? null
   }
 
   /** A conversation row is rendered with the newest message plus its counters. */
