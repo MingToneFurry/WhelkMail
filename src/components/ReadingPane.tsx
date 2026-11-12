@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { Label, MessageDetail, MessageSummary } from '../../shared/types'
 import { useI18n } from '../i18n'
+import { splitQuotedText } from '../lib/quotes'
 import {
   cn,
   displayAddress,
@@ -50,6 +51,7 @@ function emailDocument(
   html: string,
   allowImages: boolean,
   cidMap: Map<string, string>,
+  hideQuotes = false,
 ): string {
   const imgSrc = allowImages ? '* data: blob: cid:' : 'data:'
   const clean = html
@@ -80,6 +82,10 @@ function emailDocument(
     'body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;',
     'font-size:14px;line-height:1.5;color:#202124;word-break:break-word;overflow-wrap:anywhere}',
     'img{max-width:100%;height:auto}table{max-width:100%}a{color:#1a73e8}',
+    // Like Gmail: the quoted original stays out of the way until asked for.
+    hideQuotes
+      ? 'blockquote,.gmail_quote,#divRplyFwdMsg,.moz-cite-prefix{display:none!important}'
+      : '',
   ].join('')
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${imgSrc}; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-src 'none'; media-src 'none';"><style>${style}</style></head><body>${clean}</body></html>`
 }
@@ -148,12 +154,21 @@ export function ReadingPane({
     id: null,
     height: 420,
   })
+  const [quoteState, setQuoteState] = useState<{ id: string | null; show: boolean }>({
+    id: null,
+    show: false,
+  })
   const frameRef = useRef<HTMLIFrameElement | null>(null)
   const html = message?.html?.trim() ?? ''
   const hasImages =
     /(?:src|srcset)\s*=\s*["']?[^"'\s>]*(?:https?:|\/\/|cid:)/i.test(html) ||
     /url\(\s*["']?(?:https?:|\/\/|cid:)/i.test(html)
   const showImages = imageState.id === message?.id ? imageState.show : allowRemoteImages
+  // Quoted original: collapsed by default, like Gmail's three dots.
+  const showQuote = quoteState.id === message?.id ? quoteState.show : false
+  const quoted = message && !message.html ? splitQuotedText(message.text) : null
+  const hasHtmlQuote = /class="[^"]*(gmail_quote)|<blockquote|id="divRplyFwdMsg"/i.test(html)
+  const canToggleQuote = Boolean(quoted) || hasHtmlQuote
   const frameHeight = frameState.id === message?.id ? frameState.height : 420
   const cidMap = new Map<string, string>()
   for (const attachment of message?.attachments ?? []) {
@@ -431,7 +446,7 @@ export function ReadingPane({
                       ref={frameRef}
                       title={message.subject || t('list.noSubject')}
                       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                      srcDoc={emailDocument(html, showImages, cidMap)}
+                      srcDoc={emailDocument(html, showImages, cidMap, hasHtmlQuote && !showQuote)}
                       onLoad={() => {
                         const doc = frameRef.current?.contentDocument
                         if (!doc) {
@@ -453,10 +468,24 @@ export function ReadingPane({
                     />
                   </>
                 ) : message.text ? (
-                  <div className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{message.text}</div>
+                  <div className="whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                    {quoted && !showQuote ? quoted.body : message.text}
+                  </div>
                 ) : (
                   <p className="text-sm text-muted">{t('reading.noText')}</p>
                 )}
+
+                {canToggleQuote ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuoteState({ id: message.id, show: !showQuote })}
+                    title={showQuote ? t('reading.hideQuoted') : t('reading.showQuoted')}
+                    aria-label={showQuote ? t('reading.hideQuoted') : t('reading.showQuoted')}
+                    className="mt-2 flex h-6 w-8 items-center justify-center rounded-full border border-line text-[11px] tracking-[0.15em] text-muted hover:bg-slate-50 hover:text-slate-700"
+                  >
+                    •••
+                  </button>
+                ) : null}
               </div>
 
               {message.attachments.length > 0 ? (

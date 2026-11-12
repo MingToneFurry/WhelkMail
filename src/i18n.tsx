@@ -108,6 +108,8 @@ const en: Record<string, string> = {
   'list.moveTrash': 'Trash',
 
   'reading.conversation': 'Conversation · {count} messages',
+  'reading.showQuoted': 'Show quoted text',
+  'reading.hideQuoted': 'Hide quoted text',
   'reading.select': 'Select a message',
   'reading.from': 'From:',
   'reading.to': 'To:',
@@ -699,6 +701,8 @@ const it: Record<string, string> = {
   'list.moveTrash': 'Cestino',
 
   'reading.conversation': 'Conversazione · {count} messaggi',
+  'reading.showQuoted': 'Mostra il testo citato',
+  'reading.hideQuoted': 'Nascondi il testo citato',
   'reading.select': 'Seleziona un messaggio',
   'reading.from': 'Da:',
   'reading.to': 'A:',
