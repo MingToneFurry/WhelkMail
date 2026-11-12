@@ -1126,6 +1126,9 @@ export function Settings({
 
             <StorageCleanupPanel />
             <ThreadsPanel />
+            <p className="mt-3 text-[11px] text-muted">
+              {t('settings.build')}: <span className="font-mono">{__BUILD_ID__}</span>
+            </p>
 
             <button
               type="button"

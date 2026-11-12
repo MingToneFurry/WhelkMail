@@ -417,10 +417,12 @@ const en: Record<string, string> = {
   'filters.deleted': 'Filter deleted',
 
   'settings.serverConfig': 'Server configuration status',
+  'settings.build': 'Build',
   'settings.threads': 'Conversations',
   'settings.threadsHint':
     'Messages stored before conversations existed are grouped a few per sync run. This rebuilds the grouping from the headers only, without downloading bodies.',
   'settings.threadsStats': '{messages} messages · {threads} conversations',
+  'settings.threadsInbox': 'Inbox as returned by the list: {conversations} conversations, {messages} messages',
   'settings.threadsPending': '{count} messages still to group',
   'settings.threadsRebuild': 'Rebuild',
   'settings.threadsRebuilt': '{updated} messages grouped, {pending} left',
@@ -1011,10 +1013,12 @@ const it: Record<string, string> = {
   'filters.deleted': 'Filtro eliminato',
 
   'settings.serverConfig': 'Stato configurazione server',
+  'settings.build': 'Build',
   'settings.threads': 'Conversazioni',
   'settings.threadsHint':
     'I messaggi salvati prima delle conversazioni vengono raggruppati a poco a poco a ogni sync. Qui la ricostruzione usa solo le intestazioni, senza scaricare i corpi.',
   'settings.threadsStats': '{messages} messaggi · {threads} conversazioni',
+  'settings.threadsInbox': 'Inbox come la restituisce la lista: {conversations} conversazioni, {messages} messaggi',
   'settings.threadsPending': '{count} messaggi ancora da raggruppare',
   'settings.threadsRebuild': 'Ricostruisci',
   'settings.threadsRebuilt': '{updated} messaggi raggruppati, {pending} rimasti',
