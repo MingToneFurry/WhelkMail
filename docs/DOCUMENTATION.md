@@ -76,10 +76,27 @@ Key constraints:
 ### Drafts
 
 - **IMAP:** `APPEND` to the `\Drafts` folder with `\Draft \Seen`; delete with `UID STORE +FLAGS (\Deleted)` + `EXPUNGE`.
-- **Relay:** MIME stored on the destination chosen in `storage_driver`: Drive/R2 object (`drafts/<id>.eml`) or the target account's Drafts folder with a pointer, metadata in D1 with `folder='draft'`.
-- Autosave runs 5 seconds after the last change and every 30 seconds while changes remain. Closing the composer saves pending changes first.
-- On IMAP, autosave appends a new draft and deletes the previous one. The new UID comes from `APPENDUID` when the server supports UIDPLUS, otherwise from the highest UID in the Drafts folder.
+- **Relay, `storage_driver = 'drive' | 'r2'`:** the MIME is stored on the object archive (`drafts/<id>.eml`, or `accounts/<id>/drafts/<id>.eml` for R2), metadata in D1 with `folder='draft'`.
+- **Relay, `storage_driver = 'imap'`:** the draft is appended to the Drafts folder of the account in `sent_copy_account_id`, exactly like a draft written from that account. Nothing is written to Drive or R2.
+  - The folder is resolved against the **target** account: its `drafts_folder` first, then the `\Drafts` special-use flag, then the known names (`Drafts`, `INBOX.Drafts`, `INBOX/Drafts`, `Bozze`, `INBOX.Bozze`, `Bozza`, `INBOX.Bozza`, `Draft`, `INBOX.Draft`). A missing folder is created with `CREATE` and the append retried.
+  - Flags are `(\Draft \Seen)`. The UID comes from `APPENDUID` when the server supports UIDPLUS, otherwise from the folder's `UIDNEXT - 1` or from the highest UID after a search.
+  - The row in `messages` keeps `folder='draft'`, `storage_driver='imap'` and a pointer in `storage_key` (`imap:<accountId>:<encodedFolder>:<uid>`). Reopening the draft fetches that message back with `UID FETCH`; autosave appends the new version and expunges the previous copy; deleting the draft or sending from it removes the copy from that mailbox.
+  - There is **no fallback to Drive/R2** in this mode. If the target account is missing or not connected, saving fails with `sent_copy_target_not_connected`; IMAP failures return `draft_save_failed`. The composer shows the error and can still be closed (with confirmation) instead of trapping the message.
+  - The same draft is visible twice in the UI: as the relay account's row in **Drafts** (D1) and, once the target folder is synced, as a real message in that account's Drafts folder.
+- Autosave runs 5 seconds after the last change and every 30 seconds while changes remain. Closing the composer saves pending changes first; if the draft cannot be saved the user is asked whether to discard it.
 - An explicit **Save draft** closes the composer and opens the Drafts folder.
+
+### Where a send-only account keeps its copies
+
+`storage_driver` picks **one** destination per relay account; the two mailbox modes never run together with the object archive:
+
+| `storage_driver` | Sent copies | Drafts | Requirement |
+| --- | --- | --- | --- |
+| `drive` | `sent/<id>.eml` on Google Drive | `drafts/<id>.eml` on Google Drive | Google Drive connected |
+| `r2` | `accounts/<id>/sent/<id>.eml` in R2 | `accounts/<id>/drafts/<id>.eml` in R2 | `BUCKET` binding |
+| `imap` | `APPEND` to the target account's Sent folder | `APPEND` to the target account's Drafts folder | `sent_copy_account_id` pointing at a connected IMAP account |
+
+Switching back to `drive` or `r2` clears `sent_copy_account_id`. Copies appended to a mailbox are real messages on the provider: deleting the account or a row in D1 never deletes them.
 
 ## 4. Project structure
 

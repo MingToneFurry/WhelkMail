@@ -233,9 +233,10 @@ The first deployment URL is `https://whelkmail.pages.dev` (or the project name y
    - Use **Test connection** in Settings.
 6. For a send-only domain:
    - Select the relay provider and paste its API key.
-   - Choose Google Drive or R2 (R2 appears only if the `BUCKET` binding exists).
+   - Choose where sent copies and drafts go: **Google Drive**, **R2** (only if the `BUCKET` binding exists) or **another account's mailbox**. The third option appends every message to that IMAP account's Sent folder and every draft to its Drafts folder, and needs a connected IMAP account: without one the option stays disabled and saving drafts would fail (`sent_copy_target_not_connected`).
+   - Only one destination is active at a time; switching back to Drive/R2 clears the mailbox choice.
 7. Send a test message.
-8. Save a draft, reopen it from **Drafts**, and delete it.
+8. Save a draft, reopen it from **Drafts**, and delete it. With a mailbox destination, check that the draft also shows up in that account's Drafts folder on the provider.
 9. Add a second account to see address labels and the unified inbox.
 
 ### 1.8 Custom domain
