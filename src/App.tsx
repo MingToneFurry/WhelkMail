@@ -347,23 +347,14 @@ export default function App() {
       return
     }
     let cancelled = false
-    const request = selectedLabelId
-      ? api
-          .messages(selectedAccountId, folder, selectedLabelId)
-          .then((response) => ({
-            messages: response.messages,
-            nextCursor: response.nextCursor,
-            errors: response.errors,
-            syncing: response.syncing,
-          }))
-      : api
-          .threads({ accountId: selectedAccountId, folder })
-          .then((response) => ({
-            messages: response.threads.map(threadSummary),
-            nextCursor: response.nextCursor,
-            errors: response.errors,
-            syncing: false,
-          }))
+    const request = api
+      .threads({ accountId: selectedAccountId, folder, labelId: selectedLabelId })
+      .then((response) => ({
+        messages: response.threads.map(threadSummary),
+        nextCursor: response.nextCursor,
+        errors: response.errors,
+        syncing: false,
+      }))
     request
       .then((response) => {
         if (cancelled) {
@@ -682,19 +673,11 @@ export default function App() {
         })
         setSearchResults((current) => mergePage(current ?? [], response.messages))
         setSearchCursor(response.nextCursor ?? null)
-      } else if (selectedLabelId) {
-        const response = await api.messages(
-          selectedAccountId,
-          folder,
-          selectedLabelId,
-          cursor,
-        )
-        setMessages((current) => mergePage(current, response.messages))
-        setNextCursor(response.nextCursor ?? null)
       } else {
         const response = await api.threads({
           accountId: selectedAccountId,
           folder,
+          labelId: selectedLabelId,
           before: cursor,
         })
         setMessages((current) => mergePage(current, response.threads.map(threadSummary)))

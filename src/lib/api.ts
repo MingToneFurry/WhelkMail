@@ -193,10 +193,14 @@ export const api = {
   threads(params: {
     accountId: string
     folder: Folder
+    labelId?: string | null
     before?: string
     limit?: number
   }): Promise<ThreadListResult> {
     const search = new URLSearchParams({ accountId: params.accountId, folder: params.folder })
+    if (params.labelId) {
+      search.set('labelId', params.labelId)
+    }
     if (params.before) {
       search.set('before', params.before)
     }

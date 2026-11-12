@@ -46,51 +46,55 @@ interface ThreadRows {
   /** Distinct senders in order of appearance (oldest first, like Gmail). */
   participants: { name: string | null; email: string }[]
   participantCount: number
+  messages: number
+  unread: number
 }
+
+/** What the page is scoped to: one folder, or the messages carrying a label. */
+type ThreadScope =
+  | { kind: 'folder'; folder: Folder }
+  | { kind: 'label'; labelId: string }
 
 async function accountThreads(
   env: Env,
   account: AccountRow,
-  folder: Folder,
+  scope: ThreadScope,
   limit: number,
   before: { date: string; id: string } | null,
 ): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
   const groups: GroupRow[] = []
   const threads = new Map<string, ThreadRows>()
 
-  const imapSql = before
-    ? `SELECT COALESCE(thread_key, stable_key) AS key, MAX(sent_at) AS last_at, COUNT(*) AS total, COALESCE(SUM(unread), 0) AS unread
-       FROM imap_messages WHERE account_id = ? AND folder = ?
-       GROUP BY key HAVING last_at < ? OR (last_at = ? AND key < ?)
+  // The scoped query only decides *which* conversations are on the page and how
+  // they are ordered; counts and participants come from the whole thread below.
+  const imapWhere =
+    scope.kind === 'folder'
+      ? 'm.account_id = ? AND m.folder = ?'
+      : 'm.account_id = ? AND m.id IN (SELECT message_id FROM message_labels WHERE label_id = ?)'
+  const imapParams: string[] = [
+    account.id,
+    scope.kind === 'folder' ? scope.folder : scope.labelId,
+  ]
+  const relayWhere =
+    scope.kind === 'folder'
+      ? 'm.account_id = ? AND m.folder = ?'
+      : "m.account_id = ? AND ('r:' || m.id) IN (SELECT message_id FROM message_labels WHERE label_id = ?)"
+
+  const imapSql = `SELECT COALESCE(m.thread_key, m.stable_key) AS key, MAX(m.sent_at) AS last_at, COUNT(*) AS total, COALESCE(SUM(m.unread), 0) AS unread
+       FROM imap_messages m WHERE ${imapWhere}
+       GROUP BY key${before ? ' HAVING last_at < ? OR (last_at = ? AND key < ?)' : ''}
        ORDER BY last_at DESC, key DESC LIMIT ?`
-    : `SELECT COALESCE(thread_key, stable_key) AS key, MAX(sent_at) AS last_at, COUNT(*) AS total, COALESCE(SUM(unread), 0) AS unread
-       FROM imap_messages WHERE account_id = ? AND folder = ?
-       GROUP BY key ORDER BY last_at DESC, key DESC LIMIT ?`
   const imapRows = await env.DB.prepare(imapSql)
-    .bind(
-      account.id,
-      folder,
-      ...(before ? [before.date, before.date, before.id] : []),
-      limit,
-    )
+    .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
     .all<GroupRow>()
   groups.push(...imapRows.results)
 
-  const relaySql = before
-    ? `SELECT COALESCE(thread_key, 'r:' || id) AS key, MAX(sent_at) AS last_at, COUNT(*) AS total, 0 AS unread
-       FROM messages WHERE account_id = ? AND folder = ?
-       GROUP BY key HAVING last_at < ? OR (last_at = ? AND key < ?)
+  const relaySql = `SELECT COALESCE(m.thread_key, 'r:' || m.id) AS key, MAX(m.sent_at) AS last_at, COUNT(*) AS total, 0 AS unread
+       FROM messages m WHERE ${relayWhere}
+       GROUP BY key${before ? ' HAVING last_at < ? OR (last_at = ? AND key < ?)' : ''}
        ORDER BY last_at DESC, key DESC LIMIT ?`
-    : `SELECT COALESCE(thread_key, 'r:' || id) AS key, MAX(sent_at) AS last_at, COUNT(*) AS total, 0 AS unread
-       FROM messages WHERE account_id = ? AND folder = ?
-       GROUP BY key ORDER BY last_at DESC, key DESC LIMIT ?`
   const relayRows = await env.DB.prepare(relaySql)
-    .bind(
-      account.id,
-      folder,
-      ...(before ? [before.date, before.date, before.id] : []),
-      limit,
-    )
+    .bind(...imapParams, ...(before ? [before.date, before.date, before.id] : []), limit)
     .all<GroupRow>()
   groups.push(...relayRows.results)
 
@@ -99,29 +103,33 @@ async function accountThreads(
     return { groups: [], threads }
   }
   const placeholders = keys.map(() => '?').join(', ')
+  // A conversation is loaded whole: in a label view the row shows every message
+  // of the thread, exactly like opening the label in Gmail.
+  const folderClause = scope.kind === 'folder' ? ' AND folder = ?' : ''
+  const folderParam = scope.kind === 'folder' ? [scope.folder] : []
 
   const imapMessages = await env.DB.prepare(
-    `SELECT * FROM imap_messages WHERE account_id = ? AND folder = ?
+    `SELECT * FROM imap_messages WHERE account_id = ?${folderClause}
        AND COALESCE(thread_key, stable_key) IN (${placeholders})
      ORDER BY sent_at ASC`,
   )
-    .bind(account.id, folder, ...keys)
+    .bind(account.id, ...folderParam, ...keys)
     .all<ImapMessageRow>()
   for (const row of imapMessages.results) {
     const key = row.thread_key ?? row.stable_key
-    addThreadRow(threads, key, row, row.from_name, row.from_email)
+    addThreadRow(threads, key, row, row.from_name, row.from_email, Boolean(row.unread))
   }
 
   const relayMessages = await env.DB.prepare(
-    `SELECT * FROM messages WHERE account_id = ? AND folder = ?
+    `SELECT * FROM messages WHERE account_id = ?${folderClause}
        AND COALESCE(thread_key, 'r:' || id) IN (${placeholders})
      ORDER BY sent_at ASC`,
   )
-    .bind(account.id, folder, ...keys)
+    .bind(account.id, ...folderParam, ...keys)
     .all<MessageRow>()
   for (const row of relayMessages.results) {
     const key = row.thread_key ?? `r:${row.id}`
-    addThreadRow(threads, key, row, row.from_name, row.from_email)
+    addThreadRow(threads, key, row, row.from_name, row.from_email, false)
   }
 
   return { groups, threads }
@@ -137,9 +145,15 @@ function addThreadRow(
   row: MessageRow | ImapMessageRow,
   name: string | null,
   email: string,
+  unread: boolean,
 ): void {
-  const entry = threads.get(key) ?? { latest: row, participants: [], participantCount: 0 }
+  const entry =
+    threads.get(key) ?? { latest: row, participants: [], participantCount: 0, messages: 0, unread: 0 }
   entry.latest = row
+  entry.messages += 1
+  if (unread) {
+    entry.unread += 1
+  }
   const known = entry.participants.some(
     (item) => item.email.toLowerCase() === (email ?? '').toLowerCase(),
   )
@@ -183,17 +197,21 @@ async function labelIdsFor(env: Env, ids: string[]): Promise<Map<string, string[
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url)
   const accountId = url.searchParams.get('accountId') ?? 'all'
+  const labelId = url.searchParams.get('labelId')
   const folder = parseFolder(url.searchParams.get('folder'))
   if (!THREAD_FOLDERS.includes(folder)) {
     return fail('Invalid folder', 400, undefined, 'folder_invalid')
   }
+  // A label view is a first-class view: it is grouped by conversation too, and
+  // the row shows the whole thread like Gmail does.
+  const scope: ThreadScope = labelId ? { kind: 'label', labelId } : { kind: 'folder', folder }
   const limit = clampPageSize(Number(url.searchParams.get('limit') ?? ''))
   const before = decodePageCursor(url.searchParams.get('before'))
 
   let accounts: AccountRow[]
   if (accountId === 'all') {
     accounts = (await listAccountRows(context.env)).filter(
-      (row) => !(row.kind === 'relay' && folder === 'inbox'),
+      (row) => !(row.kind === 'relay' && !labelId && folder === 'inbox'),
     )
   } else {
     const row = await getAccountRow(context.env, accountId)
@@ -211,7 +229,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       const { groups, threads: rows } = await accountThreads(
         context.env,
         account,
-        folder,
+        scope,
         limit,
         before,
       )
@@ -232,8 +250,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           accountName: account.display_name,
           folder,
           latest: summary,
-          total: group.total,
-          unread: group.unread,
+          total: entry.messages,
+          unread: entry.unread,
           participants: entry.participants,
         })
       }
