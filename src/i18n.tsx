@@ -417,6 +417,20 @@ const en: Record<string, string> = {
   'filters.deleted': 'Filter deleted',
 
   'settings.serverConfig': 'Server configuration status',
+  'settings.threads': 'Conversations',
+  'settings.threadsHint':
+    'Messages stored before conversations existed are grouped a few per sync run. This rebuilds the grouping from the headers only, without downloading bodies.',
+  'settings.threadsPending': '{count} messages still to group',
+  'settings.threadsRebuild': 'Rebuild',
+  'settings.threadsRebuilt': '{updated} messages grouped, {pending} left',
+  'settings.threadsNone': 'Everything is already grouped.',
+  'settings.cleanupLog': 'Objects left behind',
+  'settings.cleanupLogHint':
+    'When deleting an account some objects cannot be removed from Drive or R2. The account and its credentials are gone, so they stay listed here for manual cleanup.',
+  'settings.cleanupLogEmpty': 'Nothing left behind.',
+  'settings.cleanupLogClear': 'Clear list',
+  'settings.cleanupLogClearConfirm': 'Clear the list? The objects stay where they are.',
+
   'settings.googleOAuth': 'Google OAuth',
   'settings.microsoftOAuth': 'Microsoft OAuth',
   'settings.language': 'Language',
@@ -996,6 +1010,20 @@ const it: Record<string, string> = {
   'filters.deleted': 'Filtro eliminato',
 
   'settings.serverConfig': 'Stato configurazione server',
+  'settings.threads': 'Conversazioni',
+  'settings.threadsHint':
+    'I messaggi salvati prima delle conversazioni vengono raggruppati a poco a poco a ogni sync. Qui la ricostruzione usa solo le intestazioni, senza scaricare i corpi.',
+  'settings.threadsPending': '{count} messaggi ancora da raggruppare',
+  'settings.threadsRebuild': 'Ricostruisci',
+  'settings.threadsRebuilt': '{updated} messaggi raggruppati, {pending} rimasti',
+  'settings.threadsNone': 'È già tutto raggruppato.',
+  'settings.cleanupLog': 'Oggetti rimasti indietro',
+  'settings.cleanupLogHint':
+    'Eliminando un account alcuni oggetti possono restare su Drive o R2. L’account e le sue credenziali non esistono più, quindi restano elencati qui per la pulizia manuale.',
+  'settings.cleanupLogEmpty': 'Nessun oggetto rimasto indietro.',
+  'settings.cleanupLogClear': 'Svuota elenco',
+  'settings.cleanupLogClearConfirm': 'Svuotare l’elenco? Gli oggetti restano dove sono.',
+
   'settings.googleOAuth': 'Google OAuth',
   'settings.microsoftOAuth': 'Microsoft OAuth',
   'settings.language': 'Lingua',
