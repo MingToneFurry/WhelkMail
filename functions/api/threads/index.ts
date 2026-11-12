@@ -41,15 +41,22 @@ function parseFolder(value: string | null): Folder {
  * existed have no key yet and use their `stable_key`, so nothing disappears while
  * the backfill catches up.
  */
+interface ThreadRows {
+  latest: MessageRow | ImapMessageRow
+  /** Distinct senders in order of appearance (oldest first, like Gmail). */
+  participants: { name: string | null; email: string }[]
+  participantCount: number
+}
+
 async function accountThreads(
   env: Env,
   account: AccountRow,
   folder: Folder,
   limit: number,
   before: { date: string; id: string } | null,
-): Promise<{ groups: GroupRow[]; latest: Map<string, MessageRow | ImapMessageRow> }> {
+): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
   const groups: GroupRow[] = []
-  const latest = new Map<string, MessageRow | ImapMessageRow>()
+  const threads = new Map<string, ThreadRows>()
 
   const imapSql = before
     ? `SELECT COALESCE(thread_key, stable_key) AS key, MAX(sent_at) AS last_at, COUNT(*) AS total, COALESCE(SUM(unread), 0) AS unread
@@ -89,39 +96,60 @@ async function accountThreads(
 
   const keys = [...new Set(groups.map((group) => group.key))].slice(0, 60)
   if (keys.length === 0) {
-    return { groups: [], latest }
+    return { groups: [], threads }
   }
   const placeholders = keys.map(() => '?').join(', ')
 
   const imapMessages = await env.DB.prepare(
     `SELECT * FROM imap_messages WHERE account_id = ? AND folder = ?
        AND COALESCE(thread_key, stable_key) IN (${placeholders})
-     ORDER BY sent_at DESC`,
+     ORDER BY sent_at ASC`,
   )
     .bind(account.id, folder, ...keys)
     .all<ImapMessageRow>()
   for (const row of imapMessages.results) {
     const key = row.thread_key ?? row.stable_key
-    if (!latest.has(key)) {
-      latest.set(key, row)
-    }
+    addThreadRow(threads, key, row, row.from_name, row.from_email)
   }
 
   const relayMessages = await env.DB.prepare(
     `SELECT * FROM messages WHERE account_id = ? AND folder = ?
        AND COALESCE(thread_key, 'r:' || id) IN (${placeholders})
-     ORDER BY sent_at DESC`,
+     ORDER BY sent_at ASC`,
   )
     .bind(account.id, folder, ...keys)
     .all<MessageRow>()
   for (const row of relayMessages.results) {
     const key = row.thread_key ?? `r:${row.id}`
-    if (!latest.has(key)) {
-      latest.set(key, row)
-    }
+    addThreadRow(threads, key, row, row.from_name, row.from_email)
   }
 
-  return { groups, latest }
+  return { groups, threads }
+}
+
+/**
+ * Rows arrive oldest first: the last one seen is the newest message, while the
+ * participant list keeps the order in which senders first appear in the thread.
+ */
+function addThreadRow(
+  threads: Map<string, ThreadRows>,
+  key: string,
+  row: MessageRow | ImapMessageRow,
+  name: string | null,
+  email: string,
+): void {
+  const entry = threads.get(key) ?? { latest: row, participants: [], participantCount: 0 }
+  entry.latest = row
+  const known = entry.participants.some(
+    (item) => item.email.toLowerCase() === (email ?? '').toLowerCase(),
+  )
+  if (!known && email) {
+    entry.participantCount += 1
+    if (entry.participants.length < 6) {
+      entry.participants.push({ name: name ?? null, email })
+    }
+  }
+  threads.set(key, entry)
 }
 
 async function labelIdsFor(env: Env, ids: string[]): Promise<Map<string, string[]>> {
@@ -180,12 +208,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   for (const account of accounts) {
     try {
-      const { groups, latest } = await accountThreads(context.env, account, folder, limit, before)
+      const { groups, threads: rows } = await accountThreads(
+        context.env,
+        account,
+        folder,
+        limit,
+        before,
+      )
       for (const group of groups) {
-        const row = latest.get(group.key)
-        if (!row) {
+        const entry = rows.get(group.key)
+        if (!entry) {
           continue
         }
+        const row = entry.latest
         const summary =
           'stable_key' in row
             ? imapMessageSummary(row as ImapMessageRow, account)
@@ -199,6 +234,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           latest: summary,
           total: group.total,
           unread: group.unread,
+          participants: entry.participants,
         })
       }
     } catch (error) {

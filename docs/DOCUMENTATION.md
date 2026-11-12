@@ -95,9 +95,9 @@ Key constraints:
 ### Conversations
 
 1. `GET /api/threads?accountId=&folder=` returns one row per conversation. The group key is `COALESCE(thread_key, stable_key)`, so messages mirrored before threading existed stay visible until the backfill reaches them.
-2. Pagination is a keyset cursor on `(last message date, thread key)`: the query groups per folder, `HAVING last_at < ? OR (last_at = ? AND key < ?)` and returns at most a page of conversations; the newest message of each visible thread is then loaded to build the row (sender, subject, snippet, unread count, attachment flag, labels).
+2. Pagination is a keyset cursor on `(last message date, thread key)`: the query groups per folder, `HAVING last_at < ? OR (last_at = ? AND key < ?)` and returns at most a page of conversations; the messages of those threads are then loaded (oldest first) to build the row: newest message, unread count, labels and the list of distinct senders, so the list reads like Gmail (`Mario, Luca +2  5`).
 3. Threads are per account: the same subject on two mailboxes stays two conversations. The unified view lists both, never merges them.
-4. `GET /api/threads/messages?accountId=&threadKey=` returns the whole conversation (Inbox, Sent and Spam of that account, drafts excluded), oldest first, so your replies appear inside the thread.
+4. `GET /api/threads/messages?accountId=&threadKey=` returns the whole conversation (Inbox, Sent and Spam of that account, drafts excluded), oldest first, so your replies appear inside the thread. The reading pane stacks one header row per message (sender, snippet, date) with the opened message expanded below it: clicking another row loads that message in place.
 5. `thread_key` is the Message-ID of the root, computed by `threadKeyFor()` (`References[0]` → `In-Reply-To` → own Message-ID). Replies written in the app send `In-Reply-To`/`References`, so their copies thread in any client. A parent row without a key is repaired in the same batch, and a bounded sync phase re-reads only the headers of rows still missing one.
 6. Not threaded yet: search results and label views stay flat, and deleting a thread row acts on the newest message shown.
 

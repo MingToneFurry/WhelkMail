@@ -718,6 +718,7 @@ export default function App() {
       threadKey: thread.threadKey,
       threadCount: thread.total,
       threadUnread: thread.unread,
+      threadParticipants: thread.participants,
     }
   }
 

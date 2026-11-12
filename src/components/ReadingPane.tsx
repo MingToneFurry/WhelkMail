@@ -297,40 +297,48 @@ export function ReadingPane({
         </div>
       </div>
 
-      {thread.length > 1 ? (
-        <div className="shrink-0 border-b border-line bg-slate-50/70 px-4 py-2 sm:px-6">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
-            {t('reading.conversation', { count: thread.length })}
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {thread.map((item) => {
-              const current = item.id === message.id
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={current}
-                  onClick={() => onSelectMessage?.(item.id)}
-                  title={`${displayAddress(item.from)} · ${formatDate(item.date, locale)}`}
-                  className={cn(
-                    'flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]',
-                    current
-                      ? 'border-brand bg-brand-soft text-brand-strong'
-                      : 'border-line bg-white text-slate-700 hover:border-slate-300',
-                  )}
-                >
-                  <span className="font-medium">{initials(item.from.name ?? item.from.email)}</span>
-                  <span className="max-w-[9rem] truncate">{item.subject || t('list.noSubject')}</span>
-                  <span className="text-muted">{formatDate(item.date, locale)}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[900px] px-4 py-4 sm:px-8 sm:py-6">
+          {thread.length > 1 ? (
+            <div className="mb-4 overflow-hidden rounded-xl border border-line">
+              {thread.map((item) => {
+                const current = item.id === message.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={current}
+                    onClick={() => onSelectMessage?.(item.id)}
+                    title={`${displayAddress(item.from)} · ${formatDate(item.date, locale)}`}
+                    className={cn(
+                      'flex w-full items-center gap-2 border-b border-line/70 px-3 py-2 text-left last:border-b-0',
+                      current ? 'bg-brand-soft/60' : 'bg-white hover:bg-slate-50',
+                    )}
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                      {initials(item.from.name ?? item.from.email)}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 text-xs',
+                        item.unread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700',
+                        current ? 'text-brand-strong' : '',
+                      )}
+                    >
+                      {item.from.name?.trim() || item.from.email}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                      {item.snippet}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted">
+                      {formatDate(item.date, locale)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
             <h1 className="min-w-0 flex-1 text-xl font-normal leading-tight text-slate-900 sm:text-2xl">
               {message.subject || t('list.noSubject')}

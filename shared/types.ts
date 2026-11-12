@@ -134,6 +134,8 @@ export interface MailThread {
   latest: MessageSummary
   total: number
   unread: number
+  /** Distinct senders, oldest first: the list shows them Gmail-style. */
+  participants: Mailbox[]
 }
 
 export interface ThreadListResult {
@@ -239,6 +241,8 @@ export interface MessageSummary {
   threadCount?: number
   /** Unread messages in the conversation, filled by the grouped list. */
   threadUnread?: number
+  /** Senders of the conversation, oldest first. */
+  threadParticipants?: Mailbox[]
 }
 
 export interface MessageDetail extends MessageSummary {
