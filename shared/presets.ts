@@ -111,12 +111,15 @@ export interface RelayProviderOption {
   // What the relayDomain field holds when needsDomain is set, which picks its
   // label and error message: a sending domain (default) or an account ID.
   domainLabel?: 'domain' | 'accountId'
+  // Whether to ask for a region (relayRegion); only Mailgun has regional
+  // endpoints. Before this flag the region box showed with any domain field.
+  needsRegion?: boolean
 }
 
 export const RELAY_PROVIDERS: RelayProviderOption[] = [
   { id: 'smtp2go', label: 'SMTP2GO', needsSecret: false, needsDomain: false },
   { id: 'resend', label: 'Resend', needsSecret: false, needsDomain: false },
-  { id: 'mailgun', label: 'Mailgun', needsSecret: false, needsDomain: true },
+  { id: 'mailgun', label: 'Mailgun', needsSecret: false, needsDomain: true, needsRegion: true },
   { id: 'brevo', label: 'Brevo', needsSecret: false, needsDomain: false },
   { id: 'sendgrid', label: 'SendGrid', needsSecret: false, needsDomain: false },
   { id: 'mailjet', label: 'Mailjet', needsSecret: true, needsDomain: false },
