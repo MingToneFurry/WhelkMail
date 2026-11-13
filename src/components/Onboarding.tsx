@@ -558,7 +558,8 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                   </label>
                 ) : null}
                 {relayMeta?.needsDomain ? (
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                  // Two columns only when the provider also has a region (Mailgun).
+                  <div className={relayMeta.needsRegion ? 'grid grid-cols-[1fr_auto] gap-2' : 'grid gap-2'}>
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-muted">
                         {relayUsesAccountId ? t('onboarding.relayAccountId') : t('onboarding.relayDomain')}
@@ -569,17 +570,19 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                         className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                       />
                     </label>
-                    <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-muted">{t('onboarding.relayRegion')}</span>
-                      <select
-                        value={relayRegion}
-                        onChange={(event) => setRelayRegion(event.target.value)}
-                        className="rounded-lg border border-line px-3 py-2 outline-none"
-                      >
-                        <option value="us">US</option>
-                        <option value="eu">EU</option>
-                      </select>
-                    </label>
+                    {relayMeta.needsRegion ? (
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-medium text-muted">{t('onboarding.relayRegion')}</span>
+                        <select
+                          value={relayRegion}
+                          onChange={(event) => setRelayRegion(event.target.value)}
+                          className="rounded-lg border border-line px-3 py-2 outline-none"
+                        >
+                          <option value="us">US</option>
+                          <option value="eu">EU</option>
+                        </select>
+                      </label>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
