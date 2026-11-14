@@ -336,7 +336,7 @@ npm run dev:api
 
 - `npm run db:local` applies `db/schema.sql` to the local D1 database.
 - `npm run db:migrate:local` applies all additive migrations (labels, filters, contacts, sync, archive, push, forwarding, deletion, security) to an existing local database.
-- If you only need the security tables (sessions, 2FA rate limiting, OAuth state), run `npm run db:migrate:local:12`. Existing sessions are invalidated and you will need to sign in again.
+- If you only need the security tables (sessions, 2FA rate limiting, OAuth state), run `node scripts/migrate.mjs local --from=012`. Existing sessions are invalidated and you will need to sign in again.
 - `npm run dev` starts Vite on port 5173.
 - `npm run dev:api` starts Pages Functions on port 8788 and proxies static files to Vite.
 - Open `http://localhost:8788`.

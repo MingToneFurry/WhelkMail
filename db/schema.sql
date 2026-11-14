@@ -284,8 +284,11 @@ CREATE TABLE IF NOT EXISTS oauth_states (
 
 CREATE INDEX IF NOT EXISTS idx_oauth_states_expires ON oauth_states (expires_at);
 
--- Registry of applied migrations (scripts/migrate.mjs). A fresh install gets
--- the full schema, so this table starts empty and only upgrades record rows.
+-- Registry of applied migrations (scripts/migrate.mjs).
+-- A database created from this file already contains every migration of this
+-- release: `npm run db:local` / `db:remote` apply the schema and then record the
+-- current files through the same script, so a fresh install does not need any
+-- manual step on its first upgrade.
 CREATE TABLE IF NOT EXISTS schema_migrations (
   name TEXT PRIMARY KEY,
   applied_at TEXT NOT NULL

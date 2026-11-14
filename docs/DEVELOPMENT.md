@@ -69,10 +69,17 @@ Cloudflare Pages preview deployment instead of a local emulator.
 - `npm run db:migrate:local` / `db:migrate:remote` apply the missing migrations in
   order and record each one in `schema_migrations`, so a rerun skips what is
   already done and an interrupted upgrade resumes.
+- `npm run db:local` / `db:remote` apply `schema.sql` and then record the current
+  migrations, so a fresh install starts with a complete registry and its first
+  upgrade needs no manual step.
 - On a database created before the registry existed the table is empty while the
   schema is complete: the script stops and asks for either `--mark-applied`
   (record everything, run nothing) or `--from=NNN` (start from one migration).
-  `--dry-run` prints the plan; `--from` also works on a normal run.
+- D1 runs the statements of a file one by one, so a file that fails halfway is
+  partly applied and unrecorded. The script prints the recovery commands:
+  `--only=NNN` re-runs that file alone, and `--only=NNN --mark-applied` records
+  it when the remaining statements are already in place.
+- `--dry-run` prints the plan without touching the database.
 
 When you add a table or column, update `db/schema.sql` **and** add a migration.
 

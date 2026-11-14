@@ -101,7 +101,7 @@ npm run db:local
 
 The example uses a placeholder D1 ID; for local development that is fine. For a real deployment, create your own database and replace it (or configure the `DB` binding in the Pages dashboard).
 
-If you already have a local database created before labels/signatures, run `npm run db:migrate:local`. If you only need the security tables (sessions, rate limiting, OAuth state), run `npm run db:migrate:local:12`; existing sessions are invalidated.
+If you already have a local database created before labels/signatures, run `npm run db:migrate:local`. If you only need the security tables (sessions, rate limiting, OAuth state), start from that migration with `node scripts/migrate.mjs local --from=012`; existing sessions are invalidated.
 
 Create `.dev.vars` in the project root:
 
@@ -160,7 +160,7 @@ Short version:
    ```bash
    npm run db:migrate:remote
    ```
-   If you only need the security tables, run `npm run db:migrate:remote:12`.
+   If you only need the security tables, run `node scripts/migrate.mjs remote --from=012`.
 5. Optional Web Push:
    ```bash
    npm run vapid
