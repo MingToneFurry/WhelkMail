@@ -139,7 +139,11 @@ function missingRequirements(file) {
       const definition = sql(
         `SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '${item.name}'`,
       )
-      if (!definition.ok || !/\bUNIQUE\b/i.test(String(definition.rows[0]?.sql ?? ''))) {
+      // Match the clause: a column literally named "unique" must not satisfy it.
+      if (
+        !definition.ok ||
+        !/^\s*CREATE\s+UNIQUE\s+INDEX/i.test(String(definition.rows[0]?.sql ?? ''))
+      ) {
         missing.push({ ...item, wrongDefinition: true })
       }
     }
