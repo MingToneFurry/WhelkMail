@@ -39,6 +39,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (enabled) {
       return fail('Two-factor authentication is already enabled', 400, undefined, 'totp_already_enabled')
     }
+    // A stolen session must not be able to install its own authenticator: the
+    // password is the one secret an attacker holding a cookie does not have.
+    if (!body.password || !(await verifyPassword(context.env, body.password))) {
+      return fail('Invalid password', 401, undefined, 'login_failed')
+    }
     const secret = generateTotpSecret()
     await storePendingSecret(context.env, secret)
     return json({
@@ -50,6 +55,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (body.action === 'enable') {
     if (enabled) {
       return fail('Two-factor authentication is already enabled', 400, undefined, 'totp_already_enabled')
+    }
+    if (!body.password || !(await verifyPassword(context.env, body.password))) {
+      return fail('Invalid password', 401, undefined, 'login_failed')
     }
     const secret = await getPendingSecret(context.env)
     if (!secret) {
