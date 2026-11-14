@@ -19,10 +19,21 @@ import type { RelayAdapter, RelayMessage, RelayResult } from './types'
  * Docs: https://developers.cloudflare.com/email-service/api/send-emails/rest-api/
  */
 
+/** Cloudflare's error list, e.g. [{ code: 10203, message: "email.sending.error..." }]. */
+type CloudflareErrors = { code?: number; message?: string }[]
+
+/** "10203 email.sending.error.email.sending_disabled; ...", or the fallback. */
+function formatErrors(errors: CloudflareErrors | undefined, data: unknown, status: number): string {
+  return (
+    errors?.map((error) => `${error.code ?? ''} ${error.message ?? ''}`.trim()).join('; ') ||
+    errorDetail(data, `HTTP ${status}`)
+  )
+}
+
 /** The parts of Cloudflare's response this relay reads. */
 interface CloudflareSendResponse {
   success?: boolean
-  errors?: { code?: number; message?: string }[]
+  errors?: CloudflareErrors
   result?: {
     message_id?: string
     // Each recipient is listed under one of: delivered, queued,
@@ -80,11 +91,15 @@ export class CloudflareRelay implements RelayAdapter {
     )
     const data = (await readJson(response)) as CloudflareSendResponse | null
     if (!response.ok || !data?.success) {
-      // Errors arrive as a list of { code, message }, e.g.
-      // "10203 email.sending.error.email.sending_disabled".
-      const detail =
-        data?.errors?.map((error) => `${error.code ?? ''} ${error.message ?? ''}`.trim()).join('; ') ||
-        errorDetail(data, `HTTP ${response.status}`)
+      const detail = formatErrors(data?.errors, data, response.status)
+      // The most likely setup mistake, so say what to do instead of only the code.
+      if (data?.errors?.some((error) => error.code === 10203)) {
+        const domain = message.fromEmail.split('@').pop()
+        throw relayHttpError(
+          `Cloudflare send failed: ${domain} isn't set up for Email Sending in this Cloudflare account. Onboard it under Email Service → Email Sending (${detail})`,
+          response.status,
+        )
+      }
       throw relayHttpError(`Cloudflare send failed: ${detail}`, response.status)
     }
     // The message was accepted. Recipients that bounced permanently or are on

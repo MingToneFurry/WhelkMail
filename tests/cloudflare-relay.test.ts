@@ -57,7 +57,15 @@ describe('cloudflare REST relay', () => {
       result: null,
     })
     await expect(new CloudflareRelay('token', 'acct').send(message)).rejects.toThrow(
+      "notifications.example.com isn't set up for Email Sending in this Cloudflare account",
+    )
+    await expect(new CloudflareRelay('token', 'acct').send(message)).rejects.toThrow(
       '10203 email.sending.error.email.sending_disabled',
+    )
+
+    mockFetch(429, { success: false, errors: [{ code: 10004, message: 'email.sending.error.throttled' }], result: null })
+    await expect(new CloudflareRelay('token', 'acct').send(message)).rejects.toThrow(
+      'Cloudflare send failed: 10004 email.sending.error.throttled',
     )
   })
 

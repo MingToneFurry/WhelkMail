@@ -339,7 +339,7 @@ Supported providers: SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmar
 
 - API key: an account API token with the **Email Sending: Edit** permission.
 - Account ID: your Cloudflare account ID (dashboard → account home, or the URL after `dash.cloudflare.com/`).
-- The sending domain must be onboarded under **Email Service → Email Sending** in the same account. Each subdomain is onboarded separately.
+- The sending domain must be onboarded under **Email Service → Email Sending** in the same account. Each subdomain is onboarded separately. If it isn't, sending fails with a message naming the domain (Cloudflare error `10203`). WhelkMail can't check this when saving: listing a zone's sending domains needs a token that can also read zones.
 - By default, a message with any recipient on Cloudflare's suppression list is rejected outright (error `10205`). Turn on **Drop suppressed recipients** for the sending domain to send to the other recipients instead; WhelkMail then reports the dropped addresses as not delivered.
 - The custom SMTP option can't be used with Cloudflare's SMTP endpoint (`smtp.mx.cloudflare.net`): Workers block TCP sockets to Cloudflare's own IP ranges.
 - Limits enforced by WhelkMail before the API call: at most **50 recipients** per message (to, cc and bcc combined) and **15 MiB of attachments**, to stay under Cloudflare's 25 MiB encoded-message limit. Larger messages are rejected with `too_many_recipients` or `attachment_too_large`.
