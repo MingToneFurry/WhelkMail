@@ -1,22 +1,19 @@
 #!/usr/bin/env sh
-# Publish the current tree of `main` to the public repository.
+# Publish the development branch to the public repository.
 #
-# The public repo (WhelkMail/WhelkMail) is the distribution copy: it must be
-# installable by someone else and must never contain personal deployment
-# configuration. This script builds a release commit whose parent is the public
-# `main`, so the public history stays linear and every push is a fast-forward.
+# The two repositories share one history, so this is a plain fast-forward push:
+# no snapshot commits and no duplicated content. A PR merged on the public repo
+# is brought back with `git merge public/main`, not copied with cherry-pick.
 #
 # Usage:
 #   git remote add public https://github.com/WhelkMail/WhelkMail.git
 #   sh scripts/publish-public.sh                 # publish main
-#   MESSAGE="Release 0.1.0" sh scripts/publish-public.sh
 #   SOURCE=feature-x sh scripts/publish-public.sh
 set -eu
 
 REMOTE=${REMOTE:-public}
 SOURCE=${SOURCE:-main}
 TARGET=${TARGET:-main}
-MESSAGE=${MESSAGE:-"Release $(date +%Y-%m-%d)"}
 
 die() {
   echo "error: $*" >&2
@@ -26,34 +23,23 @@ die() {
 command -v git >/dev/null 2>&1 || die "git not found"
 git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository"
 
-# Never publish files that describe a specific installation. The patterns match
-# the .gitignore rules: the base file, its suffixed variants and the generic
-# env files; the *.example templates are meant to be published.
-denied=$(git ls-tree -r --name-only "$SOURCE" \
-  | grep -E '(^|/)(wrangler\.toml|\.dev\.vars(\.[A-Za-z0-9_-]+)*|\.env(\.[A-Za-z0-9_-]+)*)$' \
-  | grep -v '\.example$' || true)
-if [ -n "$denied" ]; then
-  die "these files describe a specific installation and must stay untracked in $SOURCE:
-$denied"
-fi
+# Never publish files that describe a specific installation.
+for file in wrangler.toml worker/wrangler.toml .dev.vars; do
+  if git cat-file -e "$SOURCE:$file" 2>/dev/null; then
+    die "$file is tracked in $SOURCE; untrack it with: git rm --cached $file"
+  fi
+done
 
 git fetch "$REMOTE" "$TARGET" >/dev/null 2>&1 || die "cannot fetch $REMOTE/$TARGET"
 
-tree=$(git rev-parse "$SOURCE^{tree}")
-parent=$(git rev-parse "$REMOTE/$TARGET")
-commit=$(git commit-tree "$tree" -p "$parent" -m "$MESSAGE")
-
-# Keep the snapshot reachable even if the push fails (missing credentials, no
-# network): the next run replaces it and a plain
-#   git push public public-release:main
-# is enough once authentication works.
-git update-ref refs/heads/public-release "$commit"
+# Only fast-forwards: the public line is part of this history, so a rewrite would
+# mean someone merged something that was never brought back here.
+if ! git merge-base --is-ancestor "$REMOTE/$TARGET" "$SOURCE"; then
+  die "$REMOTE/$TARGET has commits missing from $SOURCE; run 'git merge $REMOTE/$TARGET' first"
+fi
 
 echo "publishing $SOURCE -> $REMOTE/$TARGET"
-echo "  tree   $tree"
-echo "  parent $parent"
-echo "  commit $commit (ref public-release)"
-git --no-pager diff --stat "$parent" "$commit" | tail -n 20
+git --no-pager diff --stat "$REMOTE/$TARGET" "$SOURCE" | tail -n 20
 echo
-git push "$REMOTE" "$commit:$TARGET"
-echo "done: $(git rev-parse --short "$commit")"
+git push "$REMOTE" "$SOURCE:$TARGET"
+echo "done: $(git rev-parse --short "$SOURCE")"

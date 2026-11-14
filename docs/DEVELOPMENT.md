@@ -8,11 +8,13 @@ and what must never end up in the public one.
 | Repository | Role |
 | --- | --- |
 | `mlzog/WhelkMail` (this one, remote `origin`) | development. Commits can be small, messy and frequent. |
-| `WhelkMail/WhelkMail` (remote `public`) | distribution. Only curated snapshots, installable by anyone. |
+| `WhelkMail/WhelkMail` (remote `public`) | distribution. Anyone can install it. |
 
-The two histories are unrelated: the public repo was re-synced from the
-development tree at some point. Do not try to merge them; publish snapshots
-instead (see below).
+Both repositories share **one history**: `public/main` is an ancestor of the
+development branch (see the unification merge). That keeps the two in sync with
+plain merges and fast-forward pushes, and it is why a PR merged on GitHub is
+brought back with `git merge public/main` instead of a cherry-pick — a cherry-pick
+would create a duplicate commit for content that already exists.
 
 ## Local setup
 
@@ -110,26 +112,25 @@ git fetch public
 Then:
 
 ```bash
-sh scripts/publish-public.sh                      # publishes main
-MESSAGE="Release 0.1.0" sh scripts/publish-public.sh
-SOURCE=feature-x sh scripts/publish-public.sh      # publish another branch
+sh scripts/publish-public.sh                  # publish main
+SOURCE=feature-x sh scripts/publish-public.sh  # publish another branch
 ```
 
 The script refuses to run if a personal config file is tracked in `SOURCE`:
 `wrangler.toml`, `worker/wrangler.toml`, `.dev.vars` and its variants
 (`.dev.vars.production`, `.dev.vars.production.local`, …), `.env` and `.env.*`
-with any number of suffixes. The `*.example` templates are allowed and expected. It then builds a snapshot commit whose parent is
-`public/main` (so the public history stays linear and pushes are fast-forwards)
-and pushes the tree of `SOURCE`.
+with any number of suffixes. The `*.example` templates are allowed and expected.
 
-The snapshot commit is also stored in the local `public-release` branch. If the
-push fails (for example because no credentials are available), nothing is lost:
-re-run the script or push the prepared commit directly with
+It then pushes `SOURCE` to `public/main` as a **fast-forward**. If `public/main`
+has commits that are missing locally the script stops and asks for a merge first:
 
 ```bash
-git push public public-release:main
+git merge public/main        # brings a PR merged on GitHub into development
+sh scripts/publish-public.sh # publishes back, fast-forward
 ```
 
+Update `public/main` regularly (`git fetch public`): whoever merges a PR on the
+public repository creates a commit your branch does not have yet.
 Before publishing, make sure the public tree is installable:
 
 ```bash
