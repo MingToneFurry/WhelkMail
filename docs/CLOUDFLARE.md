@@ -404,7 +404,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 | `D1_ERROR: no such table: accounts` | Run `npm run db:remote` |
 | `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` / `sessions` / `login_attempts` / `oauth_states` / `imap_body_cache` / `imap_sync_locks` / `schema_migrations` | Run `npm run db:migrate:remote`: migrations already recorded are skipped |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` / `auto_sync` / `delete_after_archive` / `forward_to_json` / `drafts_folder` / `spam_folder` | Run `npm run db:migrate:remote`, or apply the missing `006`–`016` migrations in order |
-| 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, site not served over HTTPS, or the `sessions` table missing (run `npm run db:migrate:remote:12`) |
+| 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, site not served over HTTPS, or the `sessions` table missing (run `node scripts/migrate.mjs remote --from=012`) |
 | 500 on every API call | Missing `DB` binding, missing secrets, or missing security tables |
 | Relay 503 | Relay provider not configured for the account and no deployment fallback |
 | Google OAuth 503 | `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` missing |

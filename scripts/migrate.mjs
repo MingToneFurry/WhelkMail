@@ -7,6 +7,7 @@
  *   node scripts/migrate.mjs remote --from=013  # ignore the registry below 013
  *   node scripts/migrate.mjs remote --mark-applied  # record, run nothing
  *   node scripts/migrate.mjs remote --dry-run   # show the plan only
+ *   node scripts/migrate.mjs remote --only=019  # re-run a single file
  *
  * Every applied file is recorded in `schema_migrations`, so a rerun skips what
  * is already done and an interrupted upgrade resumes where it stopped.
@@ -31,6 +32,8 @@ if (target !== 'local' && target !== 'remote') {
 }
 const fromArg = args.find((arg) => arg.startsWith('--from='))
 const from = fromArg ? fromArg.slice('--from='.length).padStart(3, '0') : '000'
+const onlyArg = args.find((arg) => arg.startsWith('--only='))
+const only = onlyArg ? onlyArg.slice('--only='.length).padStart(3, '0') : null
 const markApplied = args.includes('--mark-applied')
 const dryRun = args.includes('--dry-run')
 
@@ -103,7 +106,12 @@ function databaseInitialised() {
 const migrations = readdirSync(join(root, 'db', 'migrations'))
   .filter((file) => file.endsWith('.sql'))
   .sort()
-  .filter((file) => file.slice(0, 3) >= from)
+  .filter((file) => (only ? file.slice(0, 3) === only : file.slice(0, 3) >= from))
+
+if (only && migrations.length === 0) {
+  console.error(`[db] no migration file starting with ${only}.`)
+  process.exit(1)
+}
 
 ensureRegistry()
 const applied = appliedMigrations()
@@ -176,7 +184,20 @@ for (const file of pending) {
   ])
   if (result.status !== 0) {
     console.error(
-      `\n[db] ${file} failed. Everything before it is recorded; fix the error and rerun the same command.`,
+      [
+        '',
+        `[db] ${file} failed.`,
+        '     D1 runs each statement of the file on its own, so the ones before the',
+        '     error are already applied and are not recorded. Inspect the database,',
+        '     fix the statement, then finish this file alone:',
+        '',
+        `        node scripts/migrate.mjs ${target} --only=${file.slice(0, 3)}`,
+        '',
+        '     If the remaining statements are already applied, record it instead:',
+        '',
+        `        node scripts/migrate.mjs ${target} --only=${file.slice(0, 3)} --mark-applied`,
+        '',
+      ].join('\n'),
     )
     process.exit(result.status ?? 1)
   }
