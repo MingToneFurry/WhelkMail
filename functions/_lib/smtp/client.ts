@@ -21,18 +21,58 @@ interface SmtpResponse {
   lines: string[]
 }
 
+/** The slice of `cloudflare:sockets` this client relies on (swappable in tests). */
+export interface SmtpSocketLike {
+  opened: Promise<unknown>
+  readable: ReadableStream<Uint8Array>
+  writable: WritableStream<Uint8Array>
+  startTls(): SmtpSocketLike
+  close(): void
+}
+
+export type SmtpConnector = (config: SmtpConfig) => SmtpSocketLike
+
+export const DEFAULT_TIMEOUT_MS = 20_000
+/** QUIT is courtesy: never let it outlive the response we already sent. */
+const QUIT_TIMEOUT_MS = 5_000
+
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export class SmtpError extends Error {}
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new SmtpError(message)), ms)
-    }),
-  ])
+/**
+ * Race `promise` against a deadline.
+ *
+ * The timer is always cleared, and `onTimeout` runs before the rejection so the
+ * caller can tear the socket down: an SMTP server that stops answering must not
+ * keep a request (or a `finally` block) busy forever.
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string,
+  onTimeout?: () => void,
+): Promise<T> {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return promise
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      try {
+        onTimeout?.()
+      } catch {
+        // ignore
+      }
+      reject(new SmtpError(message))
+    }, ms)
+  })
+  return Promise.race([promise, deadline]).finally(() => {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+    }
+  })
 }
 
 function indexOfCrlf(buffer: Uint8Array): number {
@@ -44,36 +84,51 @@ function indexOfCrlf(buffer: Uint8Array): number {
   return -1
 }
 
+const defaultConnector: SmtpConnector = (config) =>
+  connect(
+    { hostname: config.host, port: config.port },
+    { secureTransport: config.security === 'tls' ? 'on' : 'starttls', allowHalfOpen: false },
+  )
+
 export class SmtpConnection {
-  private socket: Socket
+  private socket: SmtpSocketLike
   private reader!: ReadableStreamDefaultReader<Uint8Array>
   private writer!: WritableStreamDefaultWriter<Uint8Array>
   private buffer = new Uint8Array(0)
   private capabilities: string[] = []
+  private timeoutMs: number
+  private closed = false
 
-  private constructor(socket: Socket) {
+  constructor(socket: SmtpSocketLike, timeoutMs = DEFAULT_TIMEOUT_MS) {
     this.socket = socket
+    this.timeoutMs = timeoutMs
   }
 
-  static async open(config: SmtpConfig, timeoutMs = 20_000): Promise<SmtpConnection> {
-    const security = config.security === 'tls' ? 'on' : 'starttls'
-    const socket = connect(
-      { hostname: config.host, port: config.port },
-      { secureTransport: security, allowHalfOpen: false },
-    )
-    const connection = new SmtpConnection(socket)
-    await withTimeout(socket.opened, timeoutMs, 'SMTP connection timed out')
-    connection.attach()
-    const greeting = await connection.readResponse()
-    if (greeting.code !== 220) {
+  static async open(
+    config: SmtpConfig,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    connector: SmtpConnector = defaultConnector,
+  ): Promise<SmtpConnection> {
+    const socket = connector(config)
+    const connection = new SmtpConnection(socket, timeoutMs)
+    try {
+      await withTimeout(socket.opened, timeoutMs, 'SMTP connection timed out', () =>
+        connection.close(),
+      )
+      connection.attach()
+      const greeting = await connection.readResponse()
+      if (greeting.code !== 220) {
+        throw new SmtpError(`Unexpected SMTP greeting: ${greeting.lines.join(' | ')}`)
+      }
+      await connection.ehlo()
+      if (config.security === 'starttls') {
+        await connection.startTls()
+      }
+      return connection
+    } catch (error) {
       connection.close()
-      throw new SmtpError(`Unexpected SMTP greeting: ${greeting.lines.join(' | ')}`)
+      throw error
     }
-    await connection.ehlo()
-    if (config.security === 'starttls') {
-      await connection.startTls(timeoutMs)
-    }
-    return connection
   }
 
   private attach(): void {
@@ -82,7 +137,7 @@ export class SmtpConnection {
     this.writer = this.socket.writable.getWriter()
   }
 
-  private async startTls(timeoutMs: number): Promise<void> {
+  private async startTls(): Promise<void> {
     await this.write('STARTTLS')
     await this.expect([220], 'STARTTLS')
     try {
@@ -97,7 +152,9 @@ export class SmtpConnection {
     }
     const upgraded = this.socket.startTls()
     this.socket = upgraded
-    await withTimeout(upgraded.opened, timeoutMs, 'SMTP TLS upgrade timed out')
+    await withTimeout(upgraded.opened, this.timeoutMs, 'SMTP TLS upgrade timed out', () =>
+      this.close(),
+    )
     this.attach()
     await this.ehlo()
   }
@@ -125,7 +182,18 @@ export class SmtpConnection {
     }
   }
 
-  private async readResponse(): Promise<SmtpResponse> {
+  /**
+   * Read one full SMTP reply. Every command awaits its answer, so the deadline
+   * (and the socket close that follows it) is what keeps a silent server from
+   * blocking the request indefinitely.
+   */
+  private readResponse(timeoutMs = this.timeoutMs): Promise<SmtpResponse> {
+    return withTimeout(this.readResponseInner(), timeoutMs, 'SMTP response timed out', () =>
+      this.close(),
+    )
+  }
+
+  private async readResponseInner(): Promise<SmtpResponse> {
     const lines: string[] = []
     let code = 0
     while (true) {
@@ -171,7 +239,16 @@ export class SmtpConnection {
     return line.slice(5).toUpperCase().split(/\s+/).filter(Boolean)
   }
 
-  async authenticate(credentials: SmtpCredentials): Promise<void> {
+  authenticate(credentials: SmtpCredentials): Promise<void> {
+    return withTimeout(
+      this.authenticateInner(credentials),
+      this.timeoutMs,
+      'SMTP authentication timed out',
+      () => this.close(),
+    )
+  }
+
+  private async authenticateInner(credentials: SmtpCredentials): Promise<void> {
     if (credentials.mode === 'oauth2') {
       const payload = `user=${credentials.username}\x01auth=Bearer ${credentials.accessToken ?? ''}\x01\x01`
       await this.write(`AUTH XOAUTH2 ${toBase64(encoder.encode(payload))}`)
@@ -195,7 +272,20 @@ export class SmtpConnection {
     await this.expect([235], 'AUTH LOGIN password')
   }
 
-  async sendRaw(message: Uint8Array, from: string, recipients: string[]): Promise<void> {
+  sendRaw(message: Uint8Array, from: string, recipients: string[]): Promise<void> {
+    return withTimeout(
+      this.sendRawInner(message, from, recipients),
+      this.timeoutMs,
+      'SMTP send timed out',
+      () => this.close(),
+    )
+  }
+
+  private async sendRawInner(
+    message: Uint8Array,
+    from: string,
+    recipients: string[],
+  ): Promise<void> {
     await this.write(`MAIL FROM:<${from}>`)
     await this.expect([250], 'MAIL FROM')
     for (const recipient of recipients) {
@@ -213,24 +303,40 @@ export class SmtpConnection {
     await this.expect([250], 'Message body')
   }
 
-  async quit(): Promise<void> {
-    try {
-      await this.write('QUIT')
-      await this.readResponse()
-    } catch {
-      // ignore
+  /** Best-effort close: bounded, never throws, always closes the socket. */
+  async quit(timeoutMs = QUIT_TIMEOUT_MS): Promise<void> {
+    if (this.closed) {
+      return
     }
-    this.close()
+    try {
+      await withTimeout(
+        (async () => {
+          await this.write('QUIT')
+          await this.readResponseInner()
+        })(),
+        timeoutMs,
+        'SMTP QUIT timed out',
+      )
+    } catch {
+      // ignore: the message was already accepted
+    } finally {
+      this.close()
+    }
   }
 
   close(): void {
+    if (this.closed) {
+      return
+    }
+    this.closed = true
     try {
-      this.reader.releaseLock()
+      this.reader?.releaseLock()
     } catch {
       // ignore
     }
     try {
-      this.writer.close()
+      // close() returns a promise that rejects when the stream already errored.
+      void this.writer?.close().catch(() => undefined)
     } catch {
       // ignore
     }
