@@ -1,5 +1,6 @@
 import { toBase64 } from '../crypto'
 import { errorDetail, readJson } from './shared'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface BrevoResponse {
@@ -41,7 +42,7 @@ export class BrevoRelay implements RelayAdapter {
     })
     const data = (await readJson(response)) as BrevoResponse | null
     if (!response.ok) {
-      throw new Error(`Brevo send failed: ${errorDetail(data, `HTTP ${response.status}`)}`)
+      throw new RelayError(`Brevo send failed: ${errorDetail(data, `HTTP ${response.status}`)}`, response.status)
     }
     return { providerMessageId: data?.messageId ?? null }
   }

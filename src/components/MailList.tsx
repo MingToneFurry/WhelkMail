@@ -682,6 +682,11 @@ export function MailList({
                           <AlertCircle size={11} /> {t('list.notSent')}
                         </span>
                       ) : null}
+                      {message.status === 'unknown' ? (
+                        <span className="flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                          <AlertCircle size={11} /> {t('list.outcomeUnknown')}
+                        </span>
+                      ) : null}
                       {message.status === 'draft' ? (
                         <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                           {t('list.draft')}

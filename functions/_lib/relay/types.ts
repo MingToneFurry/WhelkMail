@@ -32,3 +32,23 @@ export interface RelayAdapter {
   maxRecipients?: number
   send(message: RelayMessage): Promise<RelayResult>
 }
+
+/**
+ * The provider answered and refused the message: it was definitely not sent.
+ *
+ * Anything else (a fetch that throws, a socket that dies, a timeout) leaves the
+ * outcome unknown: the request may have reached the provider and been accepted
+ * before the answer was lost. Callers must not treat that as a failed send.
+ */
+export class RelayError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+export function isRelayRejection(error: unknown): error is RelayError {
+  return error instanceof RelayError
+}
