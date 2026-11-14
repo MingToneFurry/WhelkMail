@@ -66,8 +66,13 @@ Cloudflare Pages preview deployment instead of a local emulator.
 - `db/migrations/NNN_name.sql` upgrades an **existing** database. They are
   additive `ALTER`/`CREATE` statements, not idempotent, so never run them on a
   fresh database.
-- `npm run db:migrate:local` / `db:migrate:remote` apply every migration in
-  order; `--from=013` restarts from one of them.
+- `npm run db:migrate:local` / `db:migrate:remote` apply the missing migrations in
+  order and record each one in `schema_migrations`, so a rerun skips what is
+  already done and an interrupted upgrade resumes.
+- On a database created before the registry existed the table is empty while the
+  schema is complete: the script stops and asks for either `--mark-applied`
+  (record everything, run nothing) or `--from=NNN` (start from one migration).
+  `--dry-run` prints the plan; `--from` also works on a normal run.
 
 When you add a table or column, update `db/schema.sql` **and** add a migration.
 
