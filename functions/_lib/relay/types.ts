@@ -52,3 +52,14 @@ export class RelayError extends Error {
 export function isRelayRejection(error: unknown): error is RelayError {
   return error instanceof RelayError
 }
+
+/**
+ * Whether an HTTP failure from a provider proves the message was refused.
+ *
+ * A 2xx with a failure body or a 4xx means the provider read the request and
+ * said no. A 5xx means it broke while handling it: the message may already have
+ * been accepted, so the outcome stays unknown and must not be reported as failed.
+ */
+export function isDefiniteRejectionStatus(status: number): boolean {
+  return status < 500
+}

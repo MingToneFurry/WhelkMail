@@ -37,6 +37,30 @@ describe('relay outcome classification', () => {
     expect((error as RelayError).status).toBe(403)
   })
 
+  it('treats a 400 as a definite rejection', async () => {
+    mockFetch(400, { success: false, errors: [{ code: 1, message: 'bad request' }] })
+
+    const error = await new CloudflareRelay('token', 'acct').send(message).catch((reason) => reason)
+
+    expect(isRelayRejection(error)).toBe(true)
+  })
+
+  it('leaves a 500 unknown: the provider may have accepted the message', async () => {
+    mockFetch(500, { success: false, errors: [{ code: 1, message: 'internal error' }] })
+
+    const error = await new CloudflareRelay('token', 'acct').send(message).catch((reason) => reason)
+
+    expect(isRelayRejection(error)).toBe(false)
+  })
+
+  it('leaves a 503 unknown', async () => {
+    mockFetch(503, { success: false, errors: [{ code: 1, message: 'unavailable' }] })
+
+    const error = await new CloudflareRelay('token', 'acct').send(message).catch((reason) => reason)
+
+    expect(isRelayRejection(error)).toBe(false)
+  })
+
   it('does not classify a network failure as a rejection', async () => {
     vi.stubGlobal(
       'fetch',

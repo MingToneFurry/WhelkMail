@@ -1,5 +1,4 @@
-import { basicAuth, errorDetail, formatAddress, readJson } from './shared'
-import { RelayError } from './types'
+import { basicAuth, errorDetail, formatAddress, readJson, relayHttpError } from './shared'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface MailgunResponse {
@@ -47,7 +46,7 @@ export class MailgunRelay implements RelayAdapter {
     })
     const data = (await readJson(response)) as MailgunResponse | null
     if (!response.ok) {
-      throw new RelayError(`Mailgun send failed: ${errorDetail(data, `HTTP ${response.status}`)}`, response.status)
+      throw relayHttpError(`Mailgun send failed: ${errorDetail(data, `HTTP ${response.status}`)}`, response.status)
     }
     return { providerMessageId: data?.id ?? null }
   }

@@ -51,12 +51,16 @@ export class CustomSmtpRelay implements RelayAdapter {
       date: new Date(),
       includeBcc: false,
     })
-    const connection = await SmtpConnection.open({
-      host: this.config.host,
-      port: this.config.port,
-      security: this.config.security,
-    })
+    // The connection is opened inside the guard too: a server that refuses the
+    // connection or the EHLO with a negative reply is a definite rejection, not
+    // an unknown outcome.
+    let connection: SmtpConnection | null = null
     try {
+      connection = await SmtpConnection.open({
+        host: this.config.host,
+        port: this.config.port,
+        security: this.config.security,
+      })
       await connection.authenticate({
         username: this.config.username,
         mode: 'password',
@@ -70,7 +74,7 @@ export class CustomSmtpRelay implements RelayAdapter {
     } catch (error) {
       throw relayErrorFromSmtp(error)
     } finally {
-      await connection.quit()
+      await connection?.quit()
     }
     return { providerMessageId: null }
   }

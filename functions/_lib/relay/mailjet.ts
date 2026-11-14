@@ -1,6 +1,5 @@
 import { toBase64 } from '../crypto'
-import { basicAuth, errorDetail, readJson } from './shared'
-import { RelayError } from './types'
+import { basicAuth, errorDetail, readJson, relayHttpError } from './shared'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface MailjetMessage {
@@ -59,7 +58,7 @@ export class MailjetRelay implements RelayAdapter {
       const detail = result?.Errors
         ? Object.values(result.Errors).join('; ')
         : errorDetail(data, `HTTP ${response.status}`)
-      throw new RelayError(`Mailjet send failed: ${detail}`, response.status)
+      throw relayHttpError(`Mailjet send failed: ${detail}`, response.status)
     }
     return { providerMessageId: result.MessageID ?? null }
   }

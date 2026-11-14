@@ -598,6 +598,7 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - Attachment indicators in lists come from `BODYSTRUCTURE`. The newest bodies are prefetched in the background and cached; other bodies are downloaded when a message is opened.
 - A relay account needs a working sent-copy destination (Drive, R2 or an IMAP mailbox). Without one the send is aborted **before** the relay is called and returns `storage_failed`, so the message is never handed to the provider.
 - Custom SMTP relays to `smtp.gmail.com` (465 and 587) and `smtp.mail.yahoo.com:465` fail with `Network connection lost.` from Workers, before authentication; other hosts (for example `smtp.fastmail.com:465`) connect normally. Use an HTTP relay, or an SMTP host that accepts the connection.
+- A relay send is recorded as `failed` only when the provider answered with a refusal (a 4xx, or a 2xx carrying an error body). A 5xx, a timeout or a dropped connection leaves the message as `unknown`: the provider may have accepted it before failing, so the UI asks to check its activity log instead of inviting a resend.
 - The Cloudflare Email Service relay is experimental: the maintainer has not exercised it against a real Cloudflare account, so delivery, suppression handling (error `10205`), rate limits and per-recipient reporting are unverified. The code follows Cloudflare's documented REST API; use another relay for mail that must be delivered reliably.
 
 ## 18. License

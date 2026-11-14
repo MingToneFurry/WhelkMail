@@ -1,3 +1,5 @@
+import { RelayError, isDefiniteRejectionStatus } from './types'
+
 export function formatAddress(name: string, email: string): string {
   const clean = name.replace(/[\r\n"\\]+/g, ' ').trim()
   return clean ? `"${clean}" <${email}>` : email
@@ -33,4 +35,14 @@ export function errorDetail(data: unknown, fallback: string): string {
     }
   }
   return fallback
+}
+
+/**
+ * Build the error for a provider HTTP failure.
+ *
+ * A 5xx is not a refusal: the provider may have accepted the message before
+ * failing, so it stays unclassified and the caller records an unknown outcome.
+ */
+export function relayHttpError(message: string, status: number): Error {
+  return isDefiniteRejectionStatus(status) ? new RelayError(message, status) : new Error(message)
 }
