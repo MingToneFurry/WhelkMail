@@ -211,8 +211,16 @@ export class SmtpConnection {
     return { code, lines }
   }
 
-  private async write(line: string): Promise<void> {
-    await this.writer.write(encoder.encode(`${line}\r\n`))
+  private write(line: string): Promise<void> {
+    // A socket can stall on the write side too (full send buffer, dead peer):
+    // without its own deadline the command would hang before readResponse()
+    // ever gets a chance to time out.
+    return withTimeout(
+      this.writer.write(encoder.encode(`${line}\r\n`)),
+      this.timeoutMs,
+      'SMTP command timed out',
+      () => this.close(),
+    )
   }
 
   private async expect(codes: number[], context: string): Promise<SmtpResponse> {
