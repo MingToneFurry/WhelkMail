@@ -23,12 +23,19 @@ die() {
 command -v git >/dev/null 2>&1 || die "git not found"
 git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository"
 
-# Never publish files that describe a specific installation.
-for file in wrangler.toml worker/wrangler.toml .dev.vars; do
-  if git cat-file -e "$SOURCE:$file" 2>/dev/null; then
-    die "$file is tracked in $SOURCE; untrack it with: git rm --cached $file"
-  fi
-done
+# Never publish files that describe a private deployment.
+#
+# Checking three fixed paths was not enough: a tracked `.env`, `.env.production`
+# or `.dev.vars.production` would have been published silently. The .gitignore
+# does not help for a file that was already committed.
+restricted=$(git ls-tree -r --name-only "$SOURCE" \
+  | grep -E '(^|/)(wrangler\.toml|\.dev\.vars|\.dev\.vars\..*|\.env|\.env\..*)$' \
+  | grep -v '\.example$' || true)
+if [ -n "$restricted" ]; then
+  echo "error: these files describe a private deployment and must stay untracked:" >&2
+  echo "$restricted" | sed 's/^/  /' >&2
+  exit 1
+fi
 
 git fetch "$REMOTE" "$TARGET" >/dev/null 2>&1 || die "cannot fetch $REMOTE/$TARGET"
 
