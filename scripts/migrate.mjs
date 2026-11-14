@@ -20,6 +20,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
+import { describeRequirement, requirementsFromSql } from './migration-requirements.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -105,19 +106,7 @@ function databaseInitialised() {
 
 /** Objects a migration creates, parsed from its own statements. */
 function requirementsOf(file) {
-  const text = readFileSync(join(root, 'db', 'migrations', file), 'utf8')
-  const items = []
-  for (const match of text.matchAll(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/gi)) {
-    items.push({ kind: 'column', table: match[1], name: match[2] })
-  }
-  for (const match of text.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
-    items.push({ kind: 'table', name: match[1] })
-  }
-  for (const match of text.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
-    // A unique index is a data guarantee, not just a performance hint.
-    items.push({ kind: 'index', name: match[1] })
-  }
-  return items
+  return requirementsFromSql(readFileSync(join(root, 'db', 'migrations', file), 'utf8'))
 }
 
 /**
@@ -143,6 +132,16 @@ function missingRequirements(file) {
     }
     if (result.rows.length === 0) {
       missing.push(item)
+      continue
+    }
+    // An index with the right name but without UNIQUE is not the same object.
+    if (item.kind === 'index' && item.unique) {
+      const definition = sql(
+        `SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '${item.name}'`,
+      )
+      if (!definition.ok || !/\bUNIQUE\b/i.test(String(definition.rows[0]?.sql ?? ''))) {
+        missing.push({ ...item, wrongDefinition: true })
+      }
     }
   }
   return { missing, error: '' }
@@ -217,10 +216,7 @@ if (markApplied) {
       [
         '',
         '[db] refusing to record migrations whose objects are missing:',
-        ...absent.map(
-          (item) =>
-            `       ${item.file}: ${item.kind === 'index' ? 'index' : item.kind === 'table' ? 'table' : 'column'} ${item.table ? `${item.table}.` : ''}${item.name}`,
-        ),
+        ...absent.map((item) => `       ${item.file}: ${describeRequirement(item)}`),
         '',
         '     schema.sql only creates what does not exist (CREATE TABLE IF NOT EXISTS),',
         '     so it cannot add columns to an existing table. Apply the migrations',
