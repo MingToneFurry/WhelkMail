@@ -67,24 +67,43 @@ function indexOfCrlf(buffer: Uint8Array): number {
   return -1
 }
 
+/** The slice of `cloudflare:sockets` this client relies on (swappable in tests). */
+export interface ImapSocketLike {
+  opened: Promise<unknown>
+  readable: ReadableStream<Uint8Array>
+  writable: WritableStream<Uint8Array>
+  startTls(): ImapSocketLike
+  close(): void
+}
+
+export type ImapConnector = (config: ImapConfig) => ImapSocketLike
+
+const defaultConnector: ImapConnector = (config) =>
+  connect(
+    { hostname: config.host, port: config.port },
+    { secureTransport: config.security === 'tls' ? 'on' : 'starttls', allowHalfOpen: false },
+  )
+
 export class ImapConnection {
-  private socket: Socket
+  private socket: ImapSocketLike
   private reader!: ReadableStreamDefaultReader<Uint8Array>
   private writer!: WritableStreamDefaultWriter<Uint8Array>
   private buffer = new Uint8Array(0)
   private tagCounter = 0
+  private commandTimeoutMs: number
 
-  private constructor(socket: Socket) {
+  constructor(socket: ImapSocketLike, commandTimeoutMs = COMMAND_TIMEOUT_MS) {
     this.socket = socket
+    this.commandTimeoutMs = commandTimeoutMs
   }
 
-  static async open(config: ImapConfig, timeoutMs = 20_000): Promise<ImapConnection> {
-    const security = config.security === 'tls' ? 'on' : 'starttls'
-    const socket = connect(
-      { hostname: config.host, port: config.port },
-      { secureTransport: security, allowHalfOpen: false },
-    )
-    const connection = new ImapConnection(socket)
+  static async open(
+    config: ImapConfig,
+    timeoutMs = 20_000,
+    connector: ImapConnector = defaultConnector,
+  ): Promise<ImapConnection> {
+    const socket = connector(config)
+    const connection = new ImapConnection(socket, timeoutMs)
     try {
       await withTimeout(socket.opened, timeoutMs, 'IMAP connection timed out')
     } catch (error) {
@@ -186,7 +205,7 @@ export class ImapConnection {
     try {
       return await withTimeout(
         this.executeCommand(command, onContinuation),
-        COMMAND_TIMEOUT_MS,
+        this.commandTimeoutMs,
         `IMAP operation timed out: ${command.split(' ')[0]}`,
       )
     } catch (error) {
