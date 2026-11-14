@@ -719,14 +719,16 @@ function AccountCard({
                     placeholder={relayUsesAccountId ? t('settings.relayAccountId') : t('settings.relayDomain')}
                     className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                   />
-                  <select
-                    value={relayRegion}
-                    onChange={(event) => setRelayRegion(event.target.value)}
-                    className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
-                  >
-                    <option value="us">US</option>
-                    <option value="eu">EU</option>
-                  </select>
+                  {relayMeta.needsRegion ? (
+                    <select
+                      value={relayRegion}
+                      onChange={(event) => setRelayRegion(event.target.value)}
+                      className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
+                    >
+                      <option value="us">US</option>
+                      <option value="eu">EU</option>
+                    </select>
+                  ) : null}
                 </div>
               ) : null}
             </div>
