@@ -20,6 +20,8 @@ interface FakeOptions {
   /** Split every reply into chunks of this size to exercise buffering. */
   chunkSize?: number
   stallOpening?: boolean
+  /** Make socket.startTls() throw, as a broken upgrade would. */
+  startTlsThrows?: boolean
 }
 
 function fakeImap(options: FakeOptions) {
@@ -62,6 +64,9 @@ function fakeImap(options: FakeOptions) {
     readable,
     writable,
     startTls() {
+      if (options.startTlsThrows) {
+        throw new Error('TLS handshake failed')
+      }
       return socket
     },
     close() {
@@ -237,5 +242,35 @@ describe('IMAP responses', () => {
     const connection = await ImapConnection.open(config, 200, connectorOf(socket))
     // LOGOUT swallows errors by design; the point is that it returns promptly.
     await expect(connection.logout()).resolves.toBeUndefined()
+  })
+})
+
+describe('IMAP STARTTLS', () => {
+  const starttlsConfig = { host: 'imap.example', port: 143, security: 'starttls' as const }
+
+  it('closes the socket when the server rejects STARTTLS', async () => {
+    const { socket, state } = fakeImap({
+      greeting,
+      respond: (tag, command) =>
+        command.startsWith('STARTTLS') ? `${tag} NO starttls not supported\r\n` : `${tag} OK\r\n`,
+    })
+
+    await expect(
+      ImapConnection.open(starttlsConfig, 200, connectorOf(socket)),
+    ).rejects.toThrow(/starttls/i)
+    expect(state.closed).toBe(true)
+  })
+
+  it('closes the socket when the upgrade itself throws', async () => {
+    const { socket, state } = fakeImap({
+      greeting,
+      startTlsThrows: true,
+      respond: (tag) => `${tag} OK\r\n`,
+    })
+
+    await expect(
+      ImapConnection.open(starttlsConfig, 200, connectorOf(socket)),
+    ).rejects.toThrow(/TLS handshake failed/)
+    expect(state.closed).toBe(true)
   })
 })

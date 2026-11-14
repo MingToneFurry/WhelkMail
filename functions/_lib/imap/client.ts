@@ -137,29 +137,32 @@ export class ImapConnection {
   }
 
   private async upgradeTls(timeoutMs: number): Promise<void> {
-    const result = await this.command('STARTTLS')
-    if (!result.ok) {
-      throw new ImapError('STARTTLS rejected by the IMAP server')
-    }
+    // Everything happens inside the guard: a rejected STARTTLS, a throwing
+    // startTls() and a timed-out upgrade all leave the connection unusable, so
+    // none of them may leak the socket.
     try {
-      this.reader.releaseLock()
-    } catch {
-      // ignore
-    }
-    try {
-      this.writer.releaseLock()
-    } catch {
-      // ignore
-    }
-    const upgraded = this.socket.startTls()
-    this.socket = upgraded
-    try {
+      const result = await this.command('STARTTLS')
+      if (!result.ok) {
+        throw new ImapError('STARTTLS rejected by the IMAP server')
+      }
+      try {
+        this.reader.releaseLock()
+      } catch {
+        // ignore
+      }
+      try {
+        this.writer.releaseLock()
+      } catch {
+        // ignore
+      }
+      const upgraded = this.socket.startTls()
+      this.socket = upgraded
       await withTimeout(upgraded.opened, timeoutMs, 'IMAP TLS upgrade timed out')
+      this.attach()
     } catch (error) {
       this.close()
       throw error
     }
-    this.attach()
   }
 
   private async fill(): Promise<void> {
