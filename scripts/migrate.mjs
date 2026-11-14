@@ -113,6 +113,10 @@ function requirementsOf(file) {
   for (const match of text.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
     items.push({ kind: 'table', name: match[1] })
   }
+  for (const match of text.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
+    // A unique index is a data guarantee, not just a performance hint.
+    items.push({ kind: 'index', name: match[1] })
+  }
   return items
 }
 
@@ -130,7 +134,9 @@ function missingRequirements(file) {
     const statement =
       item.kind === 'table'
         ? `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${item.name}'`
-        : `SELECT name FROM pragma_table_info('${item.table}') WHERE name = '${item.name}'`
+        : item.kind === 'index'
+          ? `SELECT name FROM sqlite_master WHERE type = 'index' AND name = '${item.name}'`
+          : `SELECT name FROM pragma_table_info('${item.table}') WHERE name = '${item.name}'`
     const result = sql(statement)
     if (!result.ok) {
       return { missing, error: result.error }
@@ -213,7 +219,7 @@ if (markApplied) {
         '[db] refusing to record migrations whose objects are missing:',
         ...absent.map(
           (item) =>
-            `       ${item.file}: ${item.kind === 'table' ? 'table' : 'column'} ${item.table ? `${item.table}.` : ''}${item.name}`,
+            `       ${item.file}: ${item.kind === 'index' ? 'index' : item.kind === 'table' ? 'table' : 'column'} ${item.table ? `${item.table}.` : ''}${item.name}`,
         ),
         '',
         '     schema.sql only creates what does not exist (CREATE TABLE IF NOT EXISTS),',

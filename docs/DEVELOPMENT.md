@@ -85,6 +85,9 @@ Cloudflare Pages preview deployment instead of a local emulator.
   partly applied and unrecorded. The script prints the recovery commands:
   `--only=NNN` re-runs that file alone, and `--only=NNN --mark-applied` records
   it when the remaining statements are already in place.
+- `--mark-applied` verifies the columns, tables and indexes each migration
+  creates before recording it, and refuses if any is missing. It does **not**
+  verify data changes (`UPDATE`/`DELETE` statements): check those by hand.
 - `--dry-run` prints the plan without touching the database.
 
 When you add a table or column, update `db/schema.sql` **and** add a migration.
