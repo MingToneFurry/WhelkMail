@@ -19,6 +19,7 @@ import { buildMime, snippetOf } from '../../_lib/mime'
 import { normalizeMessageId, threadKeyFor } from '../../_lib/mail/thread-key'
 import { getRelay, type RelayAdapter } from '../../_lib/relay'
 import { recipientLimitExceeded } from '../../_lib/relay/validation'
+import { isRelayRejection } from '../../_lib/relay/types'
 import type { RelayResult } from '../../_lib/relay/types'
 import { copyObjectKey, getStorage, rescueCandidates } from '../../_lib/storage'
 
@@ -41,7 +42,7 @@ interface PersistInput {
   storageDriver?: 'drive' | 'r2' | 'imap'
   attachments: AttachmentMeta[]
   threadKey: string
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed' | 'unknown'
 }
 
 async function persistRelayMessage(input: PersistInput): Promise<MessageRow> {
@@ -417,8 +418,23 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       storageDriver,
       attachments: attachmentMeta,
       threadKey,
-      status: 'failed',
+      // A provider that answered with an error definitely refused the message.
+      // A network failure, a timeout or a lost response leaves it unknown: the
+      // message may already be on its way, so it is not marked as failed.
+      status: isRelayRejection(error) ? 'failed' : 'unknown',
     })
+    if (!isRelayRejection(error)) {
+      return json(
+        {
+          error: 'Send outcome unknown',
+          code: 'message_send_unknown',
+          detail,
+          messageId: id,
+          warning: `${relay.label} did not answer. The message may have been sent: check the provider's activity log before trying again.`,
+        },
+        502,
+      )
+    }
     return json({ error: 'Send failed', code: 'message_send_failed', detail, messageId: id }, 502)
   }
 }

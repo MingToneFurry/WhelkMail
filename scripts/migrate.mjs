@@ -19,7 +19,7 @@
  * of replaying migrations that would fail on duplicate columns.
  */
 import { spawnSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -103,6 +103,45 @@ function databaseInitialised() {
   return result.ok && result.rows.length > 0
 }
 
+/** Objects a migration creates, parsed from its own statements. */
+function requirementsOf(file) {
+  const text = readFileSync(join(root, 'db', 'migrations', file), 'utf8')
+  const items = []
+  for (const match of text.matchAll(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/gi)) {
+    items.push({ kind: 'column', table: match[1], name: match[2] })
+  }
+  for (const match of text.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/gi)) {
+    items.push({ kind: 'table', name: match[1] })
+  }
+  return items
+}
+
+/**
+ * Verify that the schema really contains what a migration creates.
+ *
+ * This is what stops `--mark-applied` from declaring a database up to date when
+ * schema.sql only added the missing tables: CREATE TABLE IF NOT EXISTS never
+ * adds columns to a table that already exists, so an outdated installation could
+ * be recorded as complete and then never upgraded.
+ */
+function missingRequirements(file) {
+  const missing = []
+  for (const item of requirementsOf(file)) {
+    const statement =
+      item.kind === 'table'
+        ? `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${item.name}'`
+        : `SELECT name FROM pragma_table_info('${item.table}') WHERE name = '${item.name}'`
+    const result = sql(statement)
+    if (!result.ok) {
+      return { missing, error: result.error }
+    }
+    if (result.rows.length === 0) {
+      missing.push(item)
+    }
+  }
+  return { missing, error: '' }
+}
+
 const migrations = readdirSync(join(root, 'db', 'migrations'))
   .filter((file) => file.endsWith('.sql'))
   .sort()
@@ -157,6 +196,36 @@ if (dryRun) {
 }
 
 if (markApplied) {
+  // Never declare a migration applied unless its objects are in the database.
+  const absent = []
+  for (const file of pending) {
+    const check = missingRequirements(file)
+    if (check.error) {
+      console.error(`\n[db] cannot verify ${file}: ${check.error}`)
+      process.exit(1)
+    }
+    absent.push(...check.missing.map((item) => ({ file, ...item })))
+  }
+  if (absent.length > 0) {
+    console.error(
+      [
+        '',
+        '[db] refusing to record migrations whose objects are missing:',
+        ...absent.map(
+          (item) =>
+            `       ${item.file}: ${item.kind === 'table' ? 'table' : 'column'} ${item.table ? `${item.table}.` : ''}${item.name}`,
+        ),
+        '',
+        '     schema.sql only creates what does not exist (CREATE TABLE IF NOT EXISTS),',
+        '     so it cannot add columns to an existing table. Apply the migrations',
+        '     first, then record the result:',
+        '',
+        `        node scripts/migrate.mjs ${target}`,
+        '',
+      ].join('\n'),
+    )
+    process.exit(1)
+  }
   for (const file of pending) {
     const result = sql(
       `INSERT OR REPLACE INTO schema_migrations (name, applied_at) VALUES ('${file}', datetime('now'))`,

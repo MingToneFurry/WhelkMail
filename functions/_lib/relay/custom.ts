@@ -1,6 +1,22 @@
 import { buildMime } from '../mime'
-import { SmtpConnection, type SmtpSecurity } from '../smtp/client'
+import { SmtpConnection, SmtpError, type SmtpSecurity } from '../smtp/client'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
+
+/**
+ * Map an SMTP failure to a relay failure.
+ *
+ * A negative reply means the server refused the message, so it is definitely not
+ * sent. A closed socket, a timeout or a stalled write leaves the outcome
+ * unknown: the message may have been accepted before the answer was lost, and
+ * the caller must not report it as failed.
+ */
+export function relayErrorFromSmtp(error: unknown): unknown {
+  if (error instanceof SmtpError && error.replyCode) {
+    return new RelayError(error.message, error.replyCode)
+  }
+  return error
+}
 
 export interface CustomSmtpConfig {
   host: string
@@ -51,6 +67,8 @@ export class CustomSmtpRelay implements RelayAdapter {
         ...message.cc,
         ...message.bcc,
       ])
+    } catch (error) {
+      throw relayErrorFromSmtp(error)
     } finally {
       await connection.quit()
     }

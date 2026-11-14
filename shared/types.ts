@@ -9,7 +9,7 @@ export type AuthType = 'password' | 'oauth2'
 export type MailSecurity = 'tls' | 'starttls'
 export type ImapArchiveDriver = 'r2' | 'drive'
 export type Folder = 'inbox' | 'sent' | 'draft' | 'spam'
-export type MessageStatus = 'sent' | 'failed' | 'draft'
+export type MessageStatus = 'sent' | 'failed' | 'unknown' | 'draft'
 export type LabelColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'cyan' | 'lime'
 
 export interface Label {

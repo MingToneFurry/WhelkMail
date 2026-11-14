@@ -329,12 +329,12 @@ Provider cleanup is opt-in per account and requires body archiving. For a new in
 
 ```bash
 npm install
-npm run db:local
+npm run db:init:local
 npm run dev
 npm run dev:api
 ```
 
-- `npm run db:local` applies `db/schema.sql` to the local D1 database.
+- `npm run db:init:local` applies `db/schema.sql` to the local D1 database and records the current migrations as the baseline for later upgrades.
 - `npm run db:migrate:local` applies all additive migrations (labels, filters, contacts, sync, archive, push, forwarding, deletion, security) to an existing local database.
 - If you only need the security tables (sessions, 2FA rate limiting, OAuth state), run `node scripts/migrate.mjs local --from=012`. Existing sessions are invalidated and you will need to sign in again.
 - `npm run dev` starts Vite on port 5173.
@@ -461,7 +461,7 @@ Relay credentials entered per account in the UI take precedence over these value
 ### 12.5 Apply the schema
 
 ```bash
-npm run db:remote
+npm run db:init:remote
 ```
 
 If you already created the tables before labels and signatures were added, apply the additive migration:

@@ -21,7 +21,7 @@ Requirements: Node.js 22+ and npm.
 ```bash
 npm install
 cp wrangler.toml.example wrangler.toml   # gitignored
-npm run db:local                          # fresh database: schema only
+npm run db:init:local                     # fresh database: schema + migration baseline
 ```
 
 Create `.dev.vars` (gitignored) with at least:
@@ -69,9 +69,13 @@ Cloudflare Pages preview deployment instead of a local emulator.
 - `npm run db:migrate:local` / `db:migrate:remote` apply the missing migrations in
   order and record each one in `schema_migrations`, so a rerun skips what is
   already done and an interrupted upgrade resumes.
-- `npm run db:local` / `db:remote` apply `schema.sql` and then record the current
-  migrations, so a fresh install starts with a complete registry and its first
-  upgrade needs no manual step.
+- `npm run db:init:local` / `db:init:remote` are for a **new** database: they apply
+  `schema.sql` and then record the current migrations as the baseline, so the
+  first upgrade needs no manual step.
+- `npm run db:local` / `db:remote` apply only `schema.sql`. Never follow them with
+  `--mark-applied` on an existing database: `CREATE TABLE IF NOT EXISTS` cannot add
+  columns, and the registry would claim migrations that were never applied. The
+  script now refuses to record a migration whose columns or tables are missing.
 - On a database created before the registry existed the table is empty while the
   schema is complete: the script stops and asks for either `--mark-applied`
   (record everything, run nothing) or `--from=NNN` (start from one migration).

@@ -39,7 +39,10 @@ const QUIT_TIMEOUT_MS = 5_000
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-export class SmtpError extends Error {}
+export class SmtpError extends Error {
+  /** Set when the server answered with a negative reply (a real rejection). */
+  replyCode?: number
+}
 
 /**
  * Race `promise` against a deadline.
@@ -226,7 +229,9 @@ export class SmtpConnection {
   private async expect(codes: number[], context: string): Promise<SmtpResponse> {
     const response = await this.readResponse()
     if (!codes.includes(response.code)) {
-      throw new SmtpError(`${context}: ${response.lines.join(' | ')}`)
+      const error = new SmtpError(`${context}: ${response.lines.join(' | ')}`)
+      error.replyCode = response.code
+      throw error
     }
     return response
   }

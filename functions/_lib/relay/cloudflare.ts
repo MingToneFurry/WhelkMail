@@ -1,5 +1,6 @@
 import { toBase64 } from '../crypto'
 import { errorDetail, formatAddress, readJson } from './shared'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 /**
@@ -85,7 +86,7 @@ export class CloudflareRelay implements RelayAdapter {
       const detail =
         data?.errors?.map((error) => `${error.code ?? ''} ${error.message ?? ''}`.trim()).join('; ') ||
         errorDetail(data, `HTTP ${response.status}`)
-      throw new Error(`Cloudflare send failed: ${detail}`)
+      throw new RelayError(`Cloudflare send failed: ${detail}`, response.status)
     }
     // The message was accepted. Recipients that bounced permanently or are on
     // the suppression list don't fail the send: they are returned so the UI

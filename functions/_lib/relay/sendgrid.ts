@@ -1,5 +1,6 @@
 import { toBase64 } from '../crypto'
 import { errorDetail, readJson } from './shared'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface SendGridError {
@@ -57,7 +58,7 @@ export class SendGridRelay implements RelayAdapter {
           ?.map((item) => item.message)
           .filter(Boolean)
           .join('; ') ?? errorDetail(data, `HTTP ${response.status}`)
-      throw new Error(`SendGrid send failed: ${detail}`)
+      throw new RelayError(`SendGrid send failed: ${detail}`, response.status)
     }
     return { providerMessageId: response.headers.get('X-Message-Id') }
   }

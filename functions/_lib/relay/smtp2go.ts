@@ -1,5 +1,6 @@
 import { toBase64 } from '../crypto'
 import { errorDetail, formatAddress, readJson } from './shared'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface Smtp2GoResponse {
@@ -44,7 +45,7 @@ export class Smtp2GoRelay implements RelayAdapter {
     const data = (await readJson(response)) as Smtp2GoResponse | null
     if (!response.ok || !data?.data || data.data.succeeded !== 1) {
       const detail = data?.data?.failures?.join('; ') ?? data?.data?.error ?? errorDetail(data, `HTTP ${response.status}`)
-      throw new Error(`SMTP2GO send failed: ${detail}`)
+      throw new RelayError(`SMTP2GO send failed: ${detail}`, response.status)
     }
     return { providerMessageId: data.data.email_id ?? null }
   }

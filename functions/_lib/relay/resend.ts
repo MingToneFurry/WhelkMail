@@ -1,5 +1,6 @@
 import { toBase64 } from '../crypto'
 import { errorDetail, formatAddress, readJson } from './shared'
+import { RelayError } from './types'
 import type { RelayAdapter, RelayMessage, RelayResult } from './types'
 
 interface ResendResponse {
@@ -41,7 +42,7 @@ export class ResendRelay implements RelayAdapter {
     })
     const data = (await readJson(response)) as ResendResponse | null
     if (!response.ok) {
-      throw new Error(`Resend send failed: ${errorDetail(data, `HTTP ${response.status}`)}`)
+      throw new RelayError(`Resend send failed: ${errorDetail(data, `HTTP ${response.status}`)}`, response.status)
     }
     return { providerMessageId: data?.id ?? null }
   }
