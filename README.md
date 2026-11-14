@@ -96,7 +96,7 @@ Requirements: Node.js 22+ and npm.
 ```bash
 npm install
 cp wrangler.toml.example wrangler.toml
-npm run db:local
+npm run db:init:local
 ```
 
 The example uses a placeholder D1 ID; for local development that is fine. For a real deployment, create your own database and replace it (or configure the `DB` binding in the Pages dashboard).
@@ -154,7 +154,7 @@ Short version:
 3. Add the D1 binding `DB` and the secrets `APP_PASSWORD` and `TOKEN_ENC_KEY`.
 4. Apply the schema:
    ```bash
-   npm run db:remote
+   npm run db:init:remote
    ```
    If the database already existed before labels and signatures were added, run the additive migrations too:
    ```bash
