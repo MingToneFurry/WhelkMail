@@ -48,7 +48,7 @@ export function TwoFactorSettings() {
     setError(null)
     setNotice(null)
     try {
-      setSetup(await api.totpSetup())
+      setSetup(await api.totpSetup(password))
     } catch (reason) {
       setError(errorText(reason, t))
     } finally {
@@ -60,10 +60,11 @@ export function TwoFactorSettings() {
     setBusy(true)
     setError(null)
     try {
-      const result = await api.totpEnable(code)
+      const result = await api.totpEnable(code, password)
       setRecoveryCodes(result.recoveryCodes)
       setSetup(null)
       setCode('')
+      setPassword('')
       setStatus({ enabled: true, recoveryRemaining: result.recoveryCodes.length })
       setNotice(t('security.enabledToast'))
     } catch (reason) {
@@ -133,14 +134,29 @@ export function TwoFactorSettings() {
           <p className="mt-0.5 text-[11px] text-slate-700">{t('security.apps')}</p>
 
           {!setup ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void startSetup()}
-              className="mt-3 flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-strong disabled:opacity-50"
-            >
-              <KeyRound size={14} /> {t('security.enable')}
-            </button>
+            <div className="mt-3">
+              <label className="block text-xs">
+                <span className="mb-1 block font-medium text-muted">{t('security.password')}</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs outline-none focus:border-brand sm:w-72"
+                />
+                <span className="mt-1 block text-[11px] text-muted">
+                  {t('security.passwordHint')}
+                </span>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !password}
+                onClick={() => void startSetup()}
+                className="mt-3 flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-strong disabled:opacity-50"
+              >
+                <KeyRound size={14} /> {t('security.enable')}
+              </button>
+            </div>
           ) : (
             <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
               <p className="text-[11px] text-muted">{t('security.setupHint')}</p>
@@ -195,7 +211,7 @@ export function TwoFactorSettings() {
               </label>
               <button
                 type="button"
-                disabled={busy || !code.trim()}
+                disabled={busy || !code.trim() || !password}
                 onClick={() => void enable()}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
               >

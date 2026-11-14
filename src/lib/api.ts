@@ -94,13 +94,16 @@ export const api = {
   totpStatus(): Promise<TwoFactorStatus> {
     return request('/api/auth/totp')
   },
-  totpSetup(): Promise<TotpSetup> {
-    return request('/api/auth/totp', { method: 'POST', body: JSON.stringify({ action: 'setup' }) })
-  },
-  totpEnable(code: string): Promise<TotpEnableResult> {
+  totpSetup(password: string): Promise<TotpSetup> {
     return request('/api/auth/totp', {
       method: 'POST',
-      body: JSON.stringify({ action: 'enable', code }),
+      body: JSON.stringify({ action: 'setup', password }),
+    })
+  },
+  totpEnable(code: string, password: string): Promise<TotpEnableResult> {
+    return request('/api/auth/totp', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'enable', code, password }),
     })
   },
   totpDisable(password: string, code: string): Promise<{ ok: boolean }> {

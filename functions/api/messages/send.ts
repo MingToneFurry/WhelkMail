@@ -19,6 +19,7 @@ import { buildMime, snippetOf } from '../../_lib/mime'
 import { normalizeMessageId, threadKeyFor } from '../../_lib/mail/thread-key'
 import { getRelay, type RelayAdapter } from '../../_lib/relay'
 import { recipientLimitExceeded } from '../../_lib/relay/validation'
+import type { RelayResult } from '../../_lib/relay/types'
 import { copyObjectKey, getStorage, rescueCandidates } from '../../_lib/storage'
 
 interface PersistInput {
@@ -300,8 +301,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
   }
 
+  let relayAccepted = false
+  let relayResult: RelayResult | null = null
   try {
-    const relayResult = await relay.send({
+    relayResult = await relay.send({
       fromName: account.display_name,
       fromEmail: account.email,
       to: input.to,
@@ -312,6 +315,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       html: input.html,
       attachments,
     })
+    relayAccepted = true
     let warning: string | undefined
     if (copyTarget) {
       try {
@@ -369,7 +373,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // Recipients the relay accepted but won't deliver to (e.g. Cloudflare's
     // permanent_bounces): still a success, but the client gets the list so it
     // can warn about them.
-    const undelivered = relayResult.undelivered ?? []
+    const undelivered = relayResult?.undelivered ?? []
     return json(
       {
         ok: true,
@@ -381,6 +385,20 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Send failed'
+    if (relayAccepted) {
+      // The provider already has the message: reporting a failure here would
+      // make the client retry and deliver a duplicate.
+      const undelivered = relayResult?.undelivered ?? []
+      return json(
+        {
+          ok: true,
+          warning: `Message accepted by ${relay.label}, but WhelkMail could not record it (${detail}). Check the provider's activity log before sending it again.`,
+          messageId: id,
+          ...(undelivered.length > 0 ? { undelivered } : {}),
+        },
+        201,
+      )
+    }
     await persistRelayMessage({
       env: context.env,
       account,

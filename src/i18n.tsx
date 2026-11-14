@@ -175,6 +175,8 @@ const en: Record<string, string> = {
   'settings.tabSystem': 'System',
   'security.title': 'Two-factor authentication',
   'security.hint': 'Require a time-based one-time code from an authenticator app when signing in.',
+  'security.passwordHint':
+    'Confirm your password: a session alone must not be able to change two-factor authentication.',
   'security.enabled': 'Enabled',
   'security.disabled': 'Disabled',
   'security.appsHint': 'Any TOTP app works (RFC 6238). Suggested apps:',
@@ -785,6 +787,8 @@ const it: Record<string, string> = {
   'security.title': 'Autenticazione a due fattori',
   'security.hint':
     'Richiedi un codice temporaneo da un’app di autenticazione durante l’accesso.',
+  'security.passwordHint':
+    'Conferma la password: una sessione da sola non deve poter cambiare l’autenticazione a due fattori.',
   'security.enabled': 'Attiva',
   'security.disabled': 'Disattivata',
   'security.appsHint': 'Funziona con qualsiasi app TOTP (RFC 6238). App suggerite:',

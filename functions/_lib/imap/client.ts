@@ -85,7 +85,14 @@ export class ImapConnection {
       { secureTransport: security, allowHalfOpen: false },
     )
     const connection = new ImapConnection(socket)
-    await withTimeout(socket.opened, timeoutMs, 'IMAP connection timed out')
+    try {
+      await withTimeout(socket.opened, timeoutMs, 'IMAP connection timed out')
+    } catch (error) {
+      // The open can time out before attach(), so close the raw socket here:
+      // otherwise it is never released.
+      connection.close()
+      throw error
+    }
     connection.attach()
     let greeting: string
     try {
@@ -127,7 +134,12 @@ export class ImapConnection {
     }
     const upgraded = this.socket.startTls()
     this.socket = upgraded
-    await withTimeout(upgraded.opened, timeoutMs, 'IMAP TLS upgrade timed out')
+    try {
+      await withTimeout(upgraded.opened, timeoutMs, 'IMAP TLS upgrade timed out')
+    } catch (error) {
+      this.close()
+      throw error
+    }
     this.attach()
   }
 
@@ -506,12 +518,13 @@ export class ImapConnection {
 
   close(): void {
     try {
-      this.reader.releaseLock()
+      this.reader?.releaseLock()
     } catch {
       // ignore
     }
     try {
-      this.writer.close()
+      // close() returns a promise that rejects when the stream already errored.
+      void this.writer?.close().catch(() => undefined)
     } catch {
       // ignore
     }
