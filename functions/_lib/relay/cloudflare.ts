@@ -157,15 +157,18 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
   const ids: string[] = []
   for (let page = 1; page <= maxPages; page++) {
     let response: Response
+    let data: CloudflareAccountsResponse | null
     try {
       response = await fetch(`${API}/accounts?per_page=50&page=${page}`, {
         headers: { Authorization: `Bearer ${apiToken}` },
         signal: AbortSignal.timeout(15_000),
       })
+      // Inside the try too: the body can still fail after the headers arrived
+      // (a dropped connection, or the timeout expiring while it's read).
+      data = (await readJson(response)) as CloudflareAccountsResponse | null
     } catch (error) {
       return { ok: false, reason: 'unreachable', detail: error instanceof Error ? error.message : String(error) }
     }
-    const data = (await readJson(response)) as CloudflareAccountsResponse | null
     if (!response.ok || !data?.success) {
       const detail = formatErrors(data?.errors, data, response.status)
       return { ok: false, reason: response.status >= 500 ? 'unreachable' : 'rejected', detail }

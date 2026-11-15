@@ -203,6 +203,22 @@ describe('cloudflare account ID lookup on save', () => {
       detail: 'fetch failed',
     })
   })
+
+  it('treats a response body that fails to arrive as unreachable', async () => {
+    const broken = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('The operation was aborted due to timeout'))
+        },
+      }),
+    )
+    vi.stubGlobal('fetch', vi.fn(async () => broken))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', 'acct1'))).toMatchObject({
+      status: 502,
+      code: 'relay_check_failed',
+      detail: 'The operation was aborted due to timeout',
+    })
+  })
 })
 
 describe('relay recipient limit', () => {
