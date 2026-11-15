@@ -204,6 +204,15 @@ describe('cloudflare account ID lookup on save', () => {
     })
   })
 
+  it('treats rate limiting as a failed check, not a rejected key', async () => {
+    mockFetch(429, { success: false, errors: [{ code: 10000, message: 'Rate limited' }], result: null })
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', 'acct1'))).toMatchObject({
+      status: 502,
+      code: 'relay_check_failed',
+      detail: '10000 Rate limited',
+    })
+  })
+
   it('treats a response body that fails to arrive as unreachable', async () => {
     const broken = new Response(
       new ReadableStream({

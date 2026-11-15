@@ -171,7 +171,10 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
     }
     if (!response.ok || !data?.success) {
       const detail = formatErrors(data?.errors, data, response.status)
-      return { ok: false, reason: response.status >= 500 ? 'unreachable' : 'rejected', detail }
+      // Rate limiting and server errors say nothing about the token: report
+      // them as a failed check, not as a rejected key.
+      const temporary = response.status >= 500 || response.status === 429 || response.status === 408
+      return { ok: false, reason: temporary ? 'unreachable' : 'rejected', detail }
     }
     ids.push(...(data.result ?? []).flatMap((account) => (account.id ? [account.id] : [])))
     if (accountId && ids.includes(accountId)) {
