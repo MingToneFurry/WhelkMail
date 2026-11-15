@@ -193,6 +193,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       return fail('Relay API secret is required', 400, undefined, 'relay_secret_required')
     }
     const providerChanged = relayProvider !== row.relay_provider
+    // A domain or account ID saved for the previous provider means nothing to
+    // the new one (a Cloudflare account ID isn't a Mailgun domain): only keep
+    // what was entered with the switch.
+    if (providerChanged) {
+      relayDomain = input.relayDomain ?? null
+    }
     if (providerMeta.domainDetectable) {
       // Only when the key, account ID or provider changes, so other saves
       // don't wait on Cloudflare. A domain saved for the previous provider
@@ -201,8 +207,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
         const apiKey =
           input.relayApiKey ??
           (row.relay_api_key_enc ? await decryptString(context.env, row.relay_api_key_enc) : context.env.RELAY_API_KEY)
-        const entered = providerChanged ? input.relayDomain : (relayDomain ?? undefined)
-        const resolved = await resolveRelayDomain(providerMeta, apiKey, entered)
+        const resolved = await resolveRelayDomain(providerMeta, apiKey, relayDomain ?? undefined)
         if (resolved instanceof Response) {
           return resolved
         }
