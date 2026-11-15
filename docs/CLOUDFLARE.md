@@ -338,7 +338,7 @@ Supported providers: SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmar
 > **Experimental.** The maintainer has not tested this provider against a real Cloudflare account. The steps below follow the documented REST API, but actual delivery, suppression handling and rate limits are unverified: treat it as a preview and keep a tested relay for mail you care about.
 
 - API key: an account API token with the **Email Sending: Edit** permission.
-- Account ID: your Cloudflare account ID (dashboard → account home, or the URL after `dash.cloudflare.com/`).
+- Account ID: optional. Left blank, WhelkMail looks it up from the API token when the account is saved; that works when the token reaches exactly one account, which an account API token always does. Otherwise enter your Cloudflare account ID (dashboard → account home, or the URL after `dash.cloudflare.com/`). Either way, the token is checked against the account on save.
 - The sending domain must be onboarded under **Email Service → Email Sending** in the same account. Each subdomain is onboarded separately. If it isn't, sending fails with a message naming the domain (Cloudflare error `10203`). WhelkMail can't check this when saving: listing a zone's sending domains needs a token that can also read zones.
 - By default, a message with any recipient on Cloudflare's suppression list is rejected outright (error `10205`). Turn on **Drop suppressed recipients** for the sending domain to send to the other recipients instead; WhelkMail then reports the dropped addresses as not delivered.
 - The custom SMTP option can't be used with Cloudflare's SMTP endpoint (`smtp.mx.cloudflare.net`): Workers block TCP sockets to Cloudflare's own IP ranges.

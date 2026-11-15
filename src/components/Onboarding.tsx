@@ -168,7 +168,8 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
       setLocalError(t('onboarding.relaySecretRequired'))
       return
     }
-    if (relayMeta?.needsDomain && !relayDomain) {
+    // A detectable account ID can be left blank: the server looks it up.
+    if (relayMeta?.needsDomain && !relayMeta.domainDetectable && !relayDomain) {
       setLocalError(
         relayUsesAccountId ? t('onboarding.relayAccountIdRequired') : t('onboarding.relayDomainRequired'),
       )
@@ -567,6 +568,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                       <input
                         value={relayDomain}
                         onChange={(event) => setRelayDomain(event.target.value)}
+                        placeholder={relayMeta.domainDetectable ? t('onboarding.relayAccountIdPlaceholder') : undefined}
                         className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                       />
                     </label>
