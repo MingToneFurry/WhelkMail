@@ -9,6 +9,8 @@ import type { RelayAdapter, RelayMessage, RelayResult } from './types'
  * - API key: an account API token with the "Email Sending: Edit" permission.
  * - Domain field (`relay_domain`): the Cloudflare account ID, which is part
  *   of the URL. The preset labels this field "Account ID" (`domainLabel`).
+ *   It can be left blank: account save fills it in from the token with
+ *   findCloudflareAccount() below.
  *
  * The sender's domain must be onboarded to Email Sending in that account,
  * otherwise Cloudflare answers 403 with code 10203.
@@ -18,6 +20,8 @@ import type { RelayAdapter, RelayMessage, RelayResult } from './types'
  *
  * Docs: https://developers.cloudflare.com/email-service/api/send-emails/rest-api/
  */
+
+const API = 'https://api.cloudflare.com/client/v4'
 
 /** Cloudflare's error list, e.g. [{ code: 10203, message: "email.sending.error..." }]. */
 type CloudflareErrors = { code?: number; message?: string }[]
@@ -78,7 +82,7 @@ export class CloudflareRelay implements RelayAdapter {
       })),
     }
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.accountId)}/email/sending/send`,
+      `${API}/accounts/${encodeURIComponent(this.accountId)}/email/sending/send`,
       {
         method: 'POST',
         headers: {
@@ -113,5 +117,79 @@ export class CloudflareRelay implements RelayAdapter {
       providerMessageId: data.result?.message_id ?? null,
       ...(undelivered.length > 0 ? { undelivered } : {}),
     }
+  }
+}
+
+/** The parts of GET /accounts that findCloudflareAccount() reads. */
+interface CloudflareAccountsResponse {
+  success?: boolean
+  errors?: CloudflareErrors
+  result?: { id?: string }[] | null
+  result_info?: { total_pages?: number } | null
+}
+
+export type CloudflareAccountLookup =
+  | { ok: true; accountId: string }
+  | {
+      ok: false
+      // rejected: Cloudflare refused the token. count: the token doesn't
+      // reach exactly one account, so the ID has to be entered. denied: the
+      // entered ID isn't one the token reaches. unreachable: no usable answer.
+      reason: 'rejected' | 'count' | 'denied' | 'unreachable'
+      detail: string
+    }
+
+/**
+ * Find the account a sending token belongs to, or check that it can reach
+ * the account ID the user entered.
+ *
+ * Uses GET /accounts, the only account endpoint an "Email Sending: Edit"
+ * token can read: GET /accounts/{id} answers 403 even for its own account.
+ * An account token lists exactly its own account. A user token lists every
+ * account it was given, which can be several, so then the ID has to be
+ * entered rather than guessed.
+ */
+export async function findCloudflareAccount(apiToken: string, enteredId?: string): Promise<CloudflareAccountLookup> {
+  // Cloudflare's IDs are lowercase hex; accept one typed or pasted in capitals.
+  const accountId = enteredId?.toLowerCase()
+  // A user token can reach many accounts; stop paging after this many.
+  const maxPages = 10
+  const ids: string[] = []
+  for (let page = 1; page <= maxPages; page++) {
+    let response: Response
+    try {
+      response = await fetch(`${API}/accounts?per_page=50&page=${page}`, {
+        headers: { Authorization: `Bearer ${apiToken}` },
+        signal: AbortSignal.timeout(15_000),
+      })
+    } catch (error) {
+      return { ok: false, reason: 'unreachable', detail: error instanceof Error ? error.message : String(error) }
+    }
+    const data = (await readJson(response)) as CloudflareAccountsResponse | null
+    if (!response.ok || !data?.success) {
+      const detail = formatErrors(data?.errors, data, response.status)
+      return { ok: false, reason: response.status >= 500 ? 'unreachable' : 'rejected', detail }
+    }
+    ids.push(...(data.result ?? []).flatMap((account) => (account.id ? [account.id] : [])))
+    if (accountId && ids.includes(accountId)) {
+      return { ok: true, accountId }
+    }
+    if (page >= (data.result_info?.total_pages ?? 1)) {
+      break
+    }
+  }
+  if (accountId) {
+    return { ok: false, reason: 'denied', detail: `${accountId} isn't one of the accounts this API token can reach.` }
+  }
+  if (ids.length === 1) {
+    return { ok: true, accountId: ids[0] }
+  }
+  return {
+    ok: false,
+    reason: 'count',
+    detail:
+      ids.length === 0
+        ? "This API token doesn't list any Cloudflare accounts, so enter the account ID."
+        : `This API token can reach ${ids.length} Cloudflare accounts, so enter the ID of the one to send from.`,
   }
 }

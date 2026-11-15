@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CloudflareRelay } from '../functions/_lib/relay/cloudflare'
-import { recipientLimitExceeded, relayDomainMissing } from '../functions/_lib/relay/validation'
+import { recipientLimitExceeded, relayDomainMissing, resolveRelayDomain } from '../functions/_lib/relay/validation'
 import { findRelayProvider } from '../shared/presets'
 import type { RelayMessage } from '../functions/_lib/relay/types'
 
@@ -103,6 +103,104 @@ describe('relay domain validation', () => {
     expect(await mailgun.json()).toMatchObject({
       error: 'Mailgun domain is required',
       code: 'relay_domain_required',
+    })
+  })
+})
+
+describe('cloudflare account ID lookup on save', () => {
+  const cloudflare = findRelayProvider('cloudflare')!
+
+  /** One GET /accounts page listing these account IDs. */
+  function accountsPage(ids: string[], page = 1, totalPages = 1) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        errors: [],
+        result: ids.map((id) => ({ id, name: `Account ${id}` })),
+        result_info: { page, per_page: 50, total_pages: totalPages, count: ids.length, total_count: ids.length },
+      }),
+    )
+  }
+
+  async function errorOf(result: string | Response) {
+    expect(result).toBeInstanceOf(Response)
+    const response = result as Response
+    return { status: response.status, ...(await response.json()) }
+  }
+
+  it('fills in the account ID when the token reaches exactly one account', async () => {
+    const fetchMock = vi.fn(async () => accountsPage(['acct1']))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(resolveRelayDomain(cloudflare, 'token', undefined)).resolves.toBe('acct1')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.cloudflare.com/client/v4/accounts?per_page=50&page=1')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token')
+  })
+
+  it('asks for the ID when the token reaches no account or several', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => accountsPage(['acct1', 'acct2'])))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))).toMatchObject({
+      status: 400,
+      code: 'relay_account_id_required',
+      detail: 'This API token can reach 2 Cloudflare accounts, so enter the ID of the one to send from.',
+    })
+
+    vi.stubGlobal('fetch', vi.fn(async () => accountsPage([])))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', ''))).toMatchObject({
+      code: 'relay_account_id_required',
+      detail: "This API token doesn't list any Cloudflare accounts, so enter the account ID.",
+    })
+  })
+
+  it('accepts an entered ID the token reaches, looking past the first page', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith('page=1') ? accountsPage(['acct1'], 1, 2) : accountsPage(['acct2'], 2, 2),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(resolveRelayDomain(cloudflare, 'token', 'acct2')).resolves.toBe('acct2')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('accepts an entered ID in capitals and saves it in lowercase', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => accountsPage(['0123abcd'])))
+    await expect(resolveRelayDomain(cloudflare, 'token', '0123ABCD')).resolves.toBe('0123abcd')
+  })
+
+  it('rejects an entered ID the token does not reach', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => accountsPage(['acct1'])))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', 'someone-else'))).toMatchObject({
+      status: 400,
+      code: 'relay_account_denied',
+      detail: "someone-else isn't one of the accounts this API token can reach.",
+    })
+  })
+
+  it("reports a refused token with Cloudflare's own error", async () => {
+    mockFetch(400, {
+      success: false,
+      errors: [{ code: 6003, message: 'Invalid request headers' }],
+      result: null,
+    })
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'bad', 'acct1'))).toMatchObject({
+      status: 400,
+      code: 'relay_key_rejected',
+      detail: '6003 Invalid request headers',
+    })
+  })
+
+  it('says when Cloudflare could not be reached, without blaming the token', async () => {
+    mockFetch(503, { success: false, errors: [], result: null })
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))).toMatchObject({
+      status: 502,
+      code: 'relay_check_failed',
+    })
+
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed') }))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))).toMatchObject({
+      status: 502,
+      code: 'relay_check_failed',
+      detail: 'fetch failed',
     })
   })
 })
