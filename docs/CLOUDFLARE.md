@@ -205,7 +205,21 @@ npm run cron:deploy
 
 The worker runs every 5 minutes and calls `POST /api/cron/notifications` on the Pages app. In the same run it also applies automatic forwarding rules, the optional provider cleanup, and the per-account automatic background sync. Enable notifications from **Settings → Push notifications**, background sync per account in Settings, and forwarding/deletion in the account/filter sections.
 
-If the database already existed before relay support was added, apply the additive migration:
+If the database already existed before relay support was added, apply the missing migrations with the script rather than by hand:
+
+```bash
+npm run db:migrate:remote
+```
+
+It records what it applied, so a rerun only continues with what is left. A database created before the newer relay features also needs the columns added later, all covered by the same command:
+
+| Migration | Adds |
+| --- | --- |
+| `020_relay_sent_copy` | `accounts.sent_copy_account_id` (Drive/R2/IMAP destination of the sent copies) |
+| `022_reply_account` | `accounts.reply_account_id` (which relay answers for a forwarding mailbox) |
+| `026_relay_any_address` | `accounts.relay_any_address` (`Send from any address on this domain`) |
+
+The four first relay columns, for a database so old that it predates relay support entirely:
 
 ```sql
 ALTER TABLE accounts ADD COLUMN relay_api_key_enc TEXT;
