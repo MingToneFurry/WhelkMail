@@ -939,6 +939,7 @@ export default function App() {
       verifiedDomains: message.verifiedDomains ?? [],
       recipients: [...message.to, ...message.cc].map((item) => item.email),
       domain,
+      receivingEmail: message.accountEmail,
     })
   }
 

@@ -71,6 +71,20 @@ describe('pickDomainAlias', () => {
     expect(pickDomainAlias({ forwarded: ['me@gmail.example'], recipients: ['me@gmail.example'], domain, ...verified })).toBeNull()
   })
 
+  it("prefers another address to the receiving mailbox's own, and uses it only when it's the only one", () => {
+    const receiving = { receivingEmail: 'primary@mydomain.example' }
+    expect(
+      pickDomainAlias({ forwarded: ['primary@mydomain.example', 'shop@mydomain.example'], recipients: [], domain, ...verified, ...receiving }),
+    ).toBe('shop@mydomain.example')
+    expect(
+      pickDomainAlias({ forwarded: [], recipients: ['primary@mydomain.example', 'shop@mydomain.example'], domain, ...verified, ...receiving }),
+    ).toBe('shop@mydomain.example')
+    // Reply as maps this mailbox to the relay: mail only to primary@ still replies as primary@.
+    expect(
+      pickDomainAlias({ forwarded: ['primary@mydomain.example'], recipients: ['primary@mydomain.example'], domain, ...verified, ...receiving }),
+    ).toBe('primary@mydomain.example')
+  })
+
   it('ignores subdomains', () => {
     expect(pickDomainAlias({ forwarded: ['a@news.mydomain.example'], recipients: [], domain, ...verified })).toBeNull()
   })
@@ -133,6 +147,20 @@ describe('pickDomainRelay', () => {
     expect(
       pickDomainRelay({ ...base, receivingEmail: 'Me@a.example', forwarded: ['me@a.example'], verifiedDomains: ['a.example'] }),
     ).toBeNull()
+  })
+
+  it("looks past the receiving mailbox's own address for the alias", () => {
+    expect(
+      pickDomainRelay({
+        ...base,
+        receivingEmail: 'primary@a.example',
+        forwarded: ['primary@a.example', 'shop@a.example'],
+        verifiedDomains: ['a.example'],
+      }),
+    ).toEqual({ accountId: 'relay-a', alias: 'shop@a.example' })
+    expect(
+      pickDomainRelay({ ...base, receivingEmail: 'primary@a.example', recipients: ['primary@a.example', 'shop@a.example'] }),
+    ).toEqual({ accountId: 'relay-a', alias: 'shop@a.example' })
   })
 
   it('in Sent, keeps the address the message left from instead of a recipient', () => {

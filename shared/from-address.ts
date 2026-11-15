@@ -60,6 +60,12 @@ export interface DomainAliasInput {
   recipients: string[]
   /** Domain of the sending account. */
   domain: string
+  /**
+   * Address of the mailbox that received the message. On a shared domain it
+   * usually heads the headers (Delivered-To), so other addresses are preferred
+   * and it's only used when it's the sole candidate.
+   */
+  receivingEmail?: string
 }
 
 /**
@@ -82,8 +88,12 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
     return null
   }
   const onDomain = (email: string): boolean => domainOf(email) === domain
+  const receiving = input.receivingEmail?.trim().toLowerCase() ?? ''
+  let receivingSeen = false
   if (input.verifiedDomains.some((verified) => verified.toLowerCase() === domain)) {
-    const forwarded = input.forwarded.map((email) => email.trim().toLowerCase()).find(onDomain)
+    const onDomainForwarded = input.forwarded.map((email) => email.trim().toLowerCase()).filter(onDomain)
+    receivingSeen = onDomainForwarded.includes(receiving)
+    const forwarded = onDomainForwarded.find((email) => email !== receiving)
     if (forwarded) {
       // The forwarder's record wins even when it can't be sent from: falling
       // through to a lower header or To/Cc would pick a different address.
@@ -93,7 +103,11 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
   const recipients = new Set(
     input.recipients.map((email) => email.trim().toLowerCase()).filter(onDomain),
   )
-  return recipients.size === 1 ? sendable([...recipients][0]) : null
+  receivingSeen ||= recipients.delete(receiving)
+  if (recipients.size === 1) {
+    return sendable([...recipients][0])
+  }
+  return recipients.size === 0 && receivingSeen ? sendable(receiving) : null
 }
 
 export interface DomainRelayInput {
@@ -136,6 +150,11 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
   for (const email of input.forwarded) {
     const address = email.trim().toLowerCase()
     const relay = relayFor(address)
+    // The receiving mailbox's own address often heads the headers on a shared
+    // domain (Delivered-To): look past it for the alias.
+    if (address === receiving) {
+      continue
+    }
     if (relay && verified.has(domainOf(address))) {
       return result(relay, sendable(address))
     }
@@ -146,6 +165,7 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
       verifiedDomains: [],
       recipients: input.recipients,
       domain: domainOf(relay.email),
+      receivingEmail: receiving,
     })
     if (alias) {
       return result(relay, alias)
