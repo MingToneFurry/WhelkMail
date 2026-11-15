@@ -189,10 +189,14 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
   }
   if (accountId) {
     // Past the paging limit the list is incomplete, so not finding the ID
-    // proves nothing: accept it unchecked rather than wrongly deny it. A wrong
-    // ID still fails on the first send.
+    // proves nothing either way: say so instead of denying it, and point to an
+    // account token, which always lists exactly its own account.
     if (!complete) {
-      return { ok: true, accountId }
+      return {
+        ok: false,
+        reason: 'unreachable',
+        detail: `Couldn't verify access to ${accountId} within the account lookup paging limit. Use an account API token, which reaches only its own account, and try again.`,
+      }
     }
     return { ok: false, reason: 'denied', detail: `${accountId} isn't one of the accounts this API token can reach.` }
   }

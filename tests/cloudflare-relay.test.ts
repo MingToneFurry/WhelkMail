@@ -167,13 +167,18 @@ describe('cloudflare account ID lookup on save', () => {
     await expect(resolveRelayDomain(cloudflare, 'token', '0123ABCD')).resolves.toBe('0123abcd')
   })
 
-  it('accepts an entered ID unchecked when the token reaches more accounts than the paging limit', async () => {
+  it('reports an unverifiable ID, not a denial, when the token reaches more accounts than the paging limit', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       const page = Number(new URL(url).searchParams.get('page'))
       return accountsPage([`acct${page}`], page, 12)
     })
     vi.stubGlobal('fetch', fetchMock)
-    await expect(resolveRelayDomain(cloudflare, 'token', 'acct12')).resolves.toBe('acct12')
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', 'acct12'))).toMatchObject({
+      status: 502,
+      code: 'relay_check_failed',
+      detail:
+        "Couldn't verify access to acct12 within the account lookup paging limit. Use an account API token, which reaches only its own account, and try again.",
+    })
     expect(fetchMock).toHaveBeenCalledTimes(10)
   })
 
