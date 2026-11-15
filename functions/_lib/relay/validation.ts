@@ -41,6 +41,14 @@ export async function resolveRelayDomain(
   switch (found.reason) {
     case 'rejected':
       return fail(`${provider.label} rejected the API key`, 400, found.detail, 'relay_key_rejected')
+    case 'empty':
+      // Entering an ID cannot fix a token that reaches no account.
+      return fail(
+        `The API key doesn't reach any ${provider.label} account`,
+        400,
+        found.detail,
+        'relay_account_unavailable',
+      )
     case 'count':
       return fail(`${provider.label} account ID is required`, 400, found.detail, 'relay_account_id_required')
     case 'denied':

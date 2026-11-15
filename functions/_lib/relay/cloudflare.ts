@@ -132,10 +132,11 @@ export type CloudflareAccountLookup =
   | { ok: true; accountId: string }
   | {
       ok: false
-      // rejected: Cloudflare refused the token. count: the token doesn't
-      // reach exactly one account, so the ID has to be entered. denied: the
-      // entered ID isn't one the token reaches. unreachable: no usable answer.
-      reason: 'rejected' | 'count' | 'denied' | 'unreachable'
+      // rejected: Cloudflare refused the token. empty: the token reaches no
+      // account at all, so an ID cannot help. count: the token reaches several
+      // accounts, so the ID has to be entered. denied: the entered ID isn't one
+      // the token reaches. unreachable: no usable answer.
+      reason: 'rejected' | 'empty' | 'count' | 'denied' | 'unreachable'
       detail: string
     }
 
@@ -203,12 +204,18 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
   if (ids.length === 1) {
     return { ok: true, accountId: ids[0] }
   }
+  if (ids.length === 0) {
+    // Not a missing value: no account ID can help a token that reaches nothing.
+    return {
+      ok: false,
+      reason: 'empty',
+      detail:
+        "This API token doesn't reach any Cloudflare account. Check that it belongs to the account you send from and grants Email Sending: Edit, or create an account-scoped token there.",
+    }
+  }
   return {
     ok: false,
     reason: 'count',
-    detail:
-      ids.length === 0
-        ? "This API token doesn't list any Cloudflare accounts, so enter the account ID."
-        : `This API token can reach ${complete ? '' : 'more than '}${ids.length} Cloudflare accounts, so enter the ID of the one to send from.`,
+    detail: `This API token can reach ${complete ? '' : 'more than '}${ids.length} Cloudflare accounts, so enter the ID of the one to send from.`,
   }
 }

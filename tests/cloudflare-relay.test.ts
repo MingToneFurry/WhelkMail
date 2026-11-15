@@ -138,19 +138,27 @@ describe('cloudflare account ID lookup on save', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token')
   })
 
-  it('asks for the ID when the token reaches no account or several', async () => {
+  it('asks for the ID when the token reaches several accounts', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => accountsPage(['acct1', 'acct2'])))
     expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))).toMatchObject({
       status: 400,
       code: 'relay_account_id_required',
       detail: 'This API token can reach 2 Cloudflare accounts, so enter the ID of the one to send from.',
     })
+  })
+
+  it('does not ask for an ID when the token reaches no account', async () => {
+    // Entering an ID cannot fix a token with the wrong permissions or the wrong
+    // account scope, so this is a different error.
+    vi.stubGlobal('fetch', vi.fn(async () => accountsPage([])))
+    const error = await errorOf(await resolveRelayDomain(cloudflare, 'token', ''))
+
+    expect(error).toMatchObject({ status: 400, code: 'relay_account_unavailable' })
+    expect(error.detail).toContain('Email Sending: Edit')
 
     vi.stubGlobal('fetch', vi.fn(async () => accountsPage([])))
-    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', ''))).toMatchObject({
-      code: 'relay_account_id_required',
-      detail: "This API token doesn't list any Cloudflare accounts, so enter the account ID.",
-    })
+    const withoutId = await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))
+    expect(withoutId.code).toBe('relay_account_unavailable')
   })
 
   it('accepts an entered ID the token reaches, looking past the first page', async () => {
