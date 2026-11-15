@@ -8,6 +8,17 @@
  * address; the server checks it again before sending.
  */
 
+/**
+ * Addresses the send endpoint accepts: the same pattern as zod's email check
+ * (`z.regexes.email`), which `sendSchema` applies to `fromEmail`. Copied so
+ * the client doesn't need zod; a test keeps the two in step. An alias outside
+ * it (shop=orders@DOMAIN.IT) can't be sent from, so it isn't offered.
+ */
+export const SENDABLE_ADDRESS =
+  /^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/
+
+const sendable = (email: string | null): string | null => (email && SENDABLE_ADDRESS.test(email) ? email : null)
+
 export function domainOf(email: string): string {
   const at = email.lastIndexOf('@')
   return at === -1 ? '' : email.slice(at + 1).trim().toLowerCase()
@@ -74,13 +85,15 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
   if (input.verifiedDomains.some((verified) => verified.toLowerCase() === domain)) {
     const forwarded = input.forwarded.map((email) => email.trim().toLowerCase()).find(onDomain)
     if (forwarded) {
-      return forwarded
+      // The forwarder's record wins even when it can't be sent from: falling
+      // through to a lower header or To/Cc would pick a different address.
+      return sendable(forwarded)
     }
   }
   const recipients = new Set(
     input.recipients.map((email) => email.trim().toLowerCase()).filter(onDomain),
   )
-  return recipients.size === 1 ? [...recipients][0] : null
+  return recipients.size === 1 ? sendable([...recipients][0]) : null
 }
 
 export interface DomainRelayInput {
@@ -117,14 +130,14 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
 
   if (input.sent) {
     const from = input.from.trim().toLowerCase()
-    return result(relayFor(from), from || null)
+    return result(relayFor(from), sendable(from))
   }
   const verified = new Set(input.verifiedDomains.map((domain) => domain.toLowerCase()))
   for (const email of input.forwarded) {
     const address = email.trim().toLowerCase()
     const relay = relayFor(address)
     if (relay && verified.has(domainOf(address))) {
-      return result(relay, address)
+      return result(relay, sendable(address))
     }
   }
   for (const relay of input.relays) {

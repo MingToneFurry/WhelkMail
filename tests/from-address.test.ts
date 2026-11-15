@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { aliasAddresses, parseHeaders, verifiedDomains } from '../functions/_lib/mail/parse'
-import { canSendFrom, domainOf, pickDomainAlias, pickDomainRelay } from '../shared/from-address'
+import { SENDABLE_ADDRESS, canSendFrom, domainOf, pickDomainAlias, pickDomainRelay } from '../shared/from-address'
 
 const relay = { kind: 'relay', email: 'me@mydomain.example', relayAnyAddress: true }
 
@@ -72,6 +73,26 @@ describe('pickDomainAlias', () => {
 
   it('ignores subdomains', () => {
     expect(pickDomainAlias({ forwarded: ['a@news.mydomain.example'], recipients: [], domain, ...verified })).toBeNull()
+  })
+})
+
+describe('sendable aliases', () => {
+  it("matches zod's email check, which the send endpoint applies", () => {
+    expect(SENDABLE_ADDRESS.source).toBe(z.regexes.email.source)
+  })
+
+  it("doesn't offer a forwarded alias the send endpoint would refuse, nor a lower one instead", () => {
+    expect(
+      pickDomainAlias({
+        forwarded: ['shop=orders@mydomain.example', 'other@mydomain.example'],
+        verifiedDomains: ['mydomain.example'],
+        recipients: ['shop=orders@mydomain.example'],
+        domain: 'mydomain.example',
+      }),
+    ).toBeNull()
+    expect(
+      pickDomainAlias({ forwarded: [], verifiedDomains: [], recipients: ['a!b@mydomain.example'], domain: 'mydomain.example' }),
+    ).toBeNull()
   })
 })
 

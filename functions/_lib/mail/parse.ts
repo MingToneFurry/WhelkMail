@@ -111,7 +111,10 @@ const ALIAS_HEADERS = new Set([
   'apparently-to',
 ])
 
-const ADDRESS_PATTERN = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+// The whole local part, with every character RFC 5322 allows unquoted: a
+// narrower set would cut shop=orders@DOMAIN.IT down to orders@DOMAIN.IT, a
+// different address.
+const ADDRESS_PATTERN = /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 
 export function aliasAddresses(email: Email): string[] {
   const found = new Set<string>()

@@ -63,3 +63,12 @@ describe('alias addresses', () => {
     ])
   })
 })
+
+describe('alias address extraction', () => {
+  it('keeps the whole local part instead of cutting it at = or !', async () => {
+    const email = await parseHeaders(
+      ['X-Forwarded-For: shop=orders@mydomain.example me@gmail.example', 'X-Original-To: a!b@mydomain.example'].join('\r\n'),
+    )
+    expect(aliasAddresses(email)).toEqual(['shop=orders@mydomain.example', 'me@gmail.example', 'a!b@mydomain.example'])
+  })
+})
