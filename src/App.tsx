@@ -28,6 +28,7 @@ import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
 import { errorText } from './lib/errors'
 import { syncSignature } from './lib/sync-signature'
+import { domainOf, pickDomainAlias } from '../shared/from-address'
 import { mergePage } from '../shared/paging'
 import { pickReplySender } from './lib/sender'
 import { displayAddress } from './lib/utils'
@@ -903,13 +904,34 @@ export default function App() {
         .map((email) => email.trim().toLowerCase())
         .filter(Boolean),
     )
-    const match = accounts.find(
+    const canSend = (item: Account): boolean =>
+      item.id !== message.accountId && (item.kind === 'relay' ? item.relayConfigured : item.connected)
+    const match = accounts.find((item) => canSend(item) && addresses.has(item.email.toLowerCase()))
+    if (match) {
+      return match.id
+    }
+    // No account has exactly that address: a relay allowed to send as any
+    // address on its domain covers it, when the alias is on that domain.
+    const domainRelay = accounts.find(
       (item) =>
-        item.id !== message.accountId &&
-        (item.kind === 'relay' ? item.relayConfigured : item.connected) &&
-        addresses.has(item.email.toLowerCase()),
+        canSend(item) &&
+        item.kind === 'relay' &&
+        item.relayAnyAddress &&
+        domainAliasFor(message, item) !== null,
     )
-    return match?.id ?? null
+    return domainRelay?.id ?? null
+  }
+
+  /** The address on `account`'s domain that `message` was sent to, if it may send as it. */
+  function domainAliasFor(message: MessageDetail, account: Account): string | null {
+    if (account.kind !== 'relay' || !account.relayAnyAddress) {
+      return null
+    }
+    return pickDomainAlias({
+      forwarded: message.aliasAddresses ?? [],
+      recipients: [...message.to, ...message.cc].map((item) => item.email),
+      domain: domainOf(account.email),
+    })
   }
 
   function replyTo(message: MessageDetail, all: boolean) {
@@ -922,8 +944,13 @@ export default function App() {
       accountIds: accounts.map((item) => item.id),
     })
     const sendingAccount = accounts.find((account) => account.id === sendingAccountId)
+    // A relay allowed to send as any address on its domain answers from the
+    // address the message was sent to (shop@DOMAIN.IT), not its own.
+    const domainAlias = sendingAccount ? domainAliasFor(message, sendingAccount) : null
+    const fromEmail =
+      domainAlias && domainAlias !== sendingAccount?.email.toLowerCase() ? domainAlias : null
     const ownAddresses = new Set(
-      [message.accountEmail, sendingAccount?.email ?? '']
+      [message.accountEmail, sendingAccount?.email ?? '', fromEmail ?? '']
         .filter(Boolean)
         .map((email) => email.toLowerCase()),
     )
@@ -963,6 +990,7 @@ export default function App() {
     )} wrote:\n${quoted}`
     openCompose(null, {
       accountId: sendingAccountId,
+      fromEmail,
       inReplyTo: message.messageId,
       references: message.references,
       to,

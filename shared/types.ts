@@ -315,6 +315,8 @@ export interface SendPayload {
 
 export interface ComposeSeed {
   accountId: string
+  /** Address on the account's domain to send from instead of its own (`relayAnyAddress`). */
+  fromEmail?: string | null
   /** Message-ID answered by this compose, so the copy threads too. */
   inReplyTo?: string | null
   references?: string | null

@@ -33,3 +33,43 @@ export function canSendFrom(account: FromAccount, fromEmail: string): boolean {
     domainOf(from) === domain
   )
 }
+
+export interface DomainAliasInput {
+  /**
+   * Addresses from the forwarding headers (`X-Forwarded-For`, `Delivered-To`,
+   * `Received ... for`, ...), in header order: the topmost first.
+   */
+  forwarded: string[]
+  /** To and Cc of the message. */
+  recipients: string[]
+  /** Domain of the sending account. */
+  domain: string
+}
+
+/**
+ * The address on `domain` that a message was sent to, or null.
+ *
+ * Every server a message passes through adds its headers above the ones already
+ * there, so the forwarder's own headers sit above anything the original sender
+ * wrote. Reading top-down and taking the first address on the domain therefore
+ * finds the forwarder's record before any forged copy further down.
+ *
+ * To/Cc are written by the sender, so they are only a fallback when no
+ * forwarding header names an address on the domain, and only when exactly one
+ * of them is on it: with several there's no telling which one is ours.
+ */
+export function pickDomainAlias(input: DomainAliasInput): string | null {
+  const domain = input.domain.trim().toLowerCase()
+  if (!domain) {
+    return null
+  }
+  const onDomain = (email: string): boolean => domainOf(email) === domain
+  const forwarded = input.forwarded.map((email) => email.trim().toLowerCase()).find(onDomain)
+  if (forwarded) {
+    return forwarded
+  }
+  const recipients = new Set(
+    input.recipients.map((email) => email.trim().toLowerCase()).filter(onDomain),
+  )
+  return recipients.size === 1 ? [...recipients][0] : null
+}
