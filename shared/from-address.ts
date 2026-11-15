@@ -132,7 +132,8 @@ export interface DomainRelayInput {
  *   covers its domain. To/Cc there are the recipients, not us.
  * - Otherwise trusted forwarding headers are searched across all relays first,
  *   top-down, and To/Cc only if none matches, so a Cc on one relay's domain
- *   can't beat the forwarding record of another.
+ *   can't beat the forwarding record of another. To/Cc only count when they
+ *   name exactly one address across all relay domains.
  * - An address that belongs to the receiving account itself stays with it:
  *   ordinary mail to me@DOMAIN.IT is answered by that account, not a relay.
  */
@@ -159,7 +160,9 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
       return result(relay, sendable(address))
     }
   }
-  for (const relay of input.relays) {
+  // To/Cc across every relay domain: only an unambiguous match counts, so
+  // account order can't decide between contact@a.example and shop@b.example.
+  const candidates = input.relays.flatMap((relay) => {
     const alias = pickDomainAlias({
       forwarded: [],
       verifiedDomains: [],
@@ -167,9 +170,8 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
       domain: domainOf(relay.email),
       receivingEmail: receiving,
     })
-    if (alias) {
-      return result(relay, alias)
-    }
-  }
-  return null
+    return alias ? [{ relay, alias }] : []
+  })
+  const aliases = new Set(candidates.map((candidate) => candidate.alias))
+  return aliases.size === 1 ? result(candidates[0].relay, candidates[0].alias) : null
 }

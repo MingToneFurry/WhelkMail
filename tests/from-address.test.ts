@@ -140,6 +140,11 @@ describe('pickDomainRelay', () => {
     ).toEqual({ accountId: 'relay-a', alias: 'contact@a.example' })
   })
 
+  it('picks nothing from To/Cc when they name an address on more than one relay domain', () => {
+    expect(pickDomainRelay({ ...base, recipients: ['contact@a.example', 'shop@b.example'] })).toBeNull()
+    expect(pickDomainRelay({ ...base, relays: [relayB, relayA], recipients: ['contact@a.example', 'shop@b.example'] })).toBeNull()
+  })
+
   it("leaves the receiving account's own address to that account", () => {
     expect(
       pickDomainRelay({ ...base, receivingEmail: 'me@a.example', recipients: ['me@a.example'] }),
