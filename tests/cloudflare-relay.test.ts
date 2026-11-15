@@ -167,6 +167,27 @@ describe('cloudflare account ID lookup on save', () => {
     await expect(resolveRelayDomain(cloudflare, 'token', '0123ABCD')).resolves.toBe('0123abcd')
   })
 
+  it('accepts an entered ID unchecked when the token reaches more accounts than the paging limit', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return accountsPage([`acct${page}`], page, 12)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(resolveRelayDomain(cloudflare, 'token', 'acct12')).resolves.toBe('acct12')
+    expect(fetchMock).toHaveBeenCalledTimes(10)
+  })
+
+  it('says "more than" when the paging limit cuts the account list short', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return accountsPage([`acct${page}`], page, 12)
+    }))
+    expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', undefined))).toMatchObject({
+      code: 'relay_account_id_required',
+      detail: 'This API token can reach more than 10 Cloudflare accounts, so enter the ID of the one to send from.',
+    })
+  })
+
   it('rejects an entered ID the token does not reach', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => accountsPage(['acct1'])))
     expect(await errorOf(await resolveRelayDomain(cloudflare, 'token', 'someone-else'))).toMatchObject({

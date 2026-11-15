@@ -152,9 +152,11 @@ export type CloudflareAccountLookup =
 export async function findCloudflareAccount(apiToken: string, enteredId?: string): Promise<CloudflareAccountLookup> {
   // Cloudflare's IDs are lowercase hex; accept one typed or pasted in capitals.
   const accountId = enteredId?.toLowerCase()
-  // A user token can reach many accounts; stop paging after this many.
+  // A user token can reach many accounts; stop paging after this many. Each
+  // page is a subrequest, and a Worker only gets so many per invocation.
   const maxPages = 10
   const ids: string[] = []
+  let complete = false
   for (let page = 1; page <= maxPages; page++) {
     let response: Response
     let data: CloudflareAccountsResponse | null
@@ -181,10 +183,17 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
       return { ok: true, accountId }
     }
     if (page >= (data.result_info?.total_pages ?? 1)) {
+      complete = true
       break
     }
   }
   if (accountId) {
+    // Past the paging limit the list is incomplete, so not finding the ID
+    // proves nothing: accept it unchecked rather than wrongly deny it. A wrong
+    // ID still fails on the first send.
+    if (!complete) {
+      return { ok: true, accountId }
+    }
     return { ok: false, reason: 'denied', detail: `${accountId} isn't one of the accounts this API token can reach.` }
   }
   if (ids.length === 1) {
@@ -196,6 +205,6 @@ export async function findCloudflareAccount(apiToken: string, enteredId?: string
     detail:
       ids.length === 0
         ? "This API token doesn't list any Cloudflare accounts, so enter the account ID."
-        : `This API token can reach ${ids.length} Cloudflare accounts, so enter the ID of the one to send from.`,
+        : `This API token can reach ${complete ? '' : 'more than '}${ids.length} Cloudflare accounts, so enter the ID of the one to send from.`,
   }
 }
