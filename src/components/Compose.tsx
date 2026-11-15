@@ -49,6 +49,9 @@ interface ComposeProps {
   onDeleted: () => void
 }
 
+/** Value of the From entry for the alias; account IDs are UUIDs, so it can't clash. */
+const ALIAS_OPTION = 'alias'
+
 function base64Size(value: string): number {
   return Math.floor((value.length * 3) / 4)
 }
@@ -97,6 +100,13 @@ export function Compose({
         : seed.text
       : initialSignature
   const [accountId, setAccountId] = useState(initialAccountId)
+  // A reply from a relay allowed to send as any address on its domain starts
+  // from the address the message was sent to. It's offered as its own entry in
+  // the From list, and only applies while that account is selected.
+  const aliasEmail = initialDraft ? null : (seed?.fromEmail ?? null)
+  const aliasAccountId = aliasEmail ? (seed?.accountId ?? null) : null
+  const [useAlias, setUseAlias] = useState(Boolean(aliasEmail))
+  const fromEmail = useAlias && aliasEmail && accountId === aliasAccountId ? aliasEmail : null
   const [to, setTo] = useState(initialTo.join(', '))
   const [cc, setCc] = useState(initialCc.join(', '))
   const [bcc, setBcc] = useState(initialBcc.join(', '))
@@ -361,7 +371,7 @@ export function Compose({
     setBusy(true)
     setError(null)
     try {
-      const result = await api.send(payload)
+      const result = await api.send(fromEmail ? { ...payload, fromEmail } : payload)
       onSent(result.warning, result.sentFolder, result.undelivered)
     } catch (err) {
       sendingRef.current = false
@@ -409,17 +419,33 @@ export function Compose({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">{t('compose.from')}</span>
-            {accounts.length > 1 ? (
+            {accounts.length > 1 || aliasEmail ? (
               <select
-                value={accountId}
-                onChange={(event) => setAccountId(event.target.value)}
+                value={fromEmail ? ALIAS_OPTION : accountId}
+                onChange={(event) => {
+                  const value = event.target.value
+                  if (value === ALIAS_OPTION && aliasAccountId) {
+                    setAccountId(aliasAccountId)
+                    setUseAlias(true)
+                  } else {
+                    setAccountId(value)
+                    setUseAlias(false)
+                  }
+                }}
                 className="w-full bg-transparent text-sm outline-none"
               >
-                {accounts.map((item) => (
+                {accounts.flatMap((item) => [
+                  ...(aliasEmail && item.id === aliasAccountId
+                    ? [
+                        <option key={ALIAS_OPTION} value={ALIAS_OPTION}>
+                          {item.displayName} &lt;{aliasEmail}&gt;
+                        </option>,
+                      ]
+                    : []),
                   <option key={item.id} value={item.id}>
                     {item.displayName} &lt;{item.email}&gt;
-                  </option>
-                ))}
+                  </option>,
+                ])}
               </select>
             ) : (
               <span className="truncate">

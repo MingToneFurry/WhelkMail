@@ -212,6 +212,9 @@ const en: Record<string, string> = {
   'settings.replyAsNone': 'This account (default)',
   'settings.replyAsHint':
     'Normally a reply leaves from the account whose address received the message (detected from the To/Cc and the forwarding headers), so a domain that forwards here is used automatically. Pick an account only to force a different sender.',
+  'settings.relayAnyAddress': 'Send from any address on this domain',
+  'settings.relayAnyAddressHint':
+    'Replies leave from the address the message was sent to, when it is on {domain} (for example a different address per shop, all forwarded here). Your relay must accept those addresses. Only {domain} itself counts, not its subdomains.',
   'settings.sentFolder': 'Sent folder',
   'settings.autoSaveSent': 'Provider already saves sent mail (no APPEND)',
   'settings.sentCopy': 'Sent copy',
@@ -604,6 +607,8 @@ const en: Record<string, string> = {
   'errors.smtp_failed': 'SMTP connection failed',
   'errors.storage_failed': 'Storage operation failed',
   'errors.message_invalid': 'Invalid message',
+  'errors.from_address_not_allowed': 'This account cannot send from that address',
+  'errors.relay_any_address_relay_only': 'Only relay accounts can send from any address on their domain',
   'errors.message_not_found': 'Message not found',
   'errors.message_send_failed': 'Send failed',
   'errors.attachment_too_large': 'Attachments are too large',
@@ -831,6 +836,9 @@ const it: Record<string, string> = {
   'settings.replyAsNone': 'Questo account (predefinito)',
   'settings.replyAsHint':
     'Normalmente la risposta parte dall’account a cui il messaggio era indirizzato (ricavato da To/Cc e dalle intestazioni di inoltro), quindi il dominio che inoltra qui viene usato in automatico. Scegli un account solo per forzare un mittente diverso.',
+  'settings.relayAnyAddress': 'Invia da qualsiasi indirizzo di questo dominio',
+  'settings.relayAnyAddressHint':
+    'Le risposte partono dall’indirizzo a cui era indirizzato il messaggio, se è su {domain} (per esempio un indirizzo diverso per ogni negozio, tutti inoltrati qui). Il relay deve accettare quegli indirizzi. Vale solo {domain}, non i suoi sottodomini.',
   'settings.sentFolder': 'Cartella inviate',
   'settings.autoSaveSent': 'Il provider salva già le inviate (nessun APPEND)',
   'settings.sentCopy': 'Copia inviata',
@@ -1225,6 +1233,8 @@ const it: Record<string, string> = {
   'errors.smtp_failed': 'Connessione SMTP fallita',
   'errors.storage_failed': 'Operazione di storage fallita',
   'errors.message_invalid': 'Messaggio non valido',
+  'errors.from_address_not_allowed': 'Questo account non può inviare da quell’indirizzo',
+  'errors.relay_any_address_relay_only': 'Solo gli account relay possono inviare da qualsiasi indirizzo del loro dominio',
   'errors.message_not_found': 'Messaggio non trovato',
   'errors.message_send_failed': 'Invio fallito',
   'errors.attachment_too_large': 'Allegati troppo grandi',

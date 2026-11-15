@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { pickReplyAccount } from '../shared/from-address'
 import { pickReplySender } from '../src/lib/sender'
 
 const ids = ['provider', 'domain-relay', 'other']
@@ -101,27 +102,23 @@ describe('pickReplySender', () => {
 })
 
 describe('alias detection inputs', () => {
-  it('matches the domain account from the recipients of a forwarded message', () => {
-    // Mirrors aliasAccountFor() in App: To/Cc plus the forwarding headers.
-    const domain = { id: 'domain-relay', email: 'email@dominio.it' }
-    const provider = { id: 'provider', email: 'email@provider.it' }
-    const accounts = [provider, domain]
-    const message = {
-      accountId: 'provider',
-      aliasAddresses: ['email@dominio.it'],
-      to: [{ email: 'email@provider.it' }],
-      cc: [],
-    }
-    const addresses = new Set(
-      [
-        ...message.aliasAddresses,
-        ...message.to.map((item) => item.email),
-        ...message.cc.map((item) => item.email),
-      ].map((email) => email.toLowerCase()),
-    )
-    const match = accounts.find(
-      (item) => item.id !== message.accountId && addresses.has(item.email.toLowerCase()),
-    )
-    expect(match?.id).toBe('domain-relay')
+  // The domain account from a forwarded message, as aliasAccountFor() in App asks.
+  const input = {
+    accounts: [{ id: 'domain-relay', email: 'email@dominio.it', anyAddress: false }],
+    receivingEmail: 'email@provider.it',
+    sent: false,
+    from: 'someone@else.it',
+    forwarded: ['email@dominio.it'],
+    verifiedDomains: [] as string[],
+    recipients: ['email@provider.it'],
+  }
+
+  it('matches the domain account from a forwarding header the receiving server vouches for', () => {
+    expect(pickReplyAccount({ ...input, verifiedDomains: ['dominio.it'] })?.accountId).toBe('domain-relay')
+  })
+
+  it('ignores the same header without that check, but still reads To', () => {
+    expect(pickReplyAccount(input)).toBeNull()
+    expect(pickReplyAccount({ ...input, recipients: ['email@dominio.it'] })?.accountId).toBe('domain-relay')
   })
 })

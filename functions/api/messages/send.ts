@@ -1,3 +1,4 @@
+import { canSendFrom } from '../../../shared/from-address'
 import { sendSchema } from '../../../shared/schemas'
 import type { AttachmentMeta, Mailbox } from '../../../shared/types'
 import { fromBase64 } from '../../_lib/crypto'
@@ -26,6 +27,8 @@ import { copyObjectKey, getStorage, rescueCandidates } from '../../_lib/storage'
 interface PersistInput {
   env: Env
   account: AccountRow
+  /** The From actually used: the account's own address or another on its domain. */
+  fromEmail: string
   id: string
   messageId: string
   to: Mailbox[]
@@ -57,7 +60,7 @@ async function persistRelayMessage(input: PersistInput): Promise<MessageRow> {
       input.messageId,
       input.threadKey,
       input.account.display_name,
-      input.account.email,
+      input.fromEmail,
       JSON.stringify(input.to),
       JSON.stringify(input.cc),
       JSON.stringify(input.bcc),
@@ -104,6 +107,22 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const account = await getAccountRow(context.env, input.accountId)
   if (!account) {
     return fail('Account not found', 404, undefined, 'account_not_found')
+  }
+  // Checked here, not only in the composer: the client can't widen what an
+  // account may send as.
+  const fromEmail = input.fromEmail ?? account.email
+  if (
+    !canSendFrom(
+      { kind: account.kind, email: account.email, relayAnyAddress: Boolean(account.relay_any_address) },
+      fromEmail,
+    )
+  ) {
+    return fail(
+      'This account cannot send from that address',
+      400,
+      `${fromEmail} (account ${account.email})`,
+      'from_address_not_allowed',
+    )
   }
 
   const estimatedBytes = input.attachments.reduce(
@@ -167,7 +186,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       return fail('Account is not connected', 400, undefined, 'imap_not_connected')
     }
     const mimeBase = {
-      from: { name: account.display_name, email: account.email },
+      from: { name: account.display_name, email: fromEmail },
       to,
       cc,
       bcc,
@@ -263,7 +282,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return tooManyRecipients
   }
   const mime = buildMime({
-    from: { name: account.display_name, email: account.email },
+    from: { name: account.display_name, email: fromEmail },
     to,
     cc,
     bcc,
@@ -307,7 +326,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     relayResult = await relay.send({
       fromName: account.display_name,
-      fromEmail: account.email,
+      fromEmail,
       to: input.to,
       cc: input.cc,
       bcc: input.bcc,
@@ -349,6 +368,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const row = await persistRelayMessage({
       env: context.env,
       account,
+      fromEmail,
       id,
       messageId,
       to,
@@ -403,6 +423,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     await persistRelayMessage({
       env: context.env,
       account,
+      fromEmail,
       id,
       messageId,
       to,

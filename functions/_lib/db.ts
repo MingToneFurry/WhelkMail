@@ -32,6 +32,7 @@ export interface AccountRow {
   auto_saves_sent: number
   sent_copy_account_id: string | null
   reply_account_id: string | null
+  relay_any_address: number
   max_attachment_bytes: number
   storage_driver: string
   relay_provider: string | null
@@ -117,6 +118,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     autoSavesSent: Boolean(row.auto_saves_sent),
     sentCopyAccountId: row.sent_copy_account_id ?? null,
     replyAccountId: row.reply_account_id ?? null,
+    relayAnyAddress: Boolean(row.relay_any_address),
     maxAttachmentBytes: row.max_attachment_bytes,
     storageDriver: row.storage_driver as StorageDriver,
     relayProvider: row.relay_provider,

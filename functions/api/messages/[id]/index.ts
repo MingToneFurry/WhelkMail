@@ -8,6 +8,7 @@ import { markMessageSeen } from '../../../_lib/mail/imap'
 import { parseImapMessageId, parseRelayMessageId } from '../../../_lib/mail/ids'
 import {
   aliasAddresses,
+  verifiedDomains,
   attachmentMeta,
   bodyText,
   dateOf,
@@ -139,6 +140,7 @@ async function relayDetail(env: Env, id: string): Promise<MessageDetail | null> 
     hasAttachments: attachments.length > 0,
     status: row.status === 'failed' ? 'failed' : row.status === 'draft' ? 'draft' : 'sent',
     aliasAddresses: [],
+    verifiedDomains: [],
     messageId: row.message_id ?? null,
     references: null,
     threadKey: row.thread_key ?? null,
@@ -207,6 +209,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     hasAttachments: attachments.length > 0,
     status: loaded.folder === 'draft' ? 'draft' : 'sent',
     aliasAddresses: aliasAddresses(email),
+    verifiedDomains: verifiedDomains(email),
     messageId: email.messageId ?? null,
     references: email.references ?? null,
     threadKey,

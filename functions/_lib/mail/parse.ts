@@ -93,6 +93,10 @@ export function stripHtml(html: string): string {
  * `Delivered-To`, `X-Original-To`, `Envelope-To` or a `Received ... for <addr>`.
  * The reply composer uses these to answer from the address the message was
  * actually sent to, like Gmail does with its aliases.
+ *
+ * The result keeps header order, topmost first. Each server prepends its own
+ * headers, so the forwarder's record comes before anything the original sender
+ * wrote further down: `pickDomainAlias()` relies on that.
  */
 const ALIAS_HEADERS = new Set([
   'delivered-to',
@@ -101,11 +105,16 @@ const ALIAS_HEADERS = new Set([
   'envelope-to',
   'x-envelope-to',
   'x-forwarded-to',
+  // Cloudflare Email Routing: "X-Forwarded-For: <alias> <destination>".
+  'x-forwarded-for',
   'resent-to',
   'apparently-to',
 ])
 
-const ADDRESS_PATTERN = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+// The whole local part, with every character RFC 5322 allows unquoted: a
+// narrower set would cut shop=orders@DOMAIN.IT down to orders@DOMAIN.IT, a
+// different address.
+const ADDRESS_PATTERN = /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 
 export function aliasAddresses(email: Email): string[] {
   const found = new Set<string>()
@@ -118,7 +127,6 @@ export function aliasAddresses(email: Email): string[] {
     }
   }
 
-  add(email.deliveredTo)
   for (const header of email.headers ?? []) {
     const key = header.key.toLowerCase()
     if (ALIAS_HEADERS.has(key)) {
@@ -130,6 +138,39 @@ export function aliasAddresses(email: Email): string[] {
       if (forMatch) {
         add(forMatch[1])
       }
+    }
+  }
+  // Normally already found among the headers above; kept for a parse without them.
+  add(email.deliveredTo)
+  return [...found]
+}
+
+/**
+ * Domains with a passing DKIM signature, as reported by the server that
+ * delivered the message into this mailbox.
+ *
+ * Only the topmost Authentication-Results counts: the receiving server adds
+ * it, while any further down could have been written by the sender. A
+ * forwarder that signs with the forwarding domain (Cloudflare Email Routing
+ * does) shows up here, which is what lets `pickDomainAlias()` trust the
+ * forwarding headers for that domain. Mail delivered straight to the mailbox
+ * can't carry a passing signature for a domain the sender doesn't control.
+ */
+export function verifiedDomains(email: Email): string[] {
+  const results = (email.headers ?? []).find((header) => header.key.toLowerCase() === 'authentication-results')
+  if (!results) {
+    return []
+  }
+  const found = new Set<string>()
+  for (const part of results.value.split(';')) {
+    if (!/\bdkim\s*=\s*pass\b/i.test(part)) {
+      continue
+    }
+    const signer =
+      part.match(/\bheader\.d\s*=\s*"?([A-Za-z0-9.-]+)/i)?.[1] ??
+      part.match(/\bheader\.i\s*=\s*"?[^\s;"@]*@([A-Za-z0-9.-]+)/i)?.[1]
+    if (signer) {
+      found.add(signer.toLowerCase().replace(/\.$/, ''))
     }
   }
   return [...found]

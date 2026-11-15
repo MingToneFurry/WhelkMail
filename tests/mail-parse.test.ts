@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bodyText, dateOf, parseHeaders, toMailbox, toMailboxes } from '../functions/_lib/mail/parse'
+import { aliasAddresses, bodyText, dateOf, parseHeaders, toMailbox, toMailboxes } from '../functions/_lib/mail/parse'
 
 describe('mail parsing', () => {
   it('parses common headers', async () => {
@@ -35,5 +35,40 @@ describe('mail parsing', () => {
     expect(bodyText(email)).toContain('Prima riga')
     expect(bodyText(email)).toContain('Seconda riga')
     expect(bodyText(email)).not.toContain('<p>')
+  })
+})
+
+describe('alias addresses', () => {
+  it('keeps header order, topmost first, and reads Cloudflare\'s X-Forwarded-For', async () => {
+    // Header order of a message forwarded by Cloudflare Email Routing to Gmail,
+    // with addresses replaced. The sender added a forged X-Original-To and
+    // X-Forwarded-For; Cloudflare kept them, below its own headers.
+    const email = await parseHeaders(
+      [
+        'Delivered-To: me+tag@gmail.example',
+        'Received: from i-ba.cloudflare-email.net by mx.google.com with ESMTPS id abc for <me+tag@gmail.example>; Sun, 15 Nov 2026 03:27:08 -0800',
+        'X-Forwarded-To: me+tag@gmail.example',
+        'X-Forwarded-For: shop@mydomain.example me+tag@gmail.example',
+        'Received: from bg-bag.cloudflare-smtp.net by cloudflare-email.net (cloudflare) id ZTn9WuWCLpyF for <shop@mydomain.example>; Sun, 15 Nov 2026 11:27:02 +0000',
+        'To: shop@mydomain.example',
+        'X-Original-To: forged-a@mydomain.example',
+        'X-Forwarded-For: forged-b@mydomain.example',
+      ].join('\r\n'),
+    )
+    expect(aliasAddresses(email)).toEqual([
+      'me+tag@gmail.example',
+      'shop@mydomain.example',
+      'forged-a@mydomain.example',
+      'forged-b@mydomain.example',
+    ])
+  })
+})
+
+describe('alias address extraction', () => {
+  it('keeps the whole local part instead of cutting it at = or !', async () => {
+    const email = await parseHeaders(
+      ['X-Forwarded-For: shop=orders@mydomain.example me@gmail.example', 'X-Original-To: a!b@mydomain.example'].join('\r\n'),
+    )
+    expect(aliasAddresses(email)).toEqual(['shop=orders@mydomain.example', 'me@gmail.example', 'a!b@mydomain.example'])
   })
 })

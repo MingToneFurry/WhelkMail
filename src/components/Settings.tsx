@@ -10,6 +10,7 @@ import {
   Server,
   Trash2,
 } from 'lucide-react'
+import { domainOf } from '../../shared/from-address'
 import { RELAY_PROVIDERS, findRelayProvider } from '../../shared/presets'
 import type {
   Account,
@@ -253,6 +254,26 @@ function AccountCard({
               ))}
           </select>
           <span className="mt-1 block text-[11px] text-muted">{t('settings.replyAsHint')}</span>
+        </label>
+      ) : null}
+
+      {!isImap ? (
+        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs">
+          <input
+            type="checkbox"
+            checked={account.relayAnyAddress}
+            disabled={busy}
+            onChange={(event) =>
+              void onUpdate(account.id, { relayAnyAddress: event.target.checked })
+            }
+            className="mt-0.5 h-3.5 w-3.5"
+          />
+          <span>
+            <span className="block font-medium text-slate-700">{t('settings.relayAnyAddress')}</span>
+            <span className="text-muted">
+              {t('settings.relayAnyAddressHint', { domain: domainOf(account.email) })}
+            </span>
+          </span>
         </label>
       ) : null}
 

@@ -85,12 +85,20 @@ Key constraints:
 
 1. The reply composer takes its sender from `pickReplySender`, in this order:
    - `accounts.reply_account_id` of the mailbox that received the message (explicit override);
-   - the account whose address is the alias the message was actually sent to: `aliasAddresses()` collects `Delivered-To`, `X-Delivered-To`, `X-Original-To`, `Envelope-To`, `X-Envelope-To`, `X-Forwarded-To`, `Resent-To`, `Apparently-To` and `Received … for <addr>`, and the client also looks at the message To/Cc. Only accounts that can send are considered (relay configured, or IMAP connected);
+   - the account whose address is the alias the message was actually sent to: `aliasAddresses()` collects `Delivered-To`, `X-Delivered-To`, `X-Original-To`, `Envelope-To`, `X-Envelope-To`, `X-Forwarded-To`, `X-Forwarded-For` (Cloudflare Email Routing), `Resent-To`, `Apparently-To` and `Received … for <addr>`, in header order (topmost first), and the client also looks at the message To/Cc. Only accounts that can send are considered (relay configured, or IMAP connected). When no account has exactly that address, a relay with `relay_any_address` whose domain the alias is on is used instead (see step 2). Both kinds of match go through the same checks in `pickReplyAccount()` (`shared/from-address.ts`): a forwarding header only counts when the receiving server vouches for its domain, the first such header that names an account wins, and To/Cc only count when they name exactly one such address;
    - the global "reply sender" preference (`auto` by default);
    - the account that received the message.
 
    The alias step is what makes a forwarding domain work like Gmail: mail addressed to `EMAIL@DOMAIN.IT` and forwarded to `EMAIL@PROVIDER.IT` keeps that address in the headers, so the reply leaves from the domain account.
-2. Everything else is the normal send flow, so the reply leaves through the chosen account's own SMTP/relay and its copy follows that account's destination. Addresses of both accounts are excluded from To/Cc to avoid replying to yourself.
+2. If the chosen account is a relay with **Send from any address on this domain** on (`accounts.relay_any_address`), the reply leaves from the address the message was sent to, as long as it is on the account's exact domain (`pickDomainAlias()` in `shared/from-address.ts`):
+   - the first address on the domain in `aliasAddresses()`, read top-down, but only when the receiving server's topmost `Authentication-Results` reports a passing DKIM signature for that exact domain (`verifiedDomains()`). Cloudflare Email Routing signs forwarded mail with the domain; mail delivered straight to the mailbox can't carry such a signature, so a forged `X-Original-To` on it is ignored. On forwarded mail, every server prepends its headers, so the forwarder's own record (Cloudflare's `X-Forwarded-For` and `Received … for`) sits above anything the original sender wrote;
+   - otherwise To/Cc, only when exactly one address there is on the domain;
+   - otherwise the account's own address.
+
+   With several such relays, the trusted forwarding headers are searched across all of them before any To/Cc, and To/Cc only count when they name exactly one address across all relay domains and accounts (`pickReplyAccount()`). The receiving mailbox's own address, which often heads the headers on a shared domain, is skipped while looking for the alias; mail addressed only to it stays with that account. Replying from Sent keeps the address the message was sent from, since To/Cc there are the recipients, and a relay's own Sent copy is answered by that relay. Only addresses the send endpoint accepts are offered: `shop=orders@DOMAIN.IT` is read whole, then not used, rather than cut down to `orders@DOMAIN.IT`.
+
+   The composer shows the address as its own entry in the From list, so it can be switched back before sending. `POST /api/messages/send` takes it as `fromEmail` and refuses (`from_address_not_allowed`) anything that isn't the account's own address or, with the setting on, another address on its exact domain (no subdomains). The From in the MIME, the relay call and the stored Sent copy all use it. A draft keeps only the account, so a reopened draft sends from the account's own address.
+3. Everything else is the normal send flow, so the reply leaves through the chosen account's own SMTP/relay and its copy follows that account's destination. Addresses of both accounts are excluded from To/Cc to avoid replying to yourself.
 
 ### Conversations
 
@@ -169,6 +177,7 @@ Important fields:
 - `sent_folder`, `drafts_folder`, `spam_folder`, `auto_saves_sent`
 - `sent_copy_account_id`: IMAP account that stores sent copies and drafts when `storage_driver` is `imap` (relay accounts only)
 - `reply_account_id`: account that sends the replies to messages received here. Used when a domain only forwards to this mailbox and sends through a relay account; cleared when that account is deleted
+- `relay_any_address`: relay accounts only. When set, replies may leave from any address on the account's exact domain (see Reply). Off by default
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash
@@ -588,7 +597,8 @@ Pages → Custom domains → add the domain and follow the DNS instructions. Aft
 - No IMAP server-side search UI beyond the latest page.
 - HTML bodies are rendered in a sandboxed frame; remote images and tracking pixels are blocked by default and can be enabled globally in Settings → General, or per message. Small inline `cid:` images are embedded in the detail response; larger ones fall back to the authenticated attachment endpoint, which uses the D1 body cache when the message fits.
 - Attachments for messages not in the D1 body cache are fetched by re-reading the full message. Messages up to 512 KB are cached after the first read; larger ones keep using the provider unless a long-term archive is configured.
-- No alias-based send-as; the sender is the account address.
+- No free-form send-as: the sender is the account address, or for a relay with **Send from any address on this domain**, the address on its domain that a message was sent to (replies only).
+- The reply alias, both the account chosen in step 1 and the address of **Send from any address on this domain**, comes from headers that aren't signed, so it can't be fully proven from IMAP. Forwarding headers only count when the receiving server's topmost `Authentication-Results` reports a passing DKIM signature for the domain, which stops a forged header on mail delivered straight to the inbox. Two cases still get through: a receiving server that adds no `Authentication-Results` of its own (hosted providers such as Gmail, Outlook and Fastmail always do; a self-hosted server without DKIM checking may not), where the sender's own header is read instead; and a genuinely signed message from the domain replayed straight to the inbox with a forwarding header added on top. Either way the address is limited to the relay's own domain and is shown in the From field before sending. Ruling them out would need a list of trusted forwarding servers.
 - Autosave requires the provider to accept `APPEND` in the Drafts folder; without `APPENDUID`, the new UID is resolved with a search, which can be ambiguous with concurrent clients.
 - Forwarding and provider cleanup only process new messages detected by the cron worker after the initial sync; failed attempts are logged but not retried automatically.
 - Provider cleanup moves messages to Trash and requires archive; it never performs a permanent delete from the provider.
