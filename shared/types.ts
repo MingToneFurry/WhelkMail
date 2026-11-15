@@ -258,6 +258,11 @@ export interface MessageSummary {
 export interface MessageDetail extends MessageSummary {
   /** Addresses from Delivered-To/X-Original-To/Received that reveal a forwarding alias. */
   aliasAddresses: string[]
+  /**
+   * Domains with a passing DKIM signature according to the receiving server's
+   * Authentication-Results. Forwarding headers only count for these domains.
+   */
+  verifiedDomains: string[]
   /** RFC 5322 Message-ID, used as In-Reply-To when answering. */
   messageId: string | null
   /** Reference chain of this message, extended when answering. */

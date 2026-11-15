@@ -40,6 +40,11 @@ export interface DomainAliasInput {
    * `Received ... for`, ...), in header order: the topmost first.
    */
   forwarded: string[]
+  /**
+   * Domains the receiving server reports a passing DKIM signature for
+   * (`verifiedDomains()`). Forwarding headers only count for these.
+   */
+  verifiedDomains: string[]
   /** To and Cc of the message. */
   recipients: string[]
   /** Domain of the sending account. */
@@ -49,12 +54,14 @@ export interface DomainAliasInput {
 /**
  * The address on `domain` that a message was sent to, or null.
  *
- * Every server a message passes through adds its headers above the ones already
- * there, so the forwarder's own headers sit above anything the original sender
- * wrote. Reading top-down and taking the first address on the domain therefore
- * finds the forwarder's record before any forged copy further down.
+ * Forwarding headers are only read when the receiving server vouches for the
+ * domain: a forwarder that signs with it (Cloudflare Email Routing does) leaves
+ * a passing DKIM result, which mail delivered straight to the mailbox can't
+ * have. Then every server a message passes through adds its headers above the
+ * ones already there, so reading top-down and taking the first address on the
+ * domain finds the forwarder's record before any forged copy further down.
  *
- * To/Cc are written by the sender, so they are only a fallback when no
+ * To/Cc are written by the sender, so they are only a fallback when no trusted
  * forwarding header names an address on the domain, and only when exactly one
  * of them is on it: with several there's no telling which one is ours.
  */
@@ -64,9 +71,11 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
     return null
   }
   const onDomain = (email: string): boolean => domainOf(email) === domain
-  const forwarded = input.forwarded.map((email) => email.trim().toLowerCase()).find(onDomain)
-  if (forwarded) {
-    return forwarded
+  if (input.verifiedDomains.some((verified) => verified.toLowerCase() === domain)) {
+    const forwarded = input.forwarded.map((email) => email.trim().toLowerCase()).find(onDomain)
+    if (forwarded) {
+      return forwarded
+    }
   }
   const recipients = new Set(
     input.recipients.map((email) => email.trim().toLowerCase()).filter(onDomain),

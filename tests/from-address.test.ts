@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aliasAddresses, parseHeaders } from '../functions/_lib/mail/parse'
+import { aliasAddresses, parseHeaders, verifiedDomains } from '../functions/_lib/mail/parse'
 import { canSendFrom, domainOf, pickDomainAlias } from '../shared/from-address'
 
 const relay = { kind: 'relay', email: 'me@mydomain.example', relayAnyAddress: true }
@@ -36,43 +36,59 @@ describe('canSendFrom', () => {
 
 describe('pickDomainAlias', () => {
   const domain = 'mydomain.example'
+  const verified = { verifiedDomains: [domain] }
 
-  it('takes the topmost forwarding address on the domain', () => {
+  it('takes the topmost forwarding address on the domain when the receiving server vouches for it', () => {
     expect(
       pickDomainAlias({
         forwarded: ['me@gmail.example', 'shop@mydomain.example', 'forged@mydomain.example'],
         recipients: ['other@mydomain.example'],
         domain,
+        ...verified,
       }),
     ).toBe('shop@mydomain.example')
   })
 
+  it('ignores forwarding headers the receiving server does not vouch for', () => {
+    // Delivered straight to the mailbox with a sender-written X-Original-To.
+    expect(
+      pickDomainAlias({ forwarded: ['me@gmail.example', 'forged@mydomain.example'], recipients: ['me@gmail.example'], domain, verifiedDomains: [] }),
+    ).toBeNull()
+    // A signature for a subdomain doesn't vouch for the domain.
+    expect(
+      pickDomainAlias({ forwarded: ['forged@mydomain.example'], recipients: [], domain, verifiedDomains: ['news.mydomain.example'] }),
+    ).toBeNull()
+  })
+
   it('falls back to To/Cc only when exactly one address there is on the domain', () => {
-    expect(pickDomainAlias({ forwarded: ['me@gmail.example'], recipients: ['Shop@mydomain.example', 'friend@else.example'], domain })).toBe('shop@mydomain.example')
-    expect(pickDomainAlias({ forwarded: [], recipients: ['shop@mydomain.example', 'bank@mydomain.example'], domain })).toBeNull()
-    expect(pickDomainAlias({ forwarded: [], recipients: ['shop@mydomain.example', 'SHOP@mydomain.example'], domain })).toBe('shop@mydomain.example')
+    expect(pickDomainAlias({ forwarded: ['me@gmail.example'], recipients: ['Shop@mydomain.example', 'friend@else.example'], domain, ...verified })).toBe('shop@mydomain.example')
+    expect(pickDomainAlias({ forwarded: [], recipients: ['shop@mydomain.example', 'bank@mydomain.example'], domain, ...verified })).toBeNull()
+    expect(pickDomainAlias({ forwarded: [], recipients: ['shop@mydomain.example', 'SHOP@mydomain.example'], domain, ...verified })).toBe('shop@mydomain.example')
   })
 
   it('finds nothing for mail sent straight to another address', () => {
-    expect(pickDomainAlias({ forwarded: ['me@gmail.example'], recipients: ['me@gmail.example'], domain })).toBeNull()
+    expect(pickDomainAlias({ forwarded: ['me@gmail.example'], recipients: ['me@gmail.example'], domain, ...verified })).toBeNull()
   })
 
   it('ignores subdomains', () => {
-    expect(pickDomainAlias({ forwarded: ['a@news.mydomain.example'], recipients: [], domain })).toBeNull()
+    expect(pickDomainAlias({ forwarded: ['a@news.mydomain.example'], recipients: [], domain, ...verified })).toBeNull()
   })
 })
 
-describe('forwarded alias from real Cloudflare Email Routing headers', () => {
-  // Header order of a message forwarded by Cloudflare Email Routing to Gmail,
-  // with addresses replaced. The sender added a forged X-Original-To and
-  // X-Forwarded-For; Cloudflare kept them, below its own headers.
-  const headers = [
+describe('forwarded alias from real Gmail and Cloudflare Email Routing headers', () => {
+  // Header order of messages delivered to Gmail, with addresses replaced. The
+  // forwarded one went through Cloudflare Email Routing, which signs it with
+  // the domain; the sender added a forged X-Original-To and X-Forwarded-For,
+  // which Cloudflare kept below its own headers.
+  const forwarded = [
     'Delivered-To: me+tag@gmail.example',
     'Received: by 2002:a05:7108:da0a::0 with SMTP id dx10csp425650gdc; Sun, 15 Nov 2026 03:27:08 -0800',
     'Received: from i-ba.cloudflare-email.net (i-ba.cloudflare-email.net. [104.30.8.10]) by mx.google.com with ESMTPS id abc for <me+tag@gmail.example>; Sun, 15 Nov 2026 03:27:08 -0800',
+    'Authentication-Results: mx.google.com; dkim=pass header.i=@mydomain.example header.s=cf2024-1 header.b=GrqR+2uy; dkim=pass header.i=@cloudflare-email.net header.s=cf2024-1 header.b=K2Zd3UWg; spf=pass smtp.mailfrom=cfbounces+ndrdrop@mydomain.example',
     'X-Forwarded-To: me+tag@gmail.example',
     'X-Forwarded-For: shop@mydomain.example me+tag@gmail.example',
     'Received: from bg-bag.cloudflare-smtp.net (104.30.16.106) by cloudflare-email.net (cloudflare) id ZTn9WuWCLpyF for <shop@mydomain.example>; Sun, 15 Nov 2026 11:27:02 +0000',
+    'Authentication-Results: mx.cloudflare.net; dkim=pass header.d=news.shop.example',
     'From: "Shop" <news@shop.example>',
     'Subject: Your order',
     'To: shop@mydomain.example',
@@ -81,27 +97,39 @@ describe('forwarded alias from real Cloudflare Email Routing headers', () => {
   ].join('\r\n')
 
   it("picks Cloudflare's record of the alias, not the forged headers", async () => {
-    const email = await parseHeaders(headers)
+    const email = await parseHeaders(forwarded)
+    expect(verifiedDomains(email)).toEqual(['mydomain.example', 'cloudflare-email.net'])
     expect(
       pickDomainAlias({
         forwarded: aliasAddresses(email),
+        verifiedDomains: verifiedDomains(email),
         recipients: ['shop@mydomain.example'],
         domain: 'mydomain.example',
       }),
     ).toBe('shop@mydomain.example')
   })
 
-  it('finds no alias in a message sent straight to Gmail', async () => {
+  it('ignores a forged forwarding header on mail sent straight to Gmail', async () => {
     const direct = await parseHeaders(
       [
         'Delivered-To: me@gmail.example',
-        'Received: from bg-bag.cloudflare-smtp.net by mx.google.com with ESMTPS id abc for <me@gmail.example>; Sun, 15 Nov 2026 03:27:00 -0800',
-        'From: "Sender" <header-test.noreply@notifications.mydomain.example>',
+        'Received: from mail.attacker.example by mx.google.com with ESMTPS id abc for <me@gmail.example>; Sun, 15 Nov 2026 03:27:00 -0800',
+        'Authentication-Results: mx.google.com; dkim=pass header.i=@attacker.example header.s=s1; spf=pass smtp.mailfrom=x@attacker.example',
+        // The sender's own headers: a forged alias and a forged verdict.
+        'Authentication-Results: mx.google.com; dkim=pass header.d=mydomain.example',
+        'X-Original-To: forged@mydomain.example',
+        'From: "Sender" <x@attacker.example>',
         'To: me@gmail.example',
       ].join('\r\n'),
     )
+    expect(verifiedDomains(direct)).toEqual(['attacker.example'])
     expect(
-      pickDomainAlias({ forwarded: aliasAddresses(direct), recipients: ['me@gmail.example'], domain: 'mydomain.example' }),
+      pickDomainAlias({
+        forwarded: aliasAddresses(direct),
+        verifiedDomains: verifiedDomains(direct),
+        recipients: ['me@gmail.example'],
+        domain: 'mydomain.example',
+      }),
     ).toBeNull()
   })
 })

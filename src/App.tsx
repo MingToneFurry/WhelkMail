@@ -929,6 +929,7 @@ export default function App() {
     }
     return pickDomainAlias({
       forwarded: message.aliasAddresses ?? [],
+      verifiedDomains: message.verifiedDomains ?? [],
       recipients: [...message.to, ...message.cc].map((item) => item.email),
       domain: domainOf(account.email),
     })

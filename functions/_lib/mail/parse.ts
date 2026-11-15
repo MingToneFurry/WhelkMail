@@ -141,3 +141,34 @@ export function aliasAddresses(email: Email): string[] {
   add(email.deliveredTo)
   return [...found]
 }
+
+/**
+ * Domains with a passing DKIM signature, as reported by the server that
+ * delivered the message into this mailbox.
+ *
+ * Only the topmost Authentication-Results counts: the receiving server adds
+ * it, while any further down could have been written by the sender. A
+ * forwarder that signs with the forwarding domain (Cloudflare Email Routing
+ * does) shows up here, which is what lets `pickDomainAlias()` trust the
+ * forwarding headers for that domain. Mail delivered straight to the mailbox
+ * can't carry a passing signature for a domain the sender doesn't control.
+ */
+export function verifiedDomains(email: Email): string[] {
+  const results = (email.headers ?? []).find((header) => header.key.toLowerCase() === 'authentication-results')
+  if (!results) {
+    return []
+  }
+  const found = new Set<string>()
+  for (const part of results.value.split(';')) {
+    if (!/\bdkim\s*=\s*pass\b/i.test(part)) {
+      continue
+    }
+    const signer =
+      part.match(/\bheader\.d\s*=\s*"?([A-Za-z0-9.-]+)/i)?.[1] ??
+      part.match(/\bheader\.i\s*=\s*"?[^\s;"@]*@([A-Za-z0-9.-]+)/i)?.[1]
+    if (signer) {
+      found.add(signer.toLowerCase().replace(/\.$/, ''))
+    }
+  }
+  return [...found]
+}

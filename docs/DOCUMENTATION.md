@@ -91,7 +91,7 @@ Key constraints:
 
    The alias step is what makes a forwarding domain work like Gmail: mail addressed to `EMAIL@DOMAIN.IT` and forwarded to `EMAIL@PROVIDER.IT` keeps that address in the headers, so the reply leaves from the domain account.
 2. If the chosen account is a relay with **Send from any address on this domain** on (`accounts.relay_any_address`), the reply leaves from the address the message was sent to, as long as it is on the account's exact domain (`pickDomainAlias()` in `shared/from-address.ts`):
-   - the first address on the domain in `aliasAddresses()`, read top-down. Every server prepends its headers, so the forwarder's own record (Cloudflare's `X-Forwarded-For` and `Received … for`) sits above anything the original sender wrote, and a forged `X-Original-To` further down is never reached;
+   - the first address on the domain in `aliasAddresses()`, read top-down, but only when the receiving server's topmost `Authentication-Results` reports a passing DKIM signature for that exact domain (`verifiedDomains()`). Cloudflare Email Routing signs forwarded mail with the domain; mail delivered straight to the mailbox can't carry such a signature, so a forged `X-Original-To` on it is ignored. On forwarded mail, every server prepends its headers, so the forwarder's own record (Cloudflare's `X-Forwarded-For` and `Received … for`) sits above anything the original sender wrote;
    - otherwise To/Cc, only when exactly one address there is on the domain;
    - otherwise the account's own address.
 
