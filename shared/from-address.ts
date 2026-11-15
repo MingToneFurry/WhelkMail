@@ -82,3 +82,61 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
   )
   return recipients.size === 1 ? [...recipients][0] : null
 }
+
+export interface DomainRelayInput {
+  /** Relays that can send and have `relayAnyAddress` on, in account order. */
+  relays: { id: string; email: string }[]
+  /** Address of the account that received the message. */
+  receivingEmail: string
+  /** True for a message in Sent: its From is our own address. */
+  sent: boolean
+  /** From of the message. */
+  from: string
+  forwarded: string[]
+  verifiedDomains: string[]
+  recipients: string[]
+}
+
+/**
+ * Which relay, if any, replies as the address a message was sent to, and as
+ * which address. Used when no account has exactly that address.
+ *
+ * - In Sent, the message's own From is the address to keep, when a relay
+ *   covers its domain. To/Cc there are the recipients, not us.
+ * - Otherwise trusted forwarding headers are searched across all relays first,
+ *   top-down, and To/Cc only if none matches, so a Cc on one relay's domain
+ *   can't beat the forwarding record of another.
+ * - An address that belongs to the receiving account itself stays with it:
+ *   ordinary mail to me@DOMAIN.IT is answered by that account, not a relay.
+ */
+export function pickDomainRelay(input: DomainRelayInput): { accountId: string; alias: string } | null {
+  const relayFor = (email: string) => input.relays.find((relay) => domainOf(relay.email) === domainOf(email))
+  const receiving = input.receivingEmail.trim().toLowerCase()
+  const result = (relay: { id: string } | undefined, alias: string | null) =>
+    relay && alias && alias !== receiving ? { accountId: relay.id, alias } : null
+
+  if (input.sent) {
+    const from = input.from.trim().toLowerCase()
+    return result(relayFor(from), from || null)
+  }
+  const verified = new Set(input.verifiedDomains.map((domain) => domain.toLowerCase()))
+  for (const email of input.forwarded) {
+    const address = email.trim().toLowerCase()
+    const relay = relayFor(address)
+    if (relay && verified.has(domainOf(address))) {
+      return result(relay, address)
+    }
+  }
+  for (const relay of input.relays) {
+    const alias = pickDomainAlias({
+      forwarded: [],
+      verifiedDomains: [],
+      recipients: input.recipients,
+      domain: domainOf(relay.email),
+    })
+    if (alias) {
+      return result(relay, alias)
+    }
+  }
+  return null
+}

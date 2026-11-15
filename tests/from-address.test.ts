@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aliasAddresses, parseHeaders, verifiedDomains } from '../functions/_lib/mail/parse'
-import { canSendFrom, domainOf, pickDomainAlias } from '../shared/from-address'
+import { canSendFrom, domainOf, pickDomainAlias, pickDomainRelay } from '../shared/from-address'
 
 const relay = { kind: 'relay', email: 'me@mydomain.example', relayAnyAddress: true }
 
@@ -72,6 +72,53 @@ describe('pickDomainAlias', () => {
 
   it('ignores subdomains', () => {
     expect(pickDomainAlias({ forwarded: ['a@news.mydomain.example'], recipients: [], domain, ...verified })).toBeNull()
+  })
+})
+
+describe('pickDomainRelay', () => {
+  const relayA = { id: 'relay-a', email: 'relay@a.example' }
+  const relayB = { id: 'relay-b', email: 'relay@b.example' }
+  const base = {
+    relays: [relayA, relayB],
+    receivingEmail: 'me@gmail.example',
+    sent: false,
+    from: 'someone@else.example',
+    forwarded: [] as string[],
+    verifiedDomains: [] as string[],
+    recipients: [] as string[],
+  }
+
+  it("prefers a trusted forwarding record on any relay's domain over To/Cc on another", () => {
+    expect(
+      pickDomainRelay({
+        ...base,
+        forwarded: ['me@gmail.example', 'shop@b.example'],
+        verifiedDomains: ['b.example'],
+        recipients: ['contact@a.example'],
+      }),
+    ).toEqual({ accountId: 'relay-b', alias: 'shop@b.example' })
+  })
+
+  it('uses To/Cc when no trusted forwarding header matches', () => {
+    expect(
+      pickDomainRelay({ ...base, forwarded: ['forged@b.example'], recipients: ['contact@a.example'] }),
+    ).toEqual({ accountId: 'relay-a', alias: 'contact@a.example' })
+  })
+
+  it("leaves the receiving account's own address to that account", () => {
+    expect(
+      pickDomainRelay({ ...base, receivingEmail: 'me@a.example', recipients: ['me@a.example'] }),
+    ).toBeNull()
+    expect(
+      pickDomainRelay({ ...base, receivingEmail: 'Me@a.example', forwarded: ['me@a.example'], verifiedDomains: ['a.example'] }),
+    ).toBeNull()
+  })
+
+  it('in Sent, keeps the address the message left from instead of a recipient', () => {
+    expect(
+      pickDomainRelay({ ...base, sent: true, from: 'shop@a.example', recipients: ['colleague@b.example'] }),
+    ).toEqual({ accountId: 'relay-a', alias: 'shop@a.example' })
+    expect(pickDomainRelay({ ...base, sent: true, from: 'me@gmail.example', recipients: ['colleague@a.example'] })).toBeNull()
   })
 })
 

@@ -28,7 +28,7 @@ import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
 import { errorText } from './lib/errors'
 import { syncSignature } from './lib/sync-signature'
-import { domainOf, pickDomainAlias } from '../shared/from-address'
+import { domainOf, pickDomainAlias, pickDomainRelay } from '../shared/from-address'
 import { mergePage } from '../shared/paging'
 import { pickReplySender } from './lib/sender'
 import { displayAddress } from './lib/utils'
@@ -912,14 +912,16 @@ export default function App() {
     }
     // No account has exactly that address: a relay allowed to send as any
     // address on its domain covers it, when the alias is on that domain.
-    const domainRelay = accounts.find(
-      (item) =>
-        canSend(item) &&
-        item.kind === 'relay' &&
-        item.relayAnyAddress &&
-        domainAliasFor(message, item) !== null,
-    )
-    return domainRelay?.id ?? null
+    const domainRelay = pickDomainRelay({
+      relays: accounts.filter((item) => canSend(item) && item.kind === 'relay' && item.relayAnyAddress),
+      receivingEmail: message.accountEmail,
+      sent: message.folder === 'sent',
+      from: message.from.email,
+      forwarded: message.aliasAddresses ?? [],
+      verifiedDomains: message.verifiedDomains ?? [],
+      recipients: [...message.to, ...message.cc].map((item) => item.email),
+    })
+    return domainRelay?.accountId ?? null
   }
 
   /** The address on `account`'s domain that `message` was sent to, if it may send as it. */
@@ -927,11 +929,16 @@ export default function App() {
     if (account.kind !== 'relay' || !account.relayAnyAddress) {
       return null
     }
+    const domain = domainOf(account.email)
+    // In Sent, To/Cc are the recipients: keep the address the message left from.
+    if (message.folder === 'sent') {
+      return domainOf(message.from.email) === domain ? message.from.email.toLowerCase() : null
+    }
     return pickDomainAlias({
       forwarded: message.aliasAddresses ?? [],
       verifiedDomains: message.verifiedDomains ?? [],
       recipients: [...message.to, ...message.cc].map((item) => item.email),
-      domain: domainOf(account.email),
+      domain,
     })
   }
 
