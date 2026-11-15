@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   relay_api_secret_enc TEXT,
   relay_domain TEXT,
   relay_region TEXT,
+  relay_any_address INTEGER NOT NULL DEFAULT 0,
   drive_email TEXT,
   drive_folder_id TEXT,
   drive_refresh_token_enc TEXT,

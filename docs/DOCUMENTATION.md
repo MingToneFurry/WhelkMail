@@ -169,6 +169,7 @@ Important fields:
 - `sent_folder`, `drafts_folder`, `spam_folder`, `auto_saves_sent`
 - `sent_copy_account_id`: IMAP account that stores sent copies and drafts when `storage_driver` is `imap` (relay accounts only)
 - `reply_account_id`: account that sends the replies to messages received here. Used when a domain only forwards to this mailbox and sends through a relay account; cleared when that account is deleted
+- `relay_any_address`: relay accounts only. When set, replies may leave from any address on the account's exact domain (see Reply). Off by default
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash

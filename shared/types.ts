@@ -217,6 +217,8 @@ export interface Account {
   sentCopyAccountId: string | null
   /** Account used as the sender when replying to messages received here. */
   replyAccountId: string | null
+  /** Relay accounts only: may send from any address on the account's domain. */
+  relayAnyAddress: boolean
   maxAttachmentBytes: number
   storageDriver: StorageDriver
   relayProvider: string | null
@@ -407,6 +409,7 @@ export interface AccountPatch {
   autoSavesSent?: boolean
   sentCopyAccountId?: string | null
   replyAccountId?: string | null
+  relayAnyAddress?: boolean
   storageDriver?: StorageDriver
   password?: string
   username?: string

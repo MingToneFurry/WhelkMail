@@ -125,6 +125,24 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       )
     }
   }
+  // Sending as other addresses on the domain is a relay feature: an IMAP
+  // account's SMTP server decides which From addresses it accepts.
+  if (input.relayAnyAddress && row.kind !== 'relay') {
+    return fail(
+      'Only relay accounts can send from any address on their domain',
+      400,
+      undefined,
+      'relay_any_address_relay_only',
+    )
+  }
+  const relayAnyAddress =
+    row.kind !== 'relay'
+      ? 0
+      : input.relayAnyAddress === undefined
+        ? row.relay_any_address
+        : input.relayAnyAddress
+          ? 1
+          : 0
   const replyAccountId =
     input.replyAccountId === undefined ? row.reply_account_id : input.replyAccountId
   if (replyAccountId) {
@@ -198,7 +216,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   await context.env.DB.prepare(
-    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, delete_after_archive = ?, auto_sync = ?, sent_folder = ?, auto_saves_sent = ?, sent_copy_account_id = ?, reply_account_id = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
+    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, delete_after_archive = ?, auto_sync = ?, sent_folder = ?, auto_saves_sent = ?, sent_copy_account_id = ?, reply_account_id = ?, relay_any_address = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
   )
     .bind(
       displayName,
@@ -212,6 +230,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       autoSavesSent,
       sentCopyAccountId,
       replyAccountId,
+      relayAnyAddress,
       storageDriver,
       username,
       secretEncrypted,
