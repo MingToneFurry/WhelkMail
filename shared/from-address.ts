@@ -151,21 +151,35 @@ export interface ReplyAccountInput {
  */
 export function pickReplyAccount(input: ReplyAccountInput): { accountId: string; alias: string } | null {
   const receiving = input.receivingEmail.trim().toLowerCase()
-  const resolve = (address: string): { accountId: string; alias: string | null } | null => {
+  // `ambiguous` means two relays can send as the domain: choosing one would make
+  // the reply depend on account order, so no alias is offered.
+  const resolve = (
+    address: string,
+  ): { kind: 'exact' | 'relay'; accountId: string; alias: string | null } | { kind: 'ambiguous' } | null => {
     const exact = input.accounts.find((account) => account.email.trim().toLowerCase() === address)
     if (exact) {
-      return { accountId: exact.id, alias: address }
+      return { kind: 'exact', accountId: exact.id, alias: address }
     }
-    const relay = input.accounts.find(
+    const relays = input.accounts.filter(
       (account) => account.anyAddress && domainOf(account.email) === domainOf(address),
     )
-    return relay ? { accountId: relay.id, alias: sendable(address) } : null
+    if (relays.length === 0) {
+      return null
+    }
+    if (relays.length > 1) {
+      return { kind: 'ambiguous' }
+    }
+    return { kind: 'relay', accountId: relays[0].id, alias: sendable(address) }
   }
   const result = (found: { accountId: string; alias: string | null } | null) =>
     found && found.alias && found.alias !== receiving ? { accountId: found.accountId, alias: found.alias } : null
 
   if (input.sent) {
-    return input.receivingIsRelay ? null : result(resolve(input.from.trim().toLowerCase()))
+    if (input.receivingIsRelay) {
+      return null
+    }
+    const resolution = resolve(input.from.trim().toLowerCase())
+    return resolution && resolution.kind !== 'ambiguous' ? result(resolution) : null
   }
   const verified = new Set(input.verifiedDomains.map((domain) => domain.toLowerCase()))
   for (const email of input.forwarded) {
@@ -175,17 +189,29 @@ export function pickReplyAccount(input: ReplyAccountInput): { accountId: string;
     if (address === receiving || !verified.has(domainOf(address))) {
       continue
     }
-    const found = resolve(address)
-    if (found) {
+    const resolution = resolve(address)
+    if (resolution?.kind === 'ambiguous') {
+      // Two relays serve this domain: stop here rather than guessing or moving
+      // on to a lower header that names a different address.
+      return null
+    }
+    if (resolution) {
       // The forwarder's record wins even when it can't be sent from: falling
       // through to a lower header or To/Cc would pick a different address.
-      return result(found)
+      return result(resolution)
     }
   }
   const candidates = new Set(
     input.recipients
       .map((email) => email.trim().toLowerCase())
-      .filter((address) => address && address !== receiving && resolve(address)),
+      .filter((address) => {
+        if (!address || address === receiving) {
+          return false
+        }
+        const resolution = resolve(address)
+        return Boolean(resolution && resolution.kind !== 'ambiguous')
+      }),
   )
-  return candidates.size === 1 ? result(resolve([...candidates][0])) : null
+  const only = candidates.size === 1 ? resolve([...candidates][0]) : null
+  return only && only.kind !== 'ambiguous' ? result(only) : null
 }

@@ -124,6 +124,38 @@ describe('pickReplyAccount', () => {
     recipients: [] as string[],
   }
 
+  it('does not choose between two relays allowed to send as the same domain', () => {
+    // Picking the first would make the reply depend on account order: no alias.
+    const twinA = { id: 'twin-a', email: 'one@shared.example', anyAddress: true }
+    const twinB = { id: 'twin-b', email: 'two@shared.example', anyAddress: true }
+    expect(
+      pickReplyAccount({
+        ...base,
+        accounts: [twinA, twinB],
+        forwarded: ['shop@shared.example'],
+        verifiedDomains: ['shared.example'],
+      }),
+    ).toBeNull()
+    // Same when the alias only appears in To/Cc.
+    expect(
+      pickReplyAccount({
+        ...base,
+        accounts: [twinA, twinB],
+        recipients: ['shop@shared.example'],
+      }),
+    ).toBeNull()
+  })
+
+  it('still answers from a relay when it is the only one for that domain', () => {
+    expect(
+      pickReplyAccount({
+        ...base,
+        forwarded: ['shop@b.example'],
+        verifiedDomains: ['b.example'],
+      }),
+    ).toEqual({ accountId: 'relay-b', alias: 'shop@b.example' })
+  })
+
   it("prefers a trusted forwarding record on any relay's domain over To/Cc on another", () => {
     expect(
       pickReplyAccount({
