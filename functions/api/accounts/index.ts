@@ -7,7 +7,7 @@ import type { Env } from '../../_lib/env'
 import { ensureGlobalLabel } from '../../_lib/labels'
 import { googleMailConfigured } from '../../_lib/google/oauth'
 import { fail, json, readJson } from '../../_lib/http'
-import { relayDomainMissing } from '../../_lib/relay/validation'
+import { relayDomainMissing, resolveRelayDomain } from '../../_lib/relay/validation'
 import { isSchemaError } from '../../_lib/schema'
 import { microsoftConfigured } from '../../_lib/microsoft/oauth'
 
@@ -149,7 +149,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (providerMeta.needsSecret && !input.relayApiSecret) {
       return fail('Relay API secret is required', 400, undefined, 'relay_secret_required')
     }
-    if (providerMeta.needsDomain && !input.relayDomain) {
+    let relayDomain = input.relayDomain
+    if (providerMeta.domainDetectable) {
+      const resolved = await resolveRelayDomain(providerMeta, apiKey, relayDomain)
+      if (resolved instanceof Response) {
+        return resolved
+      }
+      relayDomain = resolved
+    } else if (providerMeta.needsDomain && !relayDomain) {
       return relayDomainMissing(providerMeta)
     }
     const keyEncrypted = apiKey ? await encryptString(context.env, apiKey) : null
@@ -170,7 +177,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         provider,
         keyEncrypted,
         secretEncrypted,
-        input.relayDomain ?? null,
+        relayDomain ?? null,
         input.relayRegion ?? null,
         customSmtp ? (input.smtpHost ?? null) : null,
         smtpPort,

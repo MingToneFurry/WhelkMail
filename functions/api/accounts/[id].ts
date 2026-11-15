@@ -1,13 +1,13 @@
 import { findRelayProvider } from '../../../shared/presets'
 import { accountUpdateSchema } from '../../../shared/schemas'
-import { encryptString } from '../../_lib/crypto'
+import { decryptString, encryptString } from '../../_lib/crypto'
 import { getAccountRow, publicAccount } from '../../_lib/db'
 import { purgeAccountStorage } from '../../_lib/deletion'
 import { recordCleanupFailures } from '../../_lib/storage/cleanup-log'
 import { backfillAccountLabel } from '../../_lib/filters'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
-import { relayDomainMissing } from '../../_lib/relay/validation'
+import { relayDomainMissing, resolveRelayDomain } from '../../_lib/relay/validation'
 
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
   const id = context.params.id as string
@@ -178,7 +178,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   const relayApiSecretEnc = isRelay && input.relayApiSecret
     ? await encryptString(context.env, input.relayApiSecret)
     : row.relay_api_secret_enc
-  const relayDomain = isRelay ? (input.relayDomain ?? row.relay_domain) : row.relay_domain
+  let relayDomain = isRelay ? (input.relayDomain ?? row.relay_domain) : row.relay_domain
   const relayRegion = isRelay ? (input.relayRegion ?? row.relay_region) : row.relay_region
 
   if (row.kind === 'relay') {
@@ -192,7 +192,23 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     if (providerMeta.needsSecret && !relayApiSecretEnc) {
       return fail('Relay API secret is required', 400, undefined, 'relay_secret_required')
     }
-    if (providerMeta.needsDomain && !relayDomain) {
+    const providerChanged = relayProvider !== row.relay_provider
+    if (providerMeta.domainDetectable) {
+      // Only when the key, account ID or provider changes, so other saves
+      // don't wait on Cloudflare. A domain saved for the previous provider
+      // isn't an account ID, so it's looked up again instead.
+      if (input.relayApiKey || input.relayDomain || providerChanged || !relayDomain) {
+        const apiKey =
+          input.relayApiKey ??
+          (row.relay_api_key_enc ? await decryptString(context.env, row.relay_api_key_enc) : context.env.RELAY_API_KEY)
+        const entered = providerChanged ? input.relayDomain : (relayDomain ?? undefined)
+        const resolved = await resolveRelayDomain(providerMeta, apiKey, entered)
+        if (resolved instanceof Response) {
+          return resolved
+        }
+        relayDomain = resolved
+      }
+    } else if (providerMeta.needsDomain && !relayDomain) {
       return relayDomainMissing(providerMeta)
     }
   }
