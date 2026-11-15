@@ -110,9 +110,12 @@ export function pickDomainAlias(input: DomainAliasInput): string | null {
   return recipients.size === 0 && receivingSeen ? sendable(receiving) : null
 }
 
-export interface DomainRelayInput {
-  /** Relays that can send and have `relayAnyAddress` on, in account order. */
-  relays: { id: string; email: string }[]
+export interface ReplyAccountInput {
+  /**
+   * Accounts that can send, other than the one holding the message, in
+   * account order. `anyAddress` marks a relay with `relayAnyAddress` on.
+   */
+  accounts: { id: string; email: string; anyAddress: boolean }[]
   /** Address of the account that received the message. */
   receivingEmail: string
   /** True for a message in Sent: its From is our own address. */
@@ -127,58 +130,62 @@ export interface DomainRelayInput {
 }
 
 /**
- * Which relay, if any, replies as the address a message was sent to, and as
- * which address. Used when no account has exactly that address.
+ * Which account replies as the address a message was sent to, and as which
+ * address: an account with exactly that address, or else a relay allowed to
+ * send as any address on its domain. Both go through the same trust checks.
  *
- * - In Sent, the message's own From is the address to keep, when a relay
- *   covers its domain. To/Cc there are the recipients, not us. A relay's own
- *   Sent copy is answered by that relay: its sending account is known, so
- *   another relay on the same domain must not take over.
- * - Otherwise trusted forwarding headers are searched across all relays first,
- *   top-down, and To/Cc only if none matches, so a Cc on one relay's domain
- *   can't beat the forwarding record of another. To/Cc only count when they
- *   name exactly one address across all relay domains.
+ * - In Sent, the message's own From is the address to keep. To/Cc there are
+ *   the recipients, not us. A relay's own Sent copy is answered by that relay,
+ *   so no other account takes over.
+ * - Otherwise the forwarding headers are read top-down, but only addresses on
+ *   a domain the receiving server vouches for (`verifiedDomains()`), so a
+ *   header the sender wrote on mail delivered straight to the inbox is
+ *   ignored. The first one that resolves to an account wins.
+ * - Failing that, To/Cc, which the sender writes, only count when they name
+ *   exactly one address that resolves to an account, so neither account order
+ *   nor an added Cc decides between two of them.
  * - An address that belongs to the receiving account itself stays with it:
- *   ordinary mail to me@DOMAIN.IT is answered by that account, not a relay.
+ *   ordinary mail to me@DOMAIN.IT is answered by that account.
+ *
+ * An account with exactly the address takes priority over a domain relay.
  */
-export function pickDomainRelay(input: DomainRelayInput): { accountId: string; alias: string } | null {
-  const relayFor = (email: string) => input.relays.find((relay) => domainOf(relay.email) === domainOf(email))
+export function pickReplyAccount(input: ReplyAccountInput): { accountId: string; alias: string } | null {
   const receiving = input.receivingEmail.trim().toLowerCase()
-  const result = (relay: { id: string } | undefined, alias: string | null) =>
-    relay && alias && alias !== receiving ? { accountId: relay.id, alias } : null
+  const resolve = (address: string): { accountId: string; alias: string | null } | null => {
+    const exact = input.accounts.find((account) => account.email.trim().toLowerCase() === address)
+    if (exact) {
+      return { accountId: exact.id, alias: address }
+    }
+    const relay = input.accounts.find(
+      (account) => account.anyAddress && domainOf(account.email) === domainOf(address),
+    )
+    return relay ? { accountId: relay.id, alias: sendable(address) } : null
+  }
+  const result = (found: { accountId: string; alias: string | null } | null) =>
+    found && found.alias && found.alias !== receiving ? { accountId: found.accountId, alias: found.alias } : null
 
   if (input.sent) {
-    if (input.receivingIsRelay) {
-      return null
-    }
-    const from = input.from.trim().toLowerCase()
-    return result(relayFor(from), sendable(from))
+    return input.receivingIsRelay ? null : result(resolve(input.from.trim().toLowerCase()))
   }
   const verified = new Set(input.verifiedDomains.map((domain) => domain.toLowerCase()))
   for (const email of input.forwarded) {
     const address = email.trim().toLowerCase()
-    const relay = relayFor(address)
     // The receiving mailbox's own address often heads the headers on a shared
     // domain (Delivered-To): look past it for the alias.
-    if (address === receiving) {
+    if (address === receiving || !verified.has(domainOf(address))) {
       continue
     }
-    if (relay && verified.has(domainOf(address))) {
-      return result(relay, sendable(address))
+    const found = resolve(address)
+    if (found) {
+      // The forwarder's record wins even when it can't be sent from: falling
+      // through to a lower header or To/Cc would pick a different address.
+      return result(found)
     }
   }
-  // To/Cc across every relay domain: only an unambiguous match counts, so
-  // account order can't decide between contact@a.example and shop@b.example.
-  const candidates = input.relays.flatMap((relay) => {
-    const alias = pickDomainAlias({
-      forwarded: [],
-      verifiedDomains: [],
-      recipients: input.recipients,
-      domain: domainOf(relay.email),
-      receivingEmail: receiving,
-    })
-    return alias ? [{ relay, alias }] : []
-  })
-  const aliases = new Set(candidates.map((candidate) => candidate.alias))
-  return aliases.size === 1 ? result(candidates[0].relay, candidates[0].alias) : null
+  const candidates = new Set(
+    input.recipients
+      .map((email) => email.trim().toLowerCase())
+      .filter((address) => address && address !== receiving && resolve(address)),
+  )
+  return candidates.size === 1 ? result(resolve([...candidates][0])) : null
 }

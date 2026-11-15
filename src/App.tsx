@@ -28,7 +28,7 @@ import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
 import { errorText } from './lib/errors'
 import { syncSignature } from './lib/sync-signature'
-import { domainOf, pickDomainAlias, pickDomainRelay } from '../shared/from-address'
+import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
 import { mergePage } from '../shared/paging'
 import { pickReplySender } from './lib/sender'
 import { displayAddress } from './lib/utils'
@@ -891,29 +891,20 @@ export default function App() {
 
   /**
    * Account whose address received the message, when the mailbox that stores it
-   * is just a forwarding destination (EMAIL@DOMAIN.IT → EMAIL@PROVIDER.IT).
-   * Only accounts that can send are considered.
+   * is just a forwarding destination (EMAIL@DOMAIN.IT → EMAIL@PROVIDER.IT), and
+   * the address to reply as. Only accounts that can send are considered, and
+   * forwarding headers only count when the receiving server vouches for them
+   * (`pickReplyAccount()`).
    */
-  function aliasAccountFor(message: MessageDetail): string | null {
-    const addresses = new Set(
-      [
-        ...(message.aliasAddresses ?? []),
-        ...message.to.map((item) => item.email),
-        ...message.cc.map((item) => item.email),
-      ]
-        .map((email) => email.trim().toLowerCase())
-        .filter(Boolean),
-    )
+  function aliasAccountFor(message: MessageDetail): { accountId: string; alias: string } | null {
     const canSend = (item: Account): boolean =>
       item.id !== message.accountId && (item.kind === 'relay' ? item.relayConfigured : item.connected)
-    const match = accounts.find((item) => canSend(item) && addresses.has(item.email.toLowerCase()))
-    if (match) {
-      return match.id
-    }
-    // No account has exactly that address: a relay allowed to send as any
-    // address on its domain covers it, when the alias is on that domain.
-    const domainRelay = pickDomainRelay({
-      relays: accounts.filter((item) => canSend(item) && item.kind === 'relay' && item.relayAnyAddress),
+    return pickReplyAccount({
+      accounts: accounts.filter(canSend).map((item) => ({
+        id: item.id,
+        email: item.email,
+        anyAddress: item.kind === 'relay' && item.relayAnyAddress,
+      })),
       receivingEmail: message.accountEmail,
       sent: message.folder === 'sent',
       receivingIsRelay: accounts.find((item) => item.id === message.accountId)?.kind === 'relay',
@@ -922,7 +913,6 @@ export default function App() {
       verifiedDomains: message.verifiedDomains ?? [],
       recipients: [...message.to, ...message.cc].map((item) => item.email),
     })
-    return domainRelay?.accountId ?? null
   }
 
   /** The address on `account`'s domain that `message` was sent to, if it may send as it. */
@@ -946,17 +936,24 @@ export default function App() {
 
   function replyTo(message: MessageDetail, all: boolean) {
     const receivingAccount = accounts.find((item) => item.id === message.accountId)
+    const alias = aliasAccountFor(message)
     const sendingAccountId = pickReplySender({
       messageAccountId: message.accountId,
       replyAccountId: receivingAccount?.replyAccountId ?? null,
-      aliasAccountId: aliasAccountFor(message),
+      aliasAccountId: alias?.accountId ?? null,
       defaultSender: defaultSenderReply,
       accountIds: accounts.map((item) => item.id),
     })
     const sendingAccount = accounts.find((account) => account.id === sendingAccountId)
     // A relay allowed to send as any address on its domain answers from the
     // address the message was sent to (shop@DOMAIN.IT), not its own.
-    const domainAlias = sendingAccount ? domainAliasFor(message, sendingAccount) : null
+    // When the alias step chose the account, reuse the address it matched.
+    const domainAlias =
+      sendingAccount && alias?.accountId === sendingAccount.id
+        ? alias.alias
+        : sendingAccount
+          ? domainAliasFor(message, sendingAccount)
+          : null
     const fromEmail =
       domainAlias && domainAlias !== sendingAccount?.email.toLowerCase() ? domainAlias : null
     const ownAddresses = new Set(
