@@ -114,6 +114,9 @@ export interface RelayProviderOption {
   // Whether to ask for a region (relayRegion); only Mailgun has regional
   // endpoints. Before this flag the region box showed with any domain field.
   needsRegion?: boolean
+  // The server can fill relayDomain in from the API key when it's left blank,
+  // and checks the key against it on save (Cloudflare's account ID).
+  domainDetectable?: boolean
 }
 
 export const RELAY_PROVIDERS: RelayProviderOption[] = [
@@ -124,7 +127,7 @@ export const RELAY_PROVIDERS: RelayProviderOption[] = [
   { id: 'sendgrid', label: 'SendGrid', needsSecret: false, needsDomain: false },
   { id: 'mailjet', label: 'Mailjet', needsSecret: true, needsDomain: false },
   { id: 'postmark', label: 'Postmark', needsSecret: false, needsDomain: false },
-  { id: 'cloudflare', label: 'Cloudflare Email Service', needsSecret: false, needsDomain: true, domainLabel: 'accountId' },
+  { id: 'cloudflare', label: 'Cloudflare Email Service', needsSecret: false, needsDomain: true, domainLabel: 'accountId', domainDetectable: true },
   { id: 'custom', label: 'SMTP personalizzato', labelKey: 'relayProviders.custom.label', needsSecret: false, needsDomain: false, manual: true },
 ]
 
