@@ -85,7 +85,7 @@ Key constraints:
 
 1. The reply composer takes its sender from `pickReplySender`, in this order:
    - `accounts.reply_account_id` of the mailbox that received the message (explicit override);
-   - the account whose address is the alias the message was actually sent to: `aliasAddresses()` collects `Delivered-To`, `X-Delivered-To`, `X-Original-To`, `Envelope-To`, `X-Envelope-To`, `X-Forwarded-To`, `Resent-To`, `Apparently-To` and `Received … for <addr>`, and the client also looks at the message To/Cc. Only accounts that can send are considered (relay configured, or IMAP connected);
+   - the account whose address is the alias the message was actually sent to: `aliasAddresses()` collects `Delivered-To`, `X-Delivered-To`, `X-Original-To`, `Envelope-To`, `X-Envelope-To`, `X-Forwarded-To`, `X-Forwarded-For` (Cloudflare Email Routing), `Resent-To`, `Apparently-To` and `Received … for <addr>`, in header order (topmost first), and the client also looks at the message To/Cc. Only accounts that can send are considered (relay configured, or IMAP connected);
    - the global "reply sender" preference (`auto` by default);
    - the account that received the message.
 

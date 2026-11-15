@@ -93,6 +93,10 @@ export function stripHtml(html: string): string {
  * `Delivered-To`, `X-Original-To`, `Envelope-To` or a `Received ... for <addr>`.
  * The reply composer uses these to answer from the address the message was
  * actually sent to, like Gmail does with its aliases.
+ *
+ * The result keeps header order, topmost first. Each server prepends its own
+ * headers, so the forwarder's record comes before anything the original sender
+ * wrote further down: `pickDomainAlias()` relies on that.
  */
 const ALIAS_HEADERS = new Set([
   'delivered-to',
@@ -101,6 +105,8 @@ const ALIAS_HEADERS = new Set([
   'envelope-to',
   'x-envelope-to',
   'x-forwarded-to',
+  // Cloudflare Email Routing: "X-Forwarded-For: <alias> <destination>".
+  'x-forwarded-for',
   'resent-to',
   'apparently-to',
 ])
@@ -118,7 +124,6 @@ export function aliasAddresses(email: Email): string[] {
     }
   }
 
-  add(email.deliveredTo)
   for (const header of email.headers ?? []) {
     const key = header.key.toLowerCase()
     if (ALIAS_HEADERS.has(key)) {
@@ -132,5 +137,7 @@ export function aliasAddresses(email: Email): string[] {
       }
     }
   }
+  // Normally already found among the headers above; kept for a parse without them.
+  add(email.deliveredTo)
   return [...found]
 }
