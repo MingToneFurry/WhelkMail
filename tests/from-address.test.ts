@@ -174,6 +174,12 @@ describe('pickDomainRelay', () => {
     ).toEqual({ accountId: 'relay-a', alias: 'shop@a.example' })
     expect(pickDomainRelay({ ...base, sent: true, from: 'me@gmail.example', recipients: ['colleague@a.example'] })).toBeNull()
   })
+
+  it("leaves a relay's own Sent copy with that relay", () => {
+    expect(
+      pickDomainRelay({ ...base, sent: true, receivingIsRelay: true, from: 'shop@a.example' }),
+    ).toBeNull()
+  })
 })
 
 describe('forwarded alias from real Gmail and Cloudflare Email Routing headers', () => {

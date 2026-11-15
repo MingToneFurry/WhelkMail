@@ -916,6 +916,7 @@ export default function App() {
       relays: accounts.filter((item) => canSend(item) && item.kind === 'relay' && item.relayAnyAddress),
       receivingEmail: message.accountEmail,
       sent: message.folder === 'sent',
+      receivingIsRelay: accounts.find((item) => item.id === message.accountId)?.kind === 'relay',
       from: message.from.email,
       forwarded: message.aliasAddresses ?? [],
       verifiedDomains: message.verifiedDomains ?? [],

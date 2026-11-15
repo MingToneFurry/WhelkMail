@@ -117,6 +117,8 @@ export interface DomainRelayInput {
   receivingEmail: string
   /** True for a message in Sent: its From is our own address. */
   sent: boolean
+  /** True when the account holding the message is itself a relay. */
+  receivingIsRelay?: boolean
   /** From of the message. */
   from: string
   forwarded: string[]
@@ -129,7 +131,9 @@ export interface DomainRelayInput {
  * which address. Used when no account has exactly that address.
  *
  * - In Sent, the message's own From is the address to keep, when a relay
- *   covers its domain. To/Cc there are the recipients, not us.
+ *   covers its domain. To/Cc there are the recipients, not us. A relay's own
+ *   Sent copy is answered by that relay: its sending account is known, so
+ *   another relay on the same domain must not take over.
  * - Otherwise trusted forwarding headers are searched across all relays first,
  *   top-down, and To/Cc only if none matches, so a Cc on one relay's domain
  *   can't beat the forwarding record of another. To/Cc only count when they
@@ -144,6 +148,9 @@ export function pickDomainRelay(input: DomainRelayInput): { accountId: string; a
     relay && alias && alias !== receiving ? { accountId: relay.id, alias } : null
 
   if (input.sent) {
+    if (input.receivingIsRelay) {
+      return null
+    }
     const from = input.from.trim().toLowerCase()
     return result(relayFor(from), sendable(from))
   }
