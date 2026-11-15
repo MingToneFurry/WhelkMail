@@ -116,6 +116,8 @@ export const draftSchema = z.object({
 
 export const sendSchema = z.object({
   accountId: z.string().min(1),
+  /** Another address on the relay account's domain (`relayAnyAddress`). */
+  fromEmail: email.optional(),
   inReplyTo: z.string().trim().max(998).optional(),
   references: z.string().trim().max(4000).optional(),
   draftId: z.string().optional(),

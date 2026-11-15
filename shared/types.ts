@@ -297,6 +297,8 @@ export interface AttachmentInput {
 
 export interface SendPayload {
   accountId: string
+  /** Address on the account's domain to send from instead of its own (`relayAnyAddress`). */
+  fromEmail?: string
   /** Message-ID answered by this compose, so the copy threads too. */
   inReplyTo?: string | null
   references?: string | null
