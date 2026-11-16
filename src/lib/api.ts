@@ -119,8 +119,8 @@ export const api = {
   health(): Promise<HealthStatus> {
     return request('/api/health')
   },
-  updateStatus(): Promise<UpdateStatus> {
-    return request('/api/update')
+  updateStatus(refresh = false): Promise<UpdateStatus> {
+    return request(refresh ? '/api/update?refresh=1' : '/api/update')
   },
   dismissUpdate(version: string): Promise<UpdateStatus> {
     return request('/api/update', { method: 'POST', body: JSON.stringify({ version }) })

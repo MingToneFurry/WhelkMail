@@ -41,10 +41,11 @@ guide is what the in-app notice links to when a newer release exists.
 
 - **The app returns a schema error.** The code is newer than the database. Run
   `npm run db:migrate:remote`, then retry.
-- **Settings → System says the check is unreachable.** GitHub was not reachable
-  from the Worker (or the unauthenticated rate limit was hit). The app keeps
-  working; the last known answer stays cached. An optional `GITHUB_TOKEN`
-  secret raises the rate limit.
+- **Settings → System says the check is unreachable.** Neither the GitHub API
+  nor the releases feed could be reached from the Worker. The app keeps
+  working; the last known answer stays cached. Run **Check again** to retry
+  immediately. An optional `GITHUB_TOKEN` secret raises the API rate limit
+  (the feed fallback needs no token).
 - **Your fork is ahead of the latest release.** No notice is shown: only
   releases newer than your build are announced.
 

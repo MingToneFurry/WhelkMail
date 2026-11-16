@@ -1400,6 +1400,14 @@ export default function App() {
     }
   }
 
+  async function refreshUpdate() {
+    try {
+      setUpdate(await api.updateStatus(true))
+    } catch {
+      // Keep the current state; the card already reports the failed check.
+    }
+  }
+
   async function logout() {
     try {
       await api.logout()
@@ -1660,6 +1668,7 @@ export default function App() {
             health={health}
             update={update}
             onRestoreUpdate={() => void restoreUpdate()}
+            onCheckUpdate={() => void refreshUpdate()}
             busyId={settingsBusyId}
             error={settingsError}
             onCreateFilter={createFilter}

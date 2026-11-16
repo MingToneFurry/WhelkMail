@@ -452,6 +452,7 @@ const en: Record<string, string> = {
   'settings.versionNoRelease': 'No published release found yet.',
   'settings.versionReleases': 'All releases',
   'settings.versionShowNotice': 'Show notice again',
+  'settings.versionCheck': 'Check again',
   'settings.build': 'Build',
   'settings.threads': 'Conversations',
   'settings.threadsHint':
@@ -1104,6 +1105,7 @@ const it: Record<string, string> = {
   'settings.versionNoRelease': 'Nessuna release pubblicata finora.',
   'settings.versionReleases': 'Tutte le release',
   'settings.versionShowNotice': 'Mostra di nuovo l’avviso',
+  'settings.versionCheck': 'Controlla ora',
   'settings.build': 'Build',
   'settings.threads': 'Conversazioni',
   'settings.threadsHint':

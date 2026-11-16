@@ -48,6 +48,7 @@ interface SettingsProps {
   health: HealthStatus | null
   update: UpdateStatus | null
   onRestoreUpdate: () => void
+  onCheckUpdate: () => void
   busyId: string | null
   error: string | null
   onCreateFilter: (input: FilterInput) => Promise<boolean>
@@ -840,6 +841,7 @@ export function Settings({
   health,
   update,
   onRestoreUpdate,
+  onCheckUpdate,
   busyId,
   error,
   onCreateFilter,
@@ -1202,6 +1204,15 @@ export function Settings({
                       className="rounded-lg border border-line bg-white px-2 py-1 text-muted hover:text-slate-800"
                     >
                       {t('settings.versionShowNotice')}
+                    </button>
+                  ) : null}
+                  {update?.checkEnabled ? (
+                    <button
+                      type="button"
+                      onClick={onCheckUpdate}
+                      className="rounded-lg border border-line bg-white px-2 py-1 text-muted hover:text-slate-800"
+                    >
+                      {t('settings.versionCheck')}
                     </button>
                   ) : null}
                 </div>

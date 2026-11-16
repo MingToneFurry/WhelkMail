@@ -10,6 +10,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const FAILURE_TTL_MS = 15 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 8000
 const LATEST_RELEASE_URL = `https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest`
+const RELEASES_FEED_URL = `https://github.com/${UPSTREAM_REPO}/releases.atom`
 
 interface ReleaseInfo {
   version: string
@@ -84,7 +85,52 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
-async function fetchLatestRelease(env: Env): Promise<ReleaseInfo | null> {
+function firstMatch(source: string, pattern: RegExp): string | null {
+  const match = pattern.exec(source)
+  return match ? match[1] : null
+}
+
+/**
+ * Latest stable release from the releases Atom feed.
+ *
+ * The feed is served by github.com, not the API, so it keeps working when the
+ * unauthenticated API rate limit (shared Cloudflare egress IPs) is exhausted.
+ * Entries are newest-first and include prereleases, which are skipped: they are
+ * not announced to installations.
+ */
+export function parseLatestReleaseFeed(xml: string): ReleaseInfo | null {
+  const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) ?? []
+  for (const entry of entries) {
+    const title = firstMatch(entry, /<title[^>]*>([\s\S]*?)<\/title>/)
+    const link =
+      firstMatch(entry, /<link[^>]*\brel="alternate"[^>]*\bhref="([^"]+)"/) ??
+      firstMatch(entry, /<link[^>]*\bhref="([^"]+)"/)
+    // The feed title is the release name ("WhelkMail 1.0.0 — first stable
+    // release"), not the tag: read the tag from the release URL instead.
+    const tag = link ? /\/releases\/tag\/([^/?#]+)/.exec(link)?.[1] : null
+    const raw = tag ?? title?.trim() ?? ''
+    let version = raw
+    try {
+      version = decodeURIComponent(raw)
+    } catch {
+      // Keep the raw tag if it is not valid percent-encoding.
+    }
+    version = version.replace(/^v/i, '')
+    const parsed = parseVersion(version)
+    if (!parsed || parsed.prerelease.length > 0) {
+      continue
+    }
+    return {
+      version,
+      name: title?.trim() ?? null,
+      url: link,
+      publishedAt: firstMatch(entry, /<updated>([^<]*)<\/updated>/),
+    }
+  }
+  return null
+}
+
+async function fetchApiRelease(env: Env): Promise<ReleaseInfo | null> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': `WhelkMail/${APP_VERSION}`,
@@ -101,7 +147,7 @@ async function fetchLatestRelease(env: Env): Promise<ReleaseInfo | null> {
     return null
   }
   if (!response.ok) {
-    throw new Error(`GitHub returned ${response.status}`)
+    throw new Error(`GitHub API returned ${response.status}`)
   }
   const data = (await response.json()) as GitHubRelease
   if (data.draft === true || data.prerelease === true) {
@@ -109,7 +155,7 @@ async function fetchLatestRelease(env: Env): Promise<ReleaseInfo | null> {
   }
   const version = stringOrNull(data.tag_name)?.trim().replace(/^v/i, '') ?? ''
   if (!parseVersion(version)) {
-    throw new Error('GitHub returned an invalid release tag')
+    throw new Error('GitHub API returned an invalid release tag')
   }
   return {
     version,
@@ -119,13 +165,39 @@ async function fetchLatestRelease(env: Env): Promise<ReleaseInfo | null> {
   }
 }
 
+async function fetchFeedRelease(): Promise<ReleaseInfo | null> {
+  const response = await fetch(RELEASES_FEED_URL, {
+    headers: {
+      Accept: 'application/atom+xml',
+      'User-Agent': `WhelkMail/${APP_VERSION}`,
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    throw new Error(`GitHub releases feed returned ${response.status}`)
+  }
+  return parseLatestReleaseFeed(await response.text())
+}
+
+async function fetchLatestRelease(env: Env): Promise<ReleaseInfo | null> {
+  try {
+    return await fetchApiRelease(env)
+  } catch (error) {
+    console.error(
+      '[update] GitHub API release check failed, trying the releases feed:',
+      error instanceof Error ? error.message : error,
+    )
+    return fetchFeedRelease()
+  }
+}
+
 /**
  * Compares the version baked into this deployment with the latest upstream
  * release. The GitHub call runs from the worker, never from the browser, and
  * the answer is cached in D1 for a day so a popular release cannot exhaust the
  * unauthenticated GitHub rate limit.
  */
-export async function getUpdateStatus(env: Env): Promise<UpdateStatus> {
+export async function getUpdateStatus(env: Env, refresh = false): Promise<UpdateStatus> {
   const installed = APP_VERSION
   if (!checksEnabled(env)) {
     return {
@@ -150,16 +222,27 @@ export async function getUpdateStatus(env: Env): Promise<UpdateStatus> {
   // A failed check, or a repository with no published release yet, is retried
   // sooner so the first release is announced without waiting a full day.
   const ttl = cache?.ok === false || cache?.release === null ? FAILURE_TTL_MS : CACHE_TTL_MS
-  const fresh = cache !== null && Date.now() - cache.checkedAt < ttl
+  const fresh = !refresh && cache !== null && Date.now() - cache.checkedAt < ttl
   if (!fresh) {
     try {
       const release = await fetchLatestRelease(env)
       cache = { checkedAt: Date.now(), ok: true, release }
-      await writeSetting(env, CACHE_KEY, JSON.stringify(cache))
-    } catch {
+    } catch (error) {
       // Keep the last known release, if any, instead of failing the page.
+      console.error(
+        '[update] release check failed:',
+        error instanceof Error ? error.message : error,
+      )
       cache = { checkedAt: Date.now(), ok: false, release: cache?.release ?? null }
+    }
+    try {
       await writeSetting(env, CACHE_KEY, JSON.stringify(cache))
+    } catch (error) {
+      // A cache write must not make a successful check look unreachable.
+      console.error(
+        '[update] cannot cache the release check:',
+        error instanceof Error ? error.message : error,
+      )
     }
   }
 

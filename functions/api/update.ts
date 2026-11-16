@@ -4,7 +4,8 @@ import { fail, json, readJson } from '../_lib/http'
 import { getUpdateStatus, setUpdateDismissed } from '../_lib/update-check'
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  return json(await getUpdateStatus(context.env))
+  const refresh = new URL(context.request.url).searchParams.has('refresh')
+  return json(await getUpdateStatus(context.env, refresh))
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
