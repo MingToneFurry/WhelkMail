@@ -240,7 +240,7 @@ Provider cleanup only runs when `archive_imap_bodies` and `delete_after_archive`
 
 ### `app_settings`
 
-Key/value store for deployment-wide preferences. Currently used for `default_signature` and `signature_mode`.
+Key/value store for deployment-wide preferences: signatures (`default_signature`, `signature_mode`), remote images (`allow_remote_images`), retention (`metadata_retention_days`, `retention_stats`), 2FA material, and the release check (`update_check` cache, `update_notice_dismissed`).
 
 `signature_mode` is `shared` (default) or `per_account`:
 
@@ -319,6 +319,14 @@ Web Push works in three parts:
 3. The `worker/` cron Worker runs every 5 minutes and calls `POST /api/cron/notifications` with `CRON_SECRET`. That endpoint syncs the selected folders, detects new UIDs and sends encrypted Web Push messages with VAPID.
 
 VAPID keys are generated with `npm run vapid` and stored as Pages secrets. The cron worker needs `APP_URL` and the same `CRON_SECRET`.
+
+### Release check
+
+`GET /api/update` compares `APP_VERSION` (`shared/version.ts`, mirrored in `package.json`) with the latest release on `WhelkMail/WhelkMail`. The GitHub call runs in the Worker with an 8-second timeout, never in the browser, so no visitor IP or mailbox data leaves the deployment; `UPDATE_CHECK=off` disables it and `GITHUB_TOKEN` optionally raises the rate limit. The answer is cached in `app_settings.update_check` for 24 hours (15 minutes after a failure or when no release exists yet), so each deployment makes at most one request per day. A cached copy is still served when GitHub is unreachable.
+
+When the latest release is newer, the client shows a dismissible banner with the upgrade steps and a link to `docs/UPGRADE.md`; the dismissal is stored server-side (`update_notice_dismissed`) per release version. `POST /api/update` records it. `GET /api/health` exposes `version` too, so a tab left open on an older bundle can offer a reload when it sees a newer server.
+
+The check is informational: it cannot update a deployment, and it only works from the release that introduced it onward. Installations older than that never run the code, so the only notice for them is the release notes.
 
 ## 11. Forwarding and provider cleanup
 

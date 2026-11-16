@@ -32,6 +32,7 @@ import type {
   TotpEnableResult,
   TotpSetup,
   TwoFactorStatus,
+  UpdateStatus,
 } from '../../shared/types'
 
 export class ApiError extends Error {
@@ -117,6 +118,12 @@ export const api = {
   },
   health(): Promise<HealthStatus> {
     return request('/api/health')
+  },
+  updateStatus(): Promise<UpdateStatus> {
+    return request('/api/update')
+  },
+  dismissUpdate(version: string): Promise<UpdateStatus> {
+    return request('/api/update', { method: 'POST', body: JSON.stringify({ version }) })
   },
   storageOptions(): Promise<StorageOptions> {
     return request('/api/storage/options')

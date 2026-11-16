@@ -21,6 +21,7 @@ import type {
   SearchScope,
   SignatureMode,
   StorageOptions,
+  UpdateStatus,
 } from '../shared/types'
 import { useI18n } from './i18n'
 import { api, ApiError, type AccountError } from './lib/api'
@@ -41,6 +42,7 @@ import { ReadingPane } from './components/ReadingPane'
 import { Settings } from './components/Settings'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
+import { UpdateNotice } from './components/UpdateNotice'
 
 type View = 'mail' | 'settings' | 'contacts'
 type AuthState = 'loading' | 'needed' | 'ok'
@@ -137,6 +139,7 @@ export default function App() {
   const [metadataRetentionDays, setMetadataRetentionDays] = useState(0)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>(initialRoute.accountId)
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(initialRoute.labelId)
   const [folder, setFolder] = useState<Folder>(initialRoute.folder)
@@ -227,6 +230,12 @@ export default function App() {
       setAccounts(accountsResponse.accounts)
       setStorage(storageResponse)
       setHealth(healthResponse)
+      // The release check can wait for the cached GitHub answer: it must not
+      // delay the inbox, so it runs in the background.
+      api
+        .updateStatus()
+        .then(setUpdate)
+        .catch(() => undefined)
       const optional = async <T,>(promise: Promise<T>): Promise<T | null> => {
         try {
           return await promise
@@ -272,6 +281,22 @@ export default function App() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (auth !== 'ok') {
+      return
+    }
+    const timer = window.setInterval(
+      () => {
+        api
+          .updateStatus()
+          .then(setUpdate)
+          .catch(() => undefined)
+      },
+      6 * 60 * 60 * 1000,
+    )
+    return () => window.clearInterval(timer)
+  }, [auth])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -1355,6 +1380,26 @@ export default function App() {
     }
   }
 
+  async function dismissUpdate(version: string) {
+    const previous = update
+    if (update) {
+      setUpdate({ ...update, dismissed: true })
+    }
+    try {
+      setUpdate(await api.dismissUpdate(version))
+    } catch {
+      setUpdate(previous)
+    }
+  }
+
+  async function restoreUpdate() {
+    try {
+      setUpdate(await api.dismissUpdate(''))
+    } catch {
+      // The card keeps showing the dismissed state; nothing else to do.
+    }
+  }
+
   async function logout() {
     try {
       await api.logout()
@@ -1458,6 +1503,8 @@ export default function App() {
         ? selectedAccountId
         : accounts[0]?.id ?? null
 
+  const serverVersion = health?.version ?? null
+
   if (auth === 'loading') {
     return (
       <div className="flex min-h-full items-center justify-center text-sm text-muted">
@@ -1558,6 +1605,13 @@ export default function App() {
           onMenu={() => setMobileSidebarOpen(true)}
         />
 
+        <UpdateNotice
+          update={update}
+          clientVersion={__APP_VERSION__}
+          serverVersion={serverVersion}
+          onDismiss={(version) => void dismissUpdate(version)}
+        />
+
         {view === 'mail' && listErrors.length > 0 ? (
           <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
             {listErrors.map((error) => (
@@ -1604,6 +1658,8 @@ export default function App() {
             filters={filters}
             storage={storage}
             health={health}
+            update={update}
+            onRestoreUpdate={() => void restoreUpdate()}
             busyId={settingsBusyId}
             error={settingsError}
             onCreateFilter={createFilter}

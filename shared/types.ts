@@ -363,6 +363,7 @@ export interface DraftSavePayload {
 
 export interface HealthStatus {
   ok: boolean
+  version: string
   driveConfigured: boolean
   r2Configured: boolean
   relayConfigured: boolean
@@ -373,6 +374,22 @@ export interface HealthStatus {
   googleMailConfigured: boolean
   pushConfigured: boolean
   cronConfigured: boolean
+}
+
+/** Result of comparing this deployment with the latest upstream release. */
+export interface UpdateStatus {
+  installed: string
+  latest: string | null
+  releaseName: string | null
+  releaseUrl: string | null
+  publishedAt: string | null
+  updateAvailable: boolean
+  /** The user hid the notice for this exact version. */
+  dismissed: boolean
+  /** False when the deployment sets UPDATE_CHECK=off. */
+  checkEnabled: boolean
+  /** GitHub could not be reached and no cached answer exists. */
+  error: 'unreachable' | null
 }
 
 export interface AccountCreateInput {

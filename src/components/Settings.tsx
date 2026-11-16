@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { domainOf } from '../../shared/from-address'
 import { RELAY_PROVIDERS, findRelayProvider } from '../../shared/presets'
+import { RELEASES_URL, UPGRADE_DOC_URL } from '../../shared/update-links'
 import type {
   Account,
   AccountPatch,
@@ -23,6 +24,7 @@ import type {
   MailSecurity,
   SignatureMode,
   StorageOptions,
+  UpdateStatus,
 } from '../../shared/types'
 import { LOCALES, useI18n, type Locale } from '../i18n'
 import { cn, formatBytes } from '../lib/utils'
@@ -44,6 +46,8 @@ interface SettingsProps {
   filters: MailFilter[]
   storage: StorageOptions
   health: HealthStatus | null
+  update: UpdateStatus | null
+  onRestoreUpdate: () => void
   busyId: string | null
   error: string | null
   onCreateFilter: (input: FilterInput) => Promise<boolean>
@@ -834,6 +838,8 @@ export function Settings({
   filters,
   storage,
   health,
+  update,
+  onRestoreUpdate,
   busyId,
   error,
   onCreateFilter,
@@ -877,6 +883,22 @@ export function Settings({
     { id: 'security' as const, label: t('settings.tabSecurity') },
     { id: 'system' as const, label: t('settings.tabSystem') },
   ]
+
+  const installedVersion = health?.version ?? __APP_VERSION__
+  let updateSummary: string
+  if (!update) {
+    updateSummary = t('settings.versionChecking')
+  } else if (!update.checkEnabled) {
+    updateSummary = t('settings.versionDisabled')
+  } else if (update.latest) {
+    updateSummary = update.updateAvailable
+      ? t('settings.versionAvailable', { version: update.latest })
+      : t('settings.versionLatest', { version: update.latest })
+  } else {
+    updateSummary = update.error
+      ? t('settings.versionUnreachable')
+      : t('settings.versionNoRelease')
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10">
@@ -1148,6 +1170,41 @@ export function Settings({
                 <ConfigBadge ok={Boolean(health?.r2Configured)} label={t('settings.r2')} />
                 <ConfigBadge ok={Boolean(health?.pushConfigured)} label={t('settings.push')} />
                 <ConfigBadge ok={Boolean(health?.cronConfigured)} label={t('settings.cron')} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-white p-5">
+              <p className="mb-3 text-sm font-medium">{t('settings.versionTitle')}</p>
+              <div className="space-y-1 text-xs text-slate-700">
+                <p>{t('settings.versionInstalled', { version: installedVersion })}</p>
+                <p className={update?.latest ? undefined : 'text-muted'}>{updateSummary}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <a
+                    href={RELEASES_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-brand-strong underline"
+                  >
+                    {t('settings.versionReleases')}
+                  </a>
+                  <a
+                    href={UPGRADE_DOC_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    {t('update.upgradeGuide')}
+                  </a>
+                  {update?.updateAvailable && update.dismissed ? (
+                    <button
+                      type="button"
+                      onClick={onRestoreUpdate}
+                      className="rounded-lg border border-line bg-white px-2 py-1 text-muted hover:text-slate-800"
+                    >
+                      {t('settings.versionShowNotice')}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
 

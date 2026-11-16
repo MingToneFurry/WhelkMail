@@ -425,7 +425,33 @@ const en: Record<string, string> = {
   'filters.updated': 'Filter updated',
   'filters.deleted': 'Filter deleted',
 
+  'update.availableTitle': 'WhelkMail {version} is available',
+  'update.availableBody': 'This installation runs {current}.',
+  'update.howTo': 'How to upgrade',
+  'update.stepSync':
+    'Bring your copy of the repository to {version} (GitHub “Sync fork”, or git fetch && git checkout v{version}).',
+  'update.stepDeploy':
+    'Redeploy: Cloudflare Pages redeploys automatically after the sync; with the CLI run npm run deploy.',
+  'update.stepMigrate':
+    'If the release notes mention migrations, run npm run db:migrate:remote before opening the app.',
+  'update.releaseNotes': 'Release notes',
+  'update.upgradeGuide': 'Upgrade guide',
+  'update.dismiss': 'Dismiss',
+  'update.reloadTitle': 'A new version is available.',
+  'update.reloadBody': 'Reload the page to finish updating.',
+  'update.reload': 'Reload',
+
   'settings.serverConfig': 'Server configuration status',
+  'settings.versionTitle': 'Version and updates',
+  'settings.versionInstalled': 'Installed: {version}',
+  'settings.versionChecking': 'Checking the latest release…',
+  'settings.versionDisabled': 'Update checks are disabled (UPDATE_CHECK=off).',
+  'settings.versionAvailable': 'New release available: {version}.',
+  'settings.versionLatest': 'Latest release: {version}. You are up to date.',
+  'settings.versionUnreachable': 'Could not reach GitHub to check for releases.',
+  'settings.versionNoRelease': 'No published release found yet.',
+  'settings.versionReleases': 'All releases',
+  'settings.versionShowNotice': 'Show notice again',
   'settings.build': 'Build',
   'settings.threads': 'Conversations',
   'settings.threadsHint':
@@ -1051,7 +1077,33 @@ const it: Record<string, string> = {
   'filters.updated': 'Filtro aggiornato',
   'filters.deleted': 'Filtro eliminato',
 
+  'update.availableTitle': 'WhelkMail {version} è disponibile',
+  'update.availableBody': 'Questa installazione esegue la {current}.',
+  'update.howTo': 'Come aggiornare',
+  'update.stepSync':
+    'Porta la tua copia del repository alla {version} (su GitHub “Sync fork”, oppure git fetch && git checkout v{version}).',
+  'update.stepDeploy':
+    'Ridispiega: Cloudflare Pages ridispiega automaticamente dopo il sync; con la CLI esegui npm run deploy.',
+  'update.stepMigrate':
+    'Se le note di rilascio citano migrazioni, esegui npm run db:migrate:remote prima di aprire l’app.',
+  'update.releaseNotes': 'Note di rilascio',
+  'update.upgradeGuide': 'Guida all’aggiornamento',
+  'update.dismiss': 'Nascondi',
+  'update.reloadTitle': 'È disponibile una nuova versione.',
+  'update.reloadBody': 'Ricarica la pagina per completare l’aggiornamento.',
+  'update.reload': 'Ricarica',
+
   'settings.serverConfig': 'Stato configurazione server',
+  'settings.versionTitle': 'Versione e aggiornamenti',
+  'settings.versionInstalled': 'Installata: {version}',
+  'settings.versionChecking': 'Controllo dell’ultima release…',
+  'settings.versionDisabled': 'I controlli degli aggiornamenti sono disattivati (UPDATE_CHECK=off).',
+  'settings.versionAvailable': 'Nuova release disponibile: {version}.',
+  'settings.versionLatest': 'Ultima release: {version}. Sei aggiornato.',
+  'settings.versionUnreachable': 'Impossibile raggiungere GitHub per controllare le release.',
+  'settings.versionNoRelease': 'Nessuna release pubblicata finora.',
+  'settings.versionReleases': 'Tutte le release',
+  'settings.versionShowNotice': 'Mostra di nuovo l’avviso',
   'settings.build': 'Build',
   'settings.threads': 'Conversazioni',
   'settings.threadsHint':

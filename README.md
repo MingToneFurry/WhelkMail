@@ -190,6 +190,8 @@ Optional deployment settings:
 | `RELAY_PROVIDER` / `RELAY_API_KEY` / `RELAY_API_SECRET` | Deployment-wide relay fallback |
 | `MAILGUN_DOMAIN` / `MAILGUN_REGION` | Mailgun relay fallback |
 | `BUCKET` (R2 binding) | Optional R2 archive |
+| `UPDATE_CHECK` | Set to `off` to stop the outbound release check (see [docs/UPGRADE.md](docs/UPGRADE.md)) |
+| `GITHUB_TOKEN` | Optional token, only used to raise the release-check rate limit |
 
 Relay credentials can also be entered per account in the UI and are encrypted at rest.
 
@@ -198,6 +200,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md) — complete Cloudflare deployment and usage guide
 - [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) — architecture, security, mailbox behavior and limitations
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local workflow, database migrations, tests and publishing to the public repository
+- [docs/UPGRADE.md](docs/UPGRADE.md) — upgrading an existing installation and the in-app release notice
 
 ## Limitations
 
@@ -220,6 +223,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Login rate limiting is per IP and best-effort, not a substitute for Cloudflare Access or a WAF.
 - Account deletion removes D1 rows and makes a best-effort cleanup of R2/Drive objects referenced in D1 (grouped per driver, so objects written before a destination change are found); it never deletes mail from the provider. Objects that cannot be removed (for example a revoked Drive token) are listed in Settings → System → “Objects left behind”, because the account credentials are gone by then and a retry is impossible. Deleting a mailbox that stores the sent copies of a send-only account needs a second confirmation, because those copies stay on the provider but their attachments and `.eml` stop being reachable from the app.
 - Provider error details are returned to the authenticated admin to help with IMAP/SMTP setup.
+- New releases are announced inside the app by comparing the installed version with the latest GitHub release. The check runs from the Worker (cached for a day, no user data sent) and is informational only: it cannot update a deployment. Set `UPDATE_CHECK=off` to disable it.
 - **Cloudflare Email Service is experimental.** The maintainer has not run it against a real Cloudflare account, so actual delivery, suppression handling (error `10205`), rate limits and the per-recipient failures the app reports are unverified. Use SMTP2GO or another listed relay when you need a path that has been tested in practice.
 - Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
 - Google OAuth uses the restricted `https://mail.google.com/` scope. A public production app needs Google verification (CASA); personal/testing apps can use OAuth in Testing mode, where refresh tokens expire after 7 days. App passwords remain available as an alternative.

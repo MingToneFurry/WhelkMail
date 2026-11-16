@@ -103,6 +103,31 @@ npm run build
 CI runs the same four steps on every push to `main` and every pull request,
 plus a guard that fails when a personal config file is tracked.
 
+## Releases
+
+The version lives in two places that a test keeps in step:
+`package.json` and `APP_VERSION` in `shared/version.ts`.
+
+1. Bump both to the new semantic version.
+2. Run the four checks above, then publish to the public repository.
+3. Create the tag and the release on GitHub:
+   ```bash
+   git tag v1.2.3
+   git push public v1.2.3
+   ```
+   Then publish the release from the tag on
+   [github.com/WhelkMail/WhelkMail/releases](https://github.com/WhelkMail/WhelkMail/releases).
+   Mark the tag as a prerelease when it is a beta: `/releases/latest` skips
+   prereleases, so installations are not told about them.
+4. In the release notes, state whether the release adds a database migration.
+
+Every deployment compares its `APP_VERSION` with the latest release (cached in
+D1 for a day) and shows an in-app notice with the upgrade steps. Anyone who
+builds from a commit between two releases runs a version that already matches
+the last tag, so they are not prompted until the next release is published.
+Keep the repository's `main` and the release tag in sync to keep that
+comparison honest.
+
 ## Publishing to the public repository
 
 One-time setup:

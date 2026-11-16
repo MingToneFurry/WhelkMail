@@ -1,3 +1,4 @@
+import { APP_VERSION } from '../../shared/version'
 import type { Env } from '../_lib/env'
 import { googleMailConfigured } from '../_lib/google/oauth'
 import { json } from '../_lib/http'
@@ -8,6 +9,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const relay = relayInfo(context.env)
   return json({
     ok: true,
+    version: APP_VERSION,
     driveConfigured: Boolean(context.env.GOOGLE_CLIENT_ID && context.env.GOOGLE_CLIENT_SECRET),
     r2Configured: Boolean(context.env.BUCKET),
     relayConfigured: relay.configured,
