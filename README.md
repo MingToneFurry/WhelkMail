@@ -16,15 +16,15 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 
 ## Screenshots
 
-![WhelkMail inbox](site/screenshots/inbox.png)
+![WhelkMail inbox](docs/screenshots/inbox.png)
 
 | Reading a message | Composing |
 | --- | --- |
-| ![Message view](site/screenshots/message.png) | ![Compose window](site/screenshots/compose.png) |
+| ![Message view](docs/screenshots/message.png) | ![Compose window](docs/screenshots/compose.png) |
 
 | Account settings | Connect an address |
 | --- | --- |
-| ![Account settings](site/screenshots/settings.png) | ![Connect an address](site/screenshots/add-account.png) |
+| ![Account settings](docs/screenshots/settings.png) | ![Connect an address](docs/screenshots/add-account.png) |
 
 ## Why WhelkMail
 
