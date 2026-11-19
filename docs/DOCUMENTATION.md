@@ -177,6 +177,7 @@ Important fields:
 - `sent_folder`, `drafts_folder`, `spam_folder`, `auto_saves_sent`
 - `sent_copy_account_id`: IMAP account that stores sent copies and drafts when `storage_driver` is `imap` (relay accounts only)
 - `reply_account_id`: account that sends the replies to messages received here. Used when a domain only forwards to this mailbox and sends through a relay account; cleared when that account is deleted
+- `sync_interval_minutes`: IMAP accounts only. Minutes between automatic checks (1, 2, 5, 10, 15 or 30, default 5).
 - `relay_any_address`: relay accounts only. When set, replies may leave from any address on the account's exact domain (see Reply). Off by default
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
@@ -218,7 +219,7 @@ The folder list reads from `imap_messages` first. Opening a folder does not bloc
 
 `imap_body_cache` is a bounded, best-effort cache: message bodies up to 512 KB are kept for 3 days, with a hard 64 MB cap. The cron worker deletes expired rows and evicts the oldest bodies until the cache is back under the cap; opportunistic cleanup also runs every 50 writes. It never replaces the provider or the long-term archive; it only avoids repeated IMAP fetches for recently listed/opened messages.
 
-`accounts.auto_sync` enables the cron worker to advance Inbox, Sent, Drafts and Spam every 5 minutes. Each run processes one bounded chunk per folder and resumes on the next run. New IMAP accounts enable it by default; existing accounts can still rely on the sync scheduled when a folder is opened.
+`accounts.auto_sync` enables the cron worker to advance Inbox, Sent, Drafts and Spam for that account. `accounts.sync_interval_minutes` sets how often (1, 2, 5, 10, 15 or 30 minutes, default 5): the worker wakes every minute and skips an account whose last sync is younger than its interval, so the value is honoured rather than rounded up to the trigger. Each run processes one bounded chunk per folder and resumes on the next run. Notification, forwarding and cleanup work ignores the interval and runs on every wake-up. New IMAP accounts enable automatic sync by default; existing accounts can still rely on the sync scheduled when a folder is opened.
 
 **Metadata retention.** `app_settings.metadata_retention_days` is `0` by default (keep everything) and is edited from Settings → Appearance. When set, the cron worker deletes `imap_messages` rows older than the window (never drafts, never anything on the provider) together with their `message_labels` rows, in batches of 500 up to 5.000 per run. Pruned messages no longer appear in folder lists, search results or label views, and the incremental sync does not pull them back because it tracks `max_uid`/`min_uid` instead of re-scanning UIDs. Only a direct message id (for example an open link) still opens one, because reading a message falls back to IMAP when the mirror has no row. The R2/Drive archive copy is untouched, and lowering then raising the window does not restore the removed rows.
 
@@ -316,7 +317,7 @@ Web Push works in three parts:
 
 1. The client asks for browser permission, registers the service worker and subscribes with the VAPID public key.
 2. `push_subscriptions` and `push_prefs` persist the subscription and per-account/folder preferences.
-3. The `worker/` cron Worker runs every 5 minutes and calls `POST /api/cron/notifications` with `CRON_SECRET`. That endpoint syncs the selected folders, detects new UIDs and sends encrypted Web Push messages with VAPID.
+3. The `worker/` cron Worker runs every minute and calls `POST /api/cron/notifications` with `CRON_SECRET`. That endpoint syncs the selected folders, detects new UIDs and sends encrypted Web Push messages with VAPID.
 
 VAPID keys are generated with `npm run vapid` and stored as Pages secrets. The cron worker needs `APP_URL` and the same `CRON_SECRET`.
 

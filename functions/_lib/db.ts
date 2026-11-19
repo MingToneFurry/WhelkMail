@@ -8,6 +8,7 @@ import type {
   StorageDriver,
 } from '../../shared/types'
 import type { Env } from './env'
+import { DEFAULT_SYNC_INTERVAL_MINUTES } from '../../shared/sync-interval'
 
 export interface AccountRow {
   id: string
@@ -51,6 +52,7 @@ export interface AccountRow {
   imap_archive_driver: string
   delete_after_archive: number
   auto_sync: number
+  sync_interval_minutes: number
   created_at: string
 }
 
@@ -114,6 +116,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     imapArchiveDriver: row.imap_archive_driver === 'drive' ? 'drive' : 'r2',
     deleteAfterArchive: Boolean(row.delete_after_archive),
     autoSync: Boolean(row.auto_sync),
+    syncIntervalMinutes: row.sync_interval_minutes ?? DEFAULT_SYNC_INTERVAL_MINUTES,
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     sentCopyAccountId: row.sent_copy_account_id ?? null,

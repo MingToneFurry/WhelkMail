@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   imap_archive_driver TEXT NOT NULL DEFAULT 'r2',
   delete_after_archive INTEGER NOT NULL DEFAULT 0,
   auto_sync INTEGER NOT NULL DEFAULT 1,
+  sync_interval_minutes INTEGER NOT NULL DEFAULT 5,
   created_at TEXT NOT NULL
 );
 

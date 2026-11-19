@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import type { Account, AccountPatch, Folder, MailboxSyncState } from '../../shared/types'
+import { SYNC_INTERVAL_OPTIONS } from '../../shared/sync-interval'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
@@ -128,6 +129,29 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
           <span className="block font-medium text-slate-700">{t('sync.autoTitle')}</span>
           <span className="text-muted">{t('sync.autoHint')}</span>
         </span>
+      </label>
+
+      <label className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[11px]">
+        <span>
+          <span className="block font-medium text-slate-700">{t('sync.intervalTitle')}</span>
+          <span className="text-muted">{t('sync.intervalHint')}</span>
+        </span>
+        <select
+          value={String(account.syncIntervalMinutes)}
+          disabled={running || !account.autoSync}
+          onChange={(event) =>
+            void onUpdate(account.id, { syncIntervalMinutes: Number(event.target.value) })
+          }
+          className="rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none disabled:opacity-50"
+        >
+          {SYNC_INTERVAL_OPTIONS.map((minutes) => (
+            <option key={minutes} value={minutes}>
+              {minutes === 1
+                ? t('sync.intervalMinute')
+                : t('sync.intervalMinutes', { count: minutes })}
+            </option>
+          ))}
+        </select>
       </label>
 
       <div className="mt-3 space-y-1.5">

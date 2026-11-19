@@ -1,4 +1,5 @@
 import type { Folder } from '../../../shared/types'
+import { syncIntervalDue } from '../../../shared/sync-interval'
 import { listAccountRows } from '../../_lib/db'
 import { deleteArchivedMessage } from '../../_lib/deletion'
 import type { Env } from '../../_lib/env'
@@ -70,26 +71,42 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const pref = prefs.get(account.id)
     const notifyEnabled = pref ? Boolean(pref.enabled) : true
     const pushFolders = new Set<Folder>(pref ? parseFolders(pref.folders_json) : ['inbox'])
-    const folders = new Set<Folder>()
+    // Work that produces a notification, a forward or a provider cleanup must
+    // run every minute; the plain automatic sync follows the account interval.
+    const requiredFolders = new Set<Folder>()
     if (notifyEnabled) {
       for (const folder of pushFolders) {
-        folders.add(folder)
+        requiredFolders.add(folder)
       }
     }
     if (hasForwarding || account.delete_after_archive) {
-      folders.add('inbox')
+      requiredFolders.add('inbox')
     }
+    const autoFolders = new Set<Folder>()
     if (account.auto_sync) {
-      folders.add('inbox')
-      folders.add('sent')
-      folders.add('draft')
-      folders.add('spam')
+      autoFolders.add('inbox')
+      autoFolders.add('sent')
+      autoFolders.add('draft')
+      autoFolders.add('spam')
     }
+    const folders = new Set<Folder>([...requiredFolders, ...autoFolders])
     if (folders.size === 0) {
       continue
     }
+    let autoDue = false
+    if (autoFolders.size > 0) {
+      const lastAuto = await context.env.DB.prepare(
+        'SELECT MAX(last_synced_at) AS last FROM imap_sync WHERE account_id = ?',
+      )
+        .bind(account.id)
+        .first<{ last: string | null }>()
+      autoDue = syncIntervalDue(lastAuto?.last, account.sync_interval_minutes)
+    }
 
     for (const folder of folders) {
+      if (!requiredFolders.has(folder) && !autoDue) {
+        continue
+      }
       const previous = await context.env.DB.prepare(
         'SELECT max_uid FROM imap_sync WHERE account_id = ? AND folder = ?',
       )

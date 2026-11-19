@@ -12,7 +12,7 @@ main = "index.ts"
 compatibility_date = "2026-11-01"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["* * * * *"]
 
 [vars]
 # Your WhelkMail Pages URL, for example https://whelkmail.example.pages.dev

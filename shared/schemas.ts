@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isSyncIntervalMinutes } from './sync-interval'
 
 const email = z.string().trim().toLowerCase().pipe(z.string().email())
 const security = z.enum(['tls', 'starttls'])
@@ -73,6 +74,12 @@ export const accountUpdateSchema = z.object({
   imapArchiveDriver: z.enum(['r2', 'drive']).optional(),
   deleteAfterArchive: z.boolean().optional(),
   autoSync: z.boolean().optional(),
+  // Only the values the settings menu offers: the cron schedule is per minute.
+  syncIntervalMinutes: z
+    .number()
+    .int()
+    .refine(isSyncIntervalMinutes, 'Unsupported sync interval')
+    .optional(),
   sentFolder: safeText(255).optional(),
   autoSavesSent: z.boolean().optional(),
   sentCopyAccountId: z.string().min(1).max(64).nullable().optional(),

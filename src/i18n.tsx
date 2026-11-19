@@ -310,6 +310,11 @@ const en: Record<string, string> = {
   'sync.autoTitle': 'Periodic sync (cron)',
   'sync.autoHint':
     'Folder opens already sync automatically. This enables the cron worker every 5 minutes for Inbox, Sent, Drafts and Spam; it is also required for Web Push and forwarding. Requires the cron worker and CRON_SECRET.',
+  'sync.intervalTitle': 'Check for mail',
+  'sync.intervalHint':
+    'How often this account is checked. Notifications, filters and cleanup still run every minute.',
+  'sync.intervalMinute': 'Every minute',
+  'sync.intervalMinutes': 'Every {count} minutes',
   'settings.archiveBodies': 'Archive bodies and attachments',
   'settings.archiveBodiesHint':
     'The sync also stores the raw EML in the selected storage. Opening and downloading messages can then use the archive.',
@@ -961,6 +966,11 @@ const it: Record<string, string> = {
   'sync.autoTitle': 'Sincronizzazione periodica (cron)',
   'sync.autoHint':
     'L’apertura di una cartella sincronizza già automaticamente. Questa opzione abilita il worker cron ogni 5 minuti per Posta in arrivo, Inviate, Bozze e Spam; serve anche per Web Push e inoltro. Richiede il worker cron e CRON_SECRET.',
+  'sync.intervalTitle': 'Controllo della posta',
+  'sync.intervalHint':
+    'Ogni quanto viene controllato questo account. Notifiche, filtri e pulizia restano ogni minuto.',
+  'sync.intervalMinute': 'Ogni minuto',
+  'sync.intervalMinutes': 'Ogni {count} minuti',
   'settings.archiveBodies': 'Archivia corpi e allegati',
   'settings.archiveBodiesHint':
     'La sync salva anche l’EML originale nello storage selezionato. Apertura e download dei messaggi possono usare l’archivio.',

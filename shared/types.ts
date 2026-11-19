@@ -211,6 +211,8 @@ export interface Account {
   imapArchiveDriver: ImapArchiveDriver
   deleteAfterArchive: boolean
   autoSync: boolean
+  /** Minutes between automatic checks for this account (1, 2, 5, 10, 15 or 30). */
+  syncIntervalMinutes: number
   sentFolder: string
   autoSavesSent: boolean
   /** IMAP account that receives a copy of the sent mail (relay accounts only). */
@@ -431,6 +433,7 @@ export interface AccountPatch {
   imapArchiveDriver?: ImapArchiveDriver
   deleteAfterArchive?: boolean
   autoSync?: boolean
+  syncIntervalMinutes?: number
   sentFolder?: string
   autoSavesSent?: boolean
   sentCopyAccountId?: string | null

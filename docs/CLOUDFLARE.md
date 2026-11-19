@@ -203,7 +203,9 @@ npm run cron:deploy
 
 `npm run cron:deploy` creates the file from the template when it is missing and stops with a clear error while `APP_URL` is still empty or a placeholder.
 
-The worker runs every 5 minutes and calls `POST /api/cron/notifications` on the Pages app. In the same run it also applies automatic forwarding rules, the optional provider cleanup, and the per-account automatic background sync. Enable notifications from **Settings → Push notifications**, background sync per account in Settings, and forwarding/deletion in the account/filter sections.
+The worker wakes up every minute and calls `POST /api/cron/notifications` on the Pages app. Notifications, automatic forwarding rules and the optional provider cleanup run on every wake-up; each account's automatic background sync follows its own interval (**Settings → account → Check for mail**, 1, 2, 5, 10, 15 or 30 minutes, 5 by default). Enable notifications from **Settings → Push notifications**, background sync per account in Settings, and forwarding/deletion in the account/filter sections.
+
+If you deployed the worker before this change, run `npm run cron:deploy` again: the trigger changed from `*/5 * * * *` to `* * * * *`, and an old trigger would cap every account at five minutes.
 
 If the database already existed before relay support was added, apply the missing migrations with the script rather than by hand:
 
