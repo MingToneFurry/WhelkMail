@@ -417,6 +417,15 @@ const en: Record<string, string> = {
   'filters.newLabel': 'New label name',
   'filters.createLabel': 'Create',
   'filters.create': 'Create filter',
+  'filters.applyTitle': 'Apply to existing mail',
+  'filters.applyHint':
+    'Labels the messages already in the mailbox that match the enabled filters. New mail is always filtered, so this is only needed for what arrived before the filter existed.',
+  'filters.applyForward': 'Also forward matching messages',
+  'filters.applyForwardHint':
+    'Sends old matching messages to the forward address. Each message is forwarded once per filter.',
+  'filters.applyButton': 'Apply filters',
+  'filters.applying': 'Applying…',
+  'filters.applyResult': '{processed} checked, {labelled} labels added, {forwarded} forwarded',
   'filters.criteriaRequired': 'Add at least one criterion',
   'filters.actionRequired': 'Select a label or add a forwarding recipient',
   'filters.invalidForward': 'One or more forwarding recipients are not valid email addresses',
@@ -1077,6 +1086,15 @@ const it: Record<string, string> = {
   'filters.newLabel': 'Nome nuova etichetta',
   'filters.createLabel': 'Crea',
   'filters.create': 'Crea filtro',
+  'filters.applyTitle': 'Applica ai messaggi esistenti',
+  'filters.applyHint':
+    'Applica le etichette ai messaggi già presenti nella casella che corrispondono ai filtri attivi. La posta nuova viene filtrata sempre: serve solo per quella arrivata prima del filtro.',
+  'filters.applyForward': 'Inoltra anche i messaggi corrispondenti',
+  'filters.applyForwardHint':
+    'Invia i vecchi messaggi corrispondenti all’indirizzo di inoltro. Ogni messaggio viene inoltrato una volta per filtro.',
+  'filters.applyButton': 'Applica i filtri',
+  'filters.applying': 'Applicazione…',
+  'filters.applyResult': '{processed} controllati, {labelled} etichette aggiunte, {forwarded} inoltrati',
   'filters.criteriaRequired': 'Aggiungi almeno un criterio',
   'filters.actionRequired': 'Seleziona un’etichetta o aggiungi un destinatario per l’inoltro',
   'filters.invalidForward': 'Uno o più destinatari dell’inoltro non sono email valide',

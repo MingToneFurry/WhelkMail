@@ -292,6 +292,26 @@ export const api = {
       body: JSON.stringify(input),
     })
   },
+  applyFilters(options: {
+    cursor?: string | null
+    filterId?: string
+    forward?: boolean
+  } = {}): Promise<{
+    processed: number
+    matched: number
+    labelled: number
+    forwarded: number
+    nextCursor: string | null
+  }> {
+    return request('/api/filters/apply', {
+      method: 'POST',
+      body: JSON.stringify({
+        cursor: options.cursor || undefined,
+        filterId: options.filterId,
+        forward: options.forward === true,
+      }),
+    })
+  },
   deleteFilter(id: string): Promise<{ ok: boolean }> {
     return request(`/api/filters/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
