@@ -315,6 +315,8 @@ const en: Record<string, string> = {
     'How often this account is checked. Notifications, filters and cleanup still run every minute.',
   'sync.intervalMinute': 'Every minute',
   'sync.intervalMinutes': 'Every {count} minutes',
+  'sync.intervalFreePlan':
+    'One and two minute checks need Workers Paid: every check opens a TLS connection, which exceeds the 10 ms CPU budget of the Free plan.',
   'settings.archiveBodies': 'Archive bodies and attachments',
   'settings.archiveBodiesHint':
     'The sync also stores the raw EML in the selected storage. Opening and downloading messages can then use the archive.',
@@ -971,6 +973,8 @@ const it: Record<string, string> = {
     'Ogni quanto viene controllato questo account. Notifiche, filtri e pulizia restano ogni minuto.',
   'sync.intervalMinute': 'Ogni minuto',
   'sync.intervalMinutes': 'Ogni {count} minuti',
+  'sync.intervalFreePlan':
+    'I controlli da uno e due minuti richiedono Workers Paid: ogni controllo apre una connessione TLS, che supera il budget CPU di 10 ms del piano Free.',
   'settings.archiveBodies': 'Archivia corpi e allegati',
   'settings.archiveBodiesHint':
     'La sync salva anche l’EML originale nello storage selezionato. Apertura e download dei messaggi possono usare l’archivio.',

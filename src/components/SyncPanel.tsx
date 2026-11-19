@@ -153,6 +153,11 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
           ))}
         </select>
       </label>
+      {account.syncIntervalMinutes <= 2 ? (
+        <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+          {t('sync.intervalFreePlan')}
+        </p>
+      ) : null}
 
       <div className="mt-3 space-y-1.5">
         {FOLDERS.map((folder) => {

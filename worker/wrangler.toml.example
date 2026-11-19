@@ -12,6 +12,13 @@ main = "index.ts"
 compatibility_date = "2026-11-01"
 
 [triggers]
+# Every minute: the Pages app decides which accounts are due, so each account
+# follows its own interval (Settings -> account -> Check for mail).
+#
+# Workers Free gives 10 ms of CPU per invocation, which a TLS handshake to an
+# IMAP server rarely fits into: on Free, use `crons = ["*/5 * * * *"]` here. The
+# wake-ups drop fivefold and only the 1 and 2 minute intervals are lost, since
+# they could not complete a sync on that plan anyway.
 crons = ["* * * * *"]
 
 [vars]

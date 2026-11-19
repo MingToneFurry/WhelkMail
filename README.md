@@ -240,7 +240,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Provider error details are returned to the authenticated admin to help with IMAP/SMTP setup.
 - New releases are announced inside the app by comparing the installed version with the latest GitHub release. The check runs from the Worker (cached for a day, no user data sent) and is informational only: it cannot update a deployment. Set `UPDATE_CHECK=off` to disable it.
 - **Cloudflare Email Service is experimental.** The maintainer has not run it against a real Cloudflare account, so actual delivery, suppression handling (error `10205`), rate limits and the per-recipient failures the app reports are unverified. Use SMTP2GO or another listed relay when you need a path that has been tested in practice.
-- Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
+- Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget. The cron worker now wakes every minute so each account can follow its own check interval, which on Free costs about 3% of the daily request quota while nothing is due; a 1 or 2 minute interval, however, means an IMAP connection every minute and is only realistic with Paid. On Free, set `crons = ["*/5 * * * *"]` in `worker/wrangler.toml` to cut the wake-ups fivefold with nothing lost.
 - Google OAuth uses the restricted `https://mail.google.com/` scope. A public production app needs Google verification (CASA); personal/testing apps can use OAuth in Testing mode, where refresh tokens expire after 7 days. App passwords remain available as an alternative.
 
 ## License

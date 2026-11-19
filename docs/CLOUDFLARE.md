@@ -207,6 +207,8 @@ The worker wakes up every minute and calls `POST /api/cron/notifications` on the
 
 If you deployed the worker before this change, run `npm run cron:deploy` again: the trigger changed from `*/5 * * * *` to `* * * * *`, and an old trigger would cap every account at five minutes.
 
+On Workers Free (10 ms of CPU per invocation, 100,000 requests a day) the every-minute trigger is cheap while nothing is due — about 1,400 invocations, 3% of the daily quota — but a 1 or 2 minute interval opens a TLS connection every minute and will usually hit the CPU limit, so those two values are for Paid. A Free deployment can put `crons = ["*/5 * * * *"]` in `worker/wrangler.toml` and lose only the intervals it cannot use.
+
 If the database already existed before relay support was added, apply the missing migrations with the script rather than by hand:
 
 ```bash
