@@ -356,7 +356,9 @@ export const api = {
   draft(id: string): Promise<{ draft: DraftPayload }> {
     return request(`/api/messages/${encodeURIComponent(id)}/draft`)
   },
-  saveDraft(payload: DraftSavePayload): Promise<{ ok: boolean; draftId?: string }> {
+  saveDraft(
+    payload: DraftSavePayload,
+  ): Promise<{ ok: boolean; draftId?: string; warning?: string }> {
     return request('/api/drafts', { method: 'POST', body: JSON.stringify(payload) })
   },
   deleteDraft(id: string): Promise<{ ok: boolean }> {

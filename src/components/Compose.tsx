@@ -131,6 +131,7 @@ export function Compose({
   const [dirty, setDirty] = useState(false)
   const [autoSaving, setAutoSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(initialDraft ? Date.now() : null)
+  const [draftWarning, setDraftWarning] = useState<string | null>(null)
   const versionRef = useRef(0)
   const savingRef = useRef(false)
   const sendingRef = useRef(false)
@@ -241,6 +242,7 @@ export function Compose({
       if (result.draftId) {
         setDraftId(result.draftId)
       }
+      setDraftWarning(result.warning ?? null)
       if (versionRef.current === versionAtStart) {
         setDirty(false)
         setLastSavedAt(Date.now())
@@ -596,6 +598,9 @@ export function Compose({
               </span>
             ) : lastSavedAt ? (
               <span className="text-[10px] text-emerald-600">{t('compose.saved')}</span>
+            ) : null}
+            {draftWarning ? (
+              <span className="text-[10px] text-amber-700">{draftWarning}</span>
             ) : null}
             {draftId ? (
               <button

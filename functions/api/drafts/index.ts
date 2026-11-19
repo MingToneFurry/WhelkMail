@@ -137,11 +137,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
   let storageKey = ''
   let storageDriver: 'drive' | 'r2' | 'imap' = account.storage_driver === 'r2' ? 'r2' : 'drive'
+  let rescuedWith: 'drive' | 'r2' | null = null
+  let appendError: string | null = null
   if (copyTarget) {
     storageDriver = 'imap'
     try {
       storageKey = await storeCopyInMailbox(context.env, copyTarget, mime, 'draft')
     } catch (error) {
+      appendError = error instanceof Error ? error.message : 'IMAP error'
       // Losing the draft because the mailbox rejected the APPEND would throw away
       // what the user typed: fall back to object storage when the deployment has
       // any, and record that driver on the row.
@@ -152,6 +155,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           const stored = await candidate.storage.put(key, mime, 'message/rfc822')
           storageKey = stored.key
           storageDriver = candidate.driver
+          rescuedWith = candidate.driver
           saved = true
           break
         } catch {
@@ -159,10 +163,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         }
       }
       if (!saved) {
+        // Name the mailbox: the same APPEND can fail for many reasons and the
+        // user needs to know which account refused the draft.
         return fail(
           'Saving the draft failed',
           502,
-          error instanceof Error ? error.message : 'IMAP error',
+          `${copyTarget.email}: ${appendError}`,
           'draft_save_failed',
         )
       }
@@ -257,5 +263,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
 
-  return json({ ok: true, draftId: `r_${relayId}` })
+  // A rescued draft is not in the mailbox the user asked for: say so instead of
+  // reporting a plain save, or the copy seems to be somewhere it is not.
+  return json({
+    ok: true,
+    draftId: `r_${relayId}`,
+    ...(rescuedWith
+      ? {
+          warning: `The draft was saved to ${rescuedWith === 'r2' ? 'R2' : 'Google Drive'} because ${copyTarget?.email ?? 'the mailbox'} rejected the copy (${appendError ?? 'IMAP error'}). It is not in that mailbox.`,
+        }
+      : {}),
+  })
 }
