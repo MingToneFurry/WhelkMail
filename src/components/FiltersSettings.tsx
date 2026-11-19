@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Filter, Pencil, Plus, Send, Tag, Trash2 } from 'lucide-react'
+import { Filter, Loader2, Pencil, Plus, Send, Tag, Trash2 } from 'lucide-react'
 import type { FilterInput, Label, LabelColor, MailFilter } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { runFilterApplication } from '../lib/apply-filters'
 import { cn, labelStyle, parseAddresses } from '../lib/utils'
 
 interface FiltersSettingsProps {
@@ -35,9 +36,10 @@ export function FiltersSettings({
   onCreateLabel,
 }: FiltersSettingsProps) {
   const { t } = useI18n()
-  const [applying, setApplying] = useState(false)
+  const [applyingAll, setApplyingAll] = useState(false)
+  const [applyingId, setApplyingId] = useState<string | null>(null)
   const [applyForward, setApplyForward] = useState(false)
-  const [applyResult, setApplyResult] = useState<{ processed: number; labelled: number; forwarded: number } | null>(null)
+  const [applyProgress, setApplyProgress] = useState<{ processed: number; labelled: number; forwarded: number } | null>(null)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [from, setFrom] = useState('')
@@ -150,26 +152,31 @@ export function FiltersSettings({
   const inputClass =
     'w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand'
 
-  async function applyToExisting() {
-    setApplying(true)
+  /**
+   * `target` is one filter id, or null for every enabled filter.
+   * Forwarding only exists for the "all" run: it is a deliberate choice, not
+   * something a per-filter button should do behind your back.
+   */
+  async function applyFilters(target: string | null) {
+    const forward = target === null ? applyForward : false
+    if (target === null) {
+      setApplyingAll(true)
+    } else {
+      setApplyingId(target)
+    }
     setApplyError(null)
-    setApplyResult(null)
-    const totals = { processed: 0, labelled: 0, forwarded: 0 }
+    setApplyProgress(null)
     try {
-      let cursor: string | null = ''
-      // The endpoint works in pages: keep asking until it says there is no more.
-      while (cursor) {
-        const page = await api.applyFilters({ cursor, forward: applyForward })
-        totals.processed += page.processed
-        totals.labelled += page.labelled
-        totals.forwarded += page.forwarded
-        setApplyResult({ ...totals })
-        cursor = page.nextCursor
-      }
+      const totals = await runFilterApplication(
+        (cursor) => api.applyFilters({ cursor, filterId: target ?? undefined, forward }),
+        (progress) => setApplyProgress(progress),
+      )
+      setApplyProgress(totals)
     } catch (error) {
       setApplyError(errorText(error, t))
     } finally {
-      setApplying(false)
+      setApplyingId(null)
+      setApplyingAll(false)
     }
   }
 
@@ -227,6 +234,20 @@ export function FiltersSettings({
               ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                disabled={applyingAll || applyingId !== null}
+                onClick={() => void applyFilters(filter.id)}
+                title={t('filters.applyOne')}
+                aria-label={t('filters.applyOne')}
+                className="rounded-full p-1.5 text-muted hover:bg-slate-100 disabled:opacity-40"
+              >
+                {applyingId === filter.id ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Tag size={13} />
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => startEdit(filter)}
@@ -390,14 +411,14 @@ export function FiltersSettings({
       </div>
 
       <div className="mt-3 rounded-2xl border border-line bg-white p-5">
-        <p className="text-sm font-medium">{t('filters.applyTitle')}</p>
-        <p className="mt-1 text-[11px] text-muted">{t('filters.applyHint')}</p>
+        <p className="text-sm font-medium">{t('filters.applyAllTitle')}</p>
+        <p className="mt-1 text-[11px] text-muted">{t('filters.applyAllHint')}</p>
         <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-700">
           <input
             type="checkbox"
             checked={applyForward}
             onChange={(event) => setApplyForward(event.target.checked)}
-            disabled={applying}
+            disabled={applyingAll}
             className="mt-0.5 h-3.5 w-3.5"
           />
           <span>
@@ -408,18 +429,18 @@ export function FiltersSettings({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled={applying || filters.length === 0}
-            onClick={() => void applyToExisting()}
+            disabled={applyingAll || applyingId !== null || filters.length === 0}
+            onClick={() => void applyFilters(null)}
             className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
           >
-            {applying ? t('filters.applying') : t('filters.applyButton')}
+            {applyingAll ? t('filters.applying') : t('filters.applyAllButton')}
           </button>
-          {applyResult ? (
+          {applyProgress ? (
             <span className="text-[11px] text-muted">
               {t('filters.applyResult', {
-                processed: applyResult.processed,
-                labelled: applyResult.labelled,
-                forwarded: applyResult.forwarded,
+                processed: applyProgress.processed,
+                labelled: applyProgress.labelled,
+                forwarded: applyProgress.forwarded,
               })}
             </span>
           ) : null}

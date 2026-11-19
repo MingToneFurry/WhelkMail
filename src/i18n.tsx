@@ -417,13 +417,14 @@ const en: Record<string, string> = {
   'filters.newLabel': 'New label name',
   'filters.createLabel': 'Create',
   'filters.create': 'Create filter',
-  'filters.applyTitle': 'Apply to existing mail',
-  'filters.applyHint':
-    'Labels the messages already in the mailbox that match the enabled filters. New mail is always filtered, so this is only needed for what arrived before the filter existed.',
-  'filters.applyForward': 'Also forward matching messages',
+  'filters.applyOne': 'Apply this filter to mail already received',
+  'filters.applyAllTitle': 'Apply filters to mail already received',
+  'filters.applyAllHint':
+    'This runs every enabled filter, not only the selected one, over the mail already in the mailbox. New mail is filtered automatically, so this is only for what arrived before a filter existed.',
+  'filters.applyForward': 'Also forward the matching messages',
   'filters.applyForwardHint':
-    'Sends old matching messages to the forward address. Each message is forwarded once per filter.',
-  'filters.applyButton': 'Apply filters',
+    'Sends the matching old messages to the forward address. Each message is forwarded once per filter, whatever the number of runs.',
+  'filters.applyAllButton': 'Apply every filter',
   'filters.applying': 'Applying…',
   'filters.applyResult': '{processed} checked, {labelled} labels added, {forwarded} forwarded',
   'filters.criteriaRequired': 'Add at least one criterion',
@@ -1086,13 +1087,14 @@ const it: Record<string, string> = {
   'filters.newLabel': 'Nome nuova etichetta',
   'filters.createLabel': 'Crea',
   'filters.create': 'Crea filtro',
-  'filters.applyTitle': 'Applica ai messaggi esistenti',
-  'filters.applyHint':
-    'Applica le etichette ai messaggi già presenti nella casella che corrispondono ai filtri attivi. La posta nuova viene filtrata sempre: serve solo per quella arrivata prima del filtro.',
+  'filters.applyOne': 'Applica questo filtro alle email già ricevute',
+  'filters.applyAllTitle': 'Applica i filtri alle email già ricevute',
+  'filters.applyAllHint':
+    'Esegue tutti i filtri attivi, non solo quello selezionato, sulle email già presenti nella casella. La posta nuova viene filtrata da sola: serve solo per quella arrivata prima del filtro.',
   'filters.applyForward': 'Inoltra anche i messaggi corrispondenti',
   'filters.applyForwardHint':
-    'Invia i vecchi messaggi corrispondenti all’indirizzo di inoltro. Ogni messaggio viene inoltrato una volta per filtro.',
-  'filters.applyButton': 'Applica i filtri',
+    'Invia i vecchi messaggi corrispondenti all’indirizzo di inoltro. Ogni messaggio viene inoltrato una volta per filtro, indipendentemente dal numero di esecuzioni.',
+  'filters.applyAllButton': 'Applica tutti i filtri',
   'filters.applying': 'Applicazione…',
   'filters.applyResult': '{processed} controllati, {labelled} etichette aggiunte, {forwarded} inoltrati',
   'filters.criteriaRequired': 'Aggiungi almeno un criterio',
