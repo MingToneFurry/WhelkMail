@@ -21,7 +21,15 @@ import {
 } from './mail/thread-key'
 import { archiveStorageCandidates, getImapArchiveStorage } from './storage'
 import { imapMessageId } from './mail/ids'
-import { bodyText, dateOf, parseFull, parseHeaders, toMailbox, toMailboxes } from './mail/parse'
+import {
+  aliasAddresses,
+  bodyText,
+  dateOf,
+  parseFull,
+  parseHeaders,
+  toMailbox,
+  toMailboxes,
+} from './mail/parse'
 import { indexMessageText } from './mail/search-text'
 import { isSchemaError } from './schema'
 import {
@@ -67,6 +75,7 @@ export interface ImapMessageRow {
   to_json: string
   cc_json: string
   bcc_json: string
+  aliases_json: string
   subject: string
   snippet: string
   search_text: string
@@ -154,6 +163,7 @@ export function imapMessageSummary(row: ImapMessageRow, account: AccountRow): Me
     to: parseJson<Mailbox[]>(row.to_json, []),
     cc: parseJson<Mailbox[]>(row.cc_json, []),
     bcc: parseJson<Mailbox[]>(row.bcc_json, []),
+    aliases: parseJson<string[]>(row.aliases_json ?? '[]', []),
     subject: row.subject,
     snippet: row.snippet,
     date: row.sent_at,
@@ -998,6 +1008,9 @@ async function runSyncChunkLocked(
             to_json: JSON.stringify(toMailboxes(email.to)),
             cc_json: JSON.stringify(toMailboxes(email.cc)),
             bcc_json: JSON.stringify(toMailboxes(email.bcc)),
+            // Kept for filters: a forwarding domain appears in these headers,
+            // not in To.
+            aliases_json: JSON.stringify(aliasAddresses(email)),
             subject: email.subject ?? '',
             snippet: '',
             search_text: '',
@@ -1037,9 +1050,9 @@ async function runSyncChunkLocked(
         await env.DB.batch(
           parsed.map((item) =>
             env.DB.prepare(
-              `INSERT INTO imap_messages (id, account_id, folder, uid, uid_validity, stable_key, message_id, thread_key, from_name, from_email, to_json, cc_json, bcc_json, subject, snippet, sent_at, size, unread, has_attachments, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(id) DO UPDATE SET uid_validity = excluded.uid_validity, stable_key = excluded.stable_key, message_id = excluded.message_id, thread_key = coalesce(excluded.thread_key, imap_messages.thread_key), from_name = excluded.from_name, from_email = excluded.from_email, to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json, subject = excluded.subject, snippet = excluded.snippet, sent_at = excluded.sent_at, size = excluded.size, unread = excluded.unread, has_attachments = excluded.has_attachments, updated_at = excluded.updated_at`,
+              `INSERT INTO imap_messages (id, account_id, folder, uid, uid_validity, stable_key, message_id, thread_key, from_name, from_email, to_json, cc_json, bcc_json, aliases_json, subject, snippet, sent_at, size, unread, has_attachments, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET uid_validity = excluded.uid_validity, stable_key = excluded.stable_key, message_id = excluded.message_id, thread_key = coalesce(excluded.thread_key, imap_messages.thread_key), from_name = excluded.from_name, from_email = excluded.from_email, to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json, aliases_json = excluded.aliases_json, subject = excluded.subject, snippet = excluded.snippet, sent_at = excluded.sent_at, size = excluded.size, unread = excluded.unread, has_attachments = excluded.has_attachments, updated_at = excluded.updated_at`,
             ).bind(
               item.row.id,
               item.row.account_id,
@@ -1054,6 +1067,7 @@ async function runSyncChunkLocked(
               item.row.to_json,
               item.row.cc_json,
               item.row.bcc_json,
+              item.row.aliases_json,
               item.row.subject,
               item.row.snippet,
               item.row.sent_at,

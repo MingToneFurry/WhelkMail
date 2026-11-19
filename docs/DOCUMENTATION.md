@@ -203,7 +203,7 @@ Fields include folder, addresses JSON, subject, snippet, body text/HTML, size, s
 
 ### `filters`
 
-Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and actions: label ids in `label_ids_json` and forwarding recipients in `forward_to_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed and when the cron worker syncs new inbox messages; matching messages receive the labels in `message_labels` and are forwarded when `forward_to_json` is not empty.
+Gmail-style automatic filters, shared across all accounts. Each row stores criteria (`from_pattern`, `to_pattern`, `subject_pattern`, `has_words`, `doesnt_have`, `has_attachment`) and actions: label ids in `label_ids_json` and forwarding recipients in `forward_to_json`. The legacy `account_id` column is kept only for schema compatibility and is set to an empty string for new rows. Enabled filters are evaluated when the inbox is listed and when the cron worker syncs new inbox messages; matching messages receive the labels in `message_labels` and are forwarded when `forward_to_json` is not empty. A `to_pattern` is matched against the message To/Cc/Bcc **and** `imap_messages.aliases_json`, the addresses collected from the forwarding headers (`Delivered-To`, `X-Forwarded-To`, `X-Original-To`, `Envelope-To`, `Received … for`), so a domain that only forwards still matches; the values are written by the sync, so messages mirrored before this field existed have none until they are synced again.
 
 ### `contacts`
 

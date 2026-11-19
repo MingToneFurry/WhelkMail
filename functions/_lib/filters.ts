@@ -68,9 +68,14 @@ function includesText(haystack: string, needle: string): boolean {
 }
 
 function recipientText(message: MessageSummary): string {
-  return [...message.to, ...message.cc, ...message.bcc]
+  const recipients = [...message.to, ...message.cc, ...message.bcc]
     .map((item) => `${item.name ?? ''} ${item.email}`)
     .join(' ')
+  // A domain that only forwards leaves its address in the forwarding headers,
+  // where the message was received by the mailbox that forwards it: without
+  // these, a filter on "to: info@domain" never matches forwarded mail.
+  const aliases = (message.aliases ?? []).join(' ')
+  return aliases ? `${recipients} ${aliases}` : recipients
 }
 
 export function matchesFilter(filter: MailFilter, message: MessageSummary): boolean {

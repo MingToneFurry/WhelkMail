@@ -247,6 +247,12 @@ export interface MessageSummary {
   hasAttachments: boolean
   status: MessageStatus
   labelIds: string[]
+  /**
+   * Addresses the message was originally sent to, read from forwarding headers
+   * (`Delivered-To`, `X-Original-To`, `Received … for`). Filters match their
+   * "to" against these as well, so a domain that only forwards still matches.
+   */
+  aliases?: string[]
   /** Conversation this message belongs to (per account). */
   threadKey?: string | null
   /** Messages in the conversation, filled by the grouped list. */

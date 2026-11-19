@@ -12,7 +12,7 @@ import type { ImapHeader } from '../../_lib/imap/client'
 import { applyAccountLabel, applyFilters } from '../../_lib/filters'
 import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
-import { dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
+import { aliasAddresses, dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
 import { relayDraftMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
 import { needsBackgroundSync, runBackgroundSync } from '../../_lib/sync-trigger'
@@ -63,6 +63,7 @@ async function summariesFromHeaders(
       to: toMailboxes(email.to),
       cc: toMailboxes(email.cc),
       bcc: toMailboxes(email.bcc),
+      aliases: aliasAddresses(email),
       subject: email.subject ?? '',
       snippet: '',
       date: dateOf(email),

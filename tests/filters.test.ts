@@ -57,6 +57,30 @@ describe('matchesFilter', () => {
     expect(matchesFilter(filter, makeMessage())).toBe(true)
   })
 
+  it('matches a filter on "to" against a forwarded address', () => {
+    // info@domain.example is forwarded to the mailbox: its address only appears
+    // in the forwarding headers, never in To.
+    const forwarded = makeMessage({
+      to: [{ name: null, email: 'me@provider.example' }],
+      aliases: ['info@domain.example'],
+    })
+    expect(matchesFilter(makeFilter({ to: 'info@domain.example' }), forwarded)).toBe(true)
+    expect(matchesFilter(makeFilter({ to: 'INFO@Domain.Example' }), forwarded)).toBe(true)
+  })
+
+  it('still rejects an address the message never went to', () => {
+    const forwarded = makeMessage({
+      to: [{ name: null, email: 'me@provider.example' }],
+      aliases: ['info@domain.example'],
+    })
+    expect(matchesFilter(makeFilter({ to: 'sales@domain.example' }), forwarded)).toBe(false)
+  })
+
+  it('matches other criteria on forwarded mail too', () => {
+    const forwarded = makeMessage({ aliases: ['info@domain.example'] })
+    expect(matchesFilter(makeFilter({ from: 'mario', subject: 'fattura' }), forwarded)).toBe(true)
+  })
+
   it('never matches messages outside the inbox', () => {
     expect(matchesFilter(makeFilter({ subject: 'fattura' }), makeMessage({ folder: 'sent' }))).toBe(
       false,
