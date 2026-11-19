@@ -22,16 +22,21 @@ export class PostmarkRelay implements RelayAdapter {
     const payload = {
       From: formatAddress(message.fromName, message.fromEmail),
       To: message.to.join(', '),
-      Cc: message.cc.join(', '),
-      Bcc: message.bcc.join(', '),
+      // An empty string is not "no carbon copy" for every provider.
+      ...(message.cc.length > 0 ? { Cc: message.cc.join(', ') } : {}),
+      ...(message.bcc.length > 0 ? { Bcc: message.bcc.join(', ') } : {}),
       Subject: message.subject,
       TextBody: message.text,
       HtmlBody: message.html,
-      Attachments: message.attachments.map((attachment) => ({
-        Name: attachment.filename,
-        Content: toBase64(attachment.content),
-        ContentType: attachment.contentType,
-      })),
+      ...(message.attachments.length > 0
+        ? {
+            Attachments: message.attachments.map((attachment) => ({
+              Name: attachment.filename,
+              Content: toBase64(attachment.content),
+              ContentType: attachment.contentType,
+            })),
+          }
+        : {}),
     }
     const response = await fetch('https://api.postmarkapp.com/email', {
       method: 'POST',

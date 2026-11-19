@@ -30,16 +30,21 @@ export class MailjetRelay implements RelayAdapter {
         {
           From: { Email: message.fromEmail, Name: message.fromName },
           To: message.to.map((email) => ({ Email: email })),
-          Cc: message.cc.map((email) => ({ Email: email })),
-          Bcc: message.bcc.map((email) => ({ Email: email })),
+          // Empty arrays are not "no recipient list" for every provider; omit them.
+          ...(message.cc.length > 0 ? { Cc: message.cc.map((email) => ({ Email: email })) } : {}),
+          ...(message.bcc.length > 0 ? { Bcc: message.bcc.map((email) => ({ Email: email })) } : {}),
           Subject: message.subject,
           TextPart: message.text,
           HTMLPart: message.html,
-          Attachments: message.attachments.map((attachment) => ({
-            ContentType: attachment.contentType,
-            Filename: attachment.filename,
-            Base64Content: toBase64(attachment.content),
-          })),
+          ...(message.attachments.length > 0
+            ? {
+                Attachments: message.attachments.map((attachment) => ({
+                  ContentType: attachment.contentType,
+                  Filename: attachment.filename,
+                  Base64Content: toBase64(attachment.content),
+                })),
+              }
+            : {}),
         },
       ],
     }
