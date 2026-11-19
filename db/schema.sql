@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS imap_messages (
   cc_json TEXT NOT NULL DEFAULT '[]',
   bcc_json TEXT NOT NULL DEFAULT '[]',
   aliases_json TEXT NOT NULL DEFAULT '[]',
+  aliases_checked INTEGER NOT NULL DEFAULT 0,
   subject TEXT NOT NULL DEFAULT '',
   snippet TEXT NOT NULL DEFAULT '',
   search_text TEXT NOT NULL DEFAULT '',

@@ -76,6 +76,7 @@ export interface ImapMessageRow {
   cc_json: string
   bcc_json: string
   aliases_json: string
+  aliases_checked: number
   subject: string
   snippet: string
   search_text: string
@@ -459,6 +460,72 @@ async function backfillUids(
     .filter((uid) => uid < minUid)
     .sort((left, right) => left - right)
     .slice(-limit)
+}
+
+/** How many mirrored messages get their forwarding headers read per chunk. */
+const ALIAS_BATCH = 40
+
+/**
+ * Fill `aliases_json` for messages mirrored before filters could match them.
+ *
+ * The forwarding headers are not stored, so they are read from the server again,
+ * a chunk at a time and newest first. Labels are applied immediately; the
+ * forward action is not, because re-forwarding old mail is not what a
+ * retroactive label should do.
+ */
+async function backfillAliases(
+  env: Env,
+  connection: ImapConnection,
+  account: AccountRow,
+  folder: Folder,
+  limit = ALIAS_BATCH,
+): Promise<number> {
+  const pending = await env.DB.prepare(
+    `SELECT id, uid FROM imap_messages
+     WHERE account_id = ? AND folder = ? AND aliases_checked = 0
+     ORDER BY uid DESC LIMIT ?`,
+  )
+    .bind(account.id, folder, limit)
+    .all<{ id: string; uid: number }>()
+  if (pending.results.length === 0) {
+    return 0
+  }
+
+  const headers = await connection.fetchHeaders(pending.results.map((row) => row.uid))
+  const byUid = new Map(headers.map((header) => [header.uid, header.header]))
+  const statements: D1PreparedStatement[] = []
+  const updated: string[] = []
+  for (const row of pending.results) {
+    const raw = byUid.get(row.uid)
+    if (!raw) {
+      // The server did not return it: leave the row for a later pass.
+      continue
+    }
+    const email = await parseHeaders(raw)
+    statements.push(
+      env.DB.prepare(
+        'UPDATE imap_messages SET aliases_json = ?, aliases_checked = 1 WHERE id = ?',
+      ).bind(JSON.stringify(aliasAddresses(email)), row.id),
+    )
+    updated.push(row.id)
+  }
+  if (statements.length === 0) {
+    return 0
+  }
+  await env.DB.batch(statements)
+
+  if (folder === 'inbox' && updated.length > 0) {
+    const placeholders = updated.map(() => '?').join(', ')
+    const rows = await env.DB.prepare(
+      `SELECT * FROM imap_messages WHERE id IN (${placeholders})`,
+    )
+      .bind(...updated)
+      .all<ImapMessageRow>()
+    // The return value carries the forwarding matches: ignoring it keeps old
+    // mail from being forwarded again.
+    await applyFilters(env, account.id, rows.results.map((row) => imapMessageSummary(row, account)))
+  }
+  return statements.length
 }
 
 /**
@@ -889,6 +956,7 @@ async function runSyncChunkLocked(
   const chunkSize = archiveBodies ? 8 : CHUNK_SIZE
   let archiveMore = false
   let indexedSnippets = 0
+  let aliased = 0
 
   const syncStartedAt = Date.now()
 
@@ -1011,6 +1079,7 @@ async function runSyncChunkLocked(
             // Kept for filters: a forwarding domain appears in these headers,
             // not in To.
             aliases_json: JSON.stringify(aliasAddresses(email)),
+            aliases_checked: 1,
             subject: email.subject ?? '',
             snippet: '',
             search_text: '',
@@ -1050,9 +1119,9 @@ async function runSyncChunkLocked(
         await env.DB.batch(
           parsed.map((item) =>
             env.DB.prepare(
-              `INSERT INTO imap_messages (id, account_id, folder, uid, uid_validity, stable_key, message_id, thread_key, from_name, from_email, to_json, cc_json, bcc_json, aliases_json, subject, snippet, sent_at, size, unread, has_attachments, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(id) DO UPDATE SET uid_validity = excluded.uid_validity, stable_key = excluded.stable_key, message_id = excluded.message_id, thread_key = coalesce(excluded.thread_key, imap_messages.thread_key), from_name = excluded.from_name, from_email = excluded.from_email, to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json, aliases_json = excluded.aliases_json, subject = excluded.subject, snippet = excluded.snippet, sent_at = excluded.sent_at, size = excluded.size, unread = excluded.unread, has_attachments = excluded.has_attachments, updated_at = excluded.updated_at`,
+              `INSERT INTO imap_messages (id, account_id, folder, uid, uid_validity, stable_key, message_id, thread_key, from_name, from_email, to_json, cc_json, bcc_json, aliases_json, aliases_checked, subject, snippet, sent_at, size, unread, has_attachments, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET uid_validity = excluded.uid_validity, stable_key = excluded.stable_key, message_id = excluded.message_id, thread_key = coalesce(excluded.thread_key, imap_messages.thread_key), from_name = excluded.from_name, from_email = excluded.from_email, to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json, aliases_json = excluded.aliases_json, aliases_checked = 1, subject = excluded.subject, snippet = excluded.snippet, sent_at = excluded.sent_at, size = excluded.size, unread = excluded.unread, has_attachments = excluded.has_attachments, updated_at = excluded.updated_at`,
             ).bind(
               item.row.id,
               item.row.account_id,
@@ -1068,6 +1137,7 @@ async function runSyncChunkLocked(
               item.row.cc_json,
               item.row.bcc_json,
               item.row.aliases_json,
+              item.row.aliases_checked,
               item.row.subject,
               item.row.snippet,
               item.row.sent_at,
@@ -1194,6 +1264,7 @@ async function runSyncChunkLocked(
     await renewSyncLock(env, account.id, folder, lock)
     indexedSnippets = await backfillSnippets(env, connection, account, folder)
     await backfillThreadKeys(env, connection, account, folder).catch(() => 0)
+    aliased = await backfillAliases(env, connection, account, folder).catch(() => 0)
 
     let hasOlder = false
     if (!backfillDone) {
@@ -1258,7 +1329,7 @@ async function runSyncChunkLocked(
   })
 
   console.log(
-    `[sync] ${account.id}/${folder} ${Date.now() - syncStartedAt}ms maxUid=${maxUid} minUid=${minUid} backfillDone=${backfillDone} indexed=${indexedSnippets}`,
+    `[sync] ${account.id}/${folder} ${Date.now() - syncStartedAt}ms maxUid=${maxUid} minUid=${minUid} backfillDone=${backfillDone} indexed=${indexedSnippets} aliases=${aliased}`,
   )
 
   const folders = await getSyncStates(env, account.id)
