@@ -399,6 +399,9 @@ const en: Record<string, string> = {
   'filters.account': 'Account',
   'filters.automatic': 'Automatic',
   'filters.allMail': 'All mail',
+  'filters.autoLabelTitle': 'Automatic account label',
+  'filters.autoLabelHint':
+    'This filter applies the label “{label}” to all mail of {email}, in every folder (inbox, sent, drafts, trash). The criteria are empty on purpose: it matches every message. Add criteria only if you want to limit it.',
   'filters.empty': 'No filters for this account.',
   'filters.enabled': 'Enabled',
   'filters.disabled': 'Disabled',
@@ -1071,6 +1074,9 @@ const it: Record<string, string> = {
   'filters.account': 'Account',
   'filters.automatic': 'Automatico',
   'filters.allMail': 'Tutta la posta',
+  'filters.autoLabelTitle': 'Etichetta automatica dell’account',
+  'filters.autoLabelHint':
+    'Questo filtro applica l’etichetta “{label}” a tutta la posta di {email}, in ogni cartella (in arrivo, inviata, bozze, cestino). I criteri sono vuoti di proposito: corrisponde a ogni messaggio. Aggiungi criteri solo se vuoi limitarlo.',
   'filters.empty': 'Nessun filtro per questo account.',
   'filters.enabled': 'Attivo',
   'filters.disabled': 'Disattivato',

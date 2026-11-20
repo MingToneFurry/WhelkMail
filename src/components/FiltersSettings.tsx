@@ -56,6 +56,7 @@ export function FiltersSettings({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const editingFilter = editingId ? (filters.find((filter) => filter.id === editingId) ?? null) : null
 
   function toggleLabel(id: string) {
     setLabelIds((current) =>
@@ -98,7 +99,16 @@ export function FiltersSettings({
     setHasWords(filter.hasWords ?? '')
     setDoesntHave(filter.doesntHave ?? '')
     setHasAttachment(filter.hasAttachment)
-    setLabelIds(filter.labelIds)
+    const account = filter.accountId
+      ? accounts.find((item) => item.id === filter.accountId)
+      : null
+    // Defensive fallback: an automatic filter must still show its label even if
+    // an older row was saved before the label was mirrored into labelIds.
+    setLabelIds(
+      filter.labelIds.length > 0 || !account?.incomingLabelId
+        ? filter.labelIds
+        : [account.incomingLabelId],
+    )
     setForwardTo(filter.forwardTo.join(', '))
     setError(null)
   }
@@ -113,10 +123,9 @@ export function FiltersSettings({
         doesntHave.trim() ||
         hasAttachment,
     )
-    const editing = editingId ? filters.find((filter) => filter.id === editingId) : null
     // The automatic account label is a match-all account filter: editing it
     // without adding criteria must keep working.
-    const matchAll = Boolean(editing && (editing.autoLabel || editing.accountId))
+    const matchAll = Boolean(editingFilter && (editingFilter.autoLabel || editingFilter.accountId))
     const recipients = [...new Set(parseAddresses(forwardTo))]
     if (!hasCriteria && !matchAll) {
       setError(t('filters.criteriaRequired'))
@@ -309,6 +318,20 @@ export function FiltersSettings({
         <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-700">
           <Plus size={13} /> {editingId ? t('filters.editTitle') : t('filters.new')}
         </p>
+        {editingFilter?.autoLabel ? (
+          <div className="mb-3 rounded-lg border border-line bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+            <p className="font-medium text-slate-700">{t('filters.autoLabelTitle')}</p>
+            <p className="mt-0.5">
+              {t('filters.autoLabelHint', {
+                label:
+                  labels.find((item) => item.id === editingFilter.labelIds[0])?.name ?? '—',
+                email:
+                  accounts.find((account) => account.id === editingFilter.accountId)?.email ??
+                  editingFilter.accountId,
+              })}
+            </p>
+          </div>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-2">
           <input
             value={name}
