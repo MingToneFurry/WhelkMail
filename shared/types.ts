@@ -174,6 +174,15 @@ export interface RetentionSummary {
   cutoff: string | null
 }
 
+export type SettingsTab =
+  | 'accounts'
+  | 'general'
+  | 'signatures'
+  | 'filters'
+  | 'notifications'
+  | 'security'
+  | 'system'
+
 export interface AppSettings {
   defaultSignature: string
   signatureMode: SignatureMode

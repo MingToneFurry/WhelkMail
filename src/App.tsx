@@ -19,6 +19,7 @@ import type {
   MessageDetail,
   MessageSummary,
   SearchScope,
+  SettingsTab,
   SignatureMode,
   StorageOptions,
   UpdateStatus,
@@ -53,6 +54,21 @@ interface MailRoute {
   labelId: string | null
   messageId: string | null
   accountId: string
+  settingsTab: SettingsTab
+}
+
+const SETTINGS_TABS: SettingsTab[] = [
+  'accounts',
+  'general',
+  'signatures',
+  'filters',
+  'notifications',
+  'security',
+  'system',
+]
+
+function parseSettingsTab(value: string | undefined): SettingsTab {
+  return SETTINGS_TABS.find((tab) => tab === value) ?? 'accounts'
 }
 
 const FOLDER_PATHS: Record<Folder, string> = {
@@ -75,10 +91,24 @@ function parseRoute(): MailRoute {
   const segments = window.location.pathname.split('/').filter(Boolean)
   const head = segments[0] ?? ''
   if (head === 'settings') {
-    return { view: 'settings', folder: 'inbox', labelId: null, messageId: null, accountId }
+    return {
+      view: 'settings',
+      folder: 'inbox',
+      labelId: null,
+      messageId: null,
+      accountId,
+      settingsTab: parseSettingsTab(segments[1]),
+    }
   }
   if (head === 'contacts') {
-    return { view: 'contacts', folder: 'inbox', labelId: null, messageId: null, accountId }
+    return {
+      view: 'contacts',
+      folder: 'inbox',
+      labelId: null,
+      messageId: null,
+      accountId,
+      settingsTab: 'accounts',
+    }
   }
   if (head === 'label' && segments[1]) {
     return {
@@ -87,6 +117,7 @@ function parseRoute(): MailRoute {
       labelId: decodeURIComponent(segments[1]),
       messageId: segments[2] ? decodeURIComponent(segments[2]) : null,
       accountId,
+      settingsTab: 'accounts',
     }
   }
   return {
@@ -95,6 +126,7 @@ function parseRoute(): MailRoute {
     labelId: null,
     messageId: segments[1] ? decodeURIComponent(segments[1]) : null,
     accountId,
+    settingsTab: 'accounts',
   }
 }
 
@@ -105,7 +137,7 @@ function routeUrl(route: MailRoute): string {
   }
   const suffix = params.toString() ? `?${params.toString()}` : ''
   if (route.view === 'settings') {
-    return `/settings${suffix}`
+    return `/settings/${route.settingsTab}${suffix}`
   }
   if (route.view === 'contacts') {
     return `/contacts${suffix}`
@@ -156,6 +188,7 @@ export default function App() {
   const [detailSwitching, setDetailSwitching] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [view, setView] = useState<View>(initialRoute.view)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>(initialRoute.settingsTab)
   const [query, setQuery] = useState('')
   const [searchScope, setSearchScope] = useState<SearchScope>('all')
   const [searchResults, setSearchResults] = useState<MessageSummary[] | null>(null)
@@ -335,6 +368,7 @@ export default function App() {
       labelId: selectedLabelId,
       messageId: selectedMessageId,
       accountId: selectedAccountId,
+      settingsTab,
     })
     const previous = routeUrlRef.current
     routeUrlRef.current = next
@@ -347,7 +381,7 @@ export default function App() {
     } else {
       window.history.pushState({}, '', next)
     }
-  }, [view, folder, selectedLabelId, selectedMessageId, selectedAccountId])
+  }, [view, folder, selectedLabelId, selectedMessageId, selectedAccountId, settingsTab])
 
   useEffect(() => {
     function onPopState() {
@@ -358,6 +392,7 @@ export default function App() {
       setSelectedLabelId(route.labelId)
       setSelectedMessageId(route.messageId)
       setSelectedAccountId(route.accountId)
+      setSettingsTab(route.settingsTab)
       setSelectedIds([])
       setHiddenIds([])
       setQuery('')
@@ -1684,6 +1719,8 @@ export default function App() {
             onCheckUpdate={() => void refreshUpdate()}
             busyId={settingsBusyId}
             error={settingsError}
+            tab={settingsTab}
+            onTabChange={setSettingsTab}
             onCreateFilter={createFilter}
             onUpdateFilter={(id, input) => void updateFilter(id, input)}
             onDeleteFilter={(id) => void deleteFilter(id)}

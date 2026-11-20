@@ -22,6 +22,7 @@ import type {
   LabelColor,
   MailFilter,
   MailSecurity,
+  SettingsTab,
   SignatureMode,
   StorageOptions,
   UpdateStatus,
@@ -51,6 +52,8 @@ interface SettingsProps {
   onCheckUpdate: () => void
   busyId: string | null
   error: string | null
+  tab: SettingsTab
+  onTabChange: (tab: SettingsTab) => void
   onCreateFilter: (input: FilterInput) => Promise<boolean>
   onUpdateFilter: (id: string, input: FilterInput) => void
   onDeleteFilter: (id: string) => void
@@ -844,6 +847,8 @@ export function Settings({
   onCheckUpdate,
   busyId,
   error,
+  tab,
+  onTabChange,
   onCreateFilter,
   onUpdateFilter,
   onDeleteFilter,
@@ -873,10 +878,7 @@ export function Settings({
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
   const [signatureDraft, setSignatureDraft] = useState(defaultSignature)
-  const [tab, setTab] = useState<
-    'accounts' | 'general' | 'signatures' | 'filters' | 'notifications' | 'security' | 'system'
-  >('accounts')
-  const tabs = [
+  const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'accounts' as const, label: t('settings.tabAccounts') },
     { id: 'general' as const, label: t('settings.tabGeneral') },
     { id: 'signatures' as const, label: t('settings.tabSignatures') },
@@ -916,7 +918,7 @@ export function Settings({
               type="button"
               role="tab"
               aria-selected={tab === item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => onTabChange(item.id)}
               className={cn(
                 'shrink-0 border-b-2 px-3 py-2 text-xs font-medium transition-colors',
                 tab === item.id
