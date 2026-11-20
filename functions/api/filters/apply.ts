@@ -1,4 +1,9 @@
-import { listAccountRows, type AccountRow } from '../../_lib/db'
+import {
+  listAccountRows,
+  relayMessageSummary,
+  type AccountRow,
+  type MessageRow,
+} from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { matchesFilter, toFilter, type FilterRow } from '../../_lib/filters'
 import { forwardFilteredMessage } from '../../_lib/forward'
@@ -10,9 +15,10 @@ import { isSchemaError, schemaOutdated } from '../../_lib/schema'
  * Apply the enabled filters to mail that is already in the mirror.
  *
  * Filters normally run on new mail only: when one is created, the mail that
- * arrived before it is untouched. This endpoint walks the mirror of every folder
- * in batches so the user can apply a new filter (or all of them) to what is
- * already there. Labels are always applied to every folder; forwarding is opt-in
+ * arrived before it is untouched. This endpoint walks the mirror of every folder,
+ * then the local sent/draft rows, in batches so the user can apply a new filter
+ * (or all of them) to what is already there. Labels are always applied to every
+ * folder; forwarding is opt-in
  * per run and only touches incoming mail, because it sends mail to an external
  * address.
  *
@@ -55,45 +61,96 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     const accounts = new Map((await listAccountRows(context.env)).map((row) => [row.id, row]))
     const limit = forward ? FORWARD_BATCH : LABEL_BATCH
-    const rows = await context.env.DB.prepare(
-      'SELECT * FROM imap_messages WHERE id > ? ORDER BY id ASC LIMIT ?',
-    )
-      .bind(cursor, limit)
-      .all<ImapMessageRow>()
+
+    // The walk runs in two phases with a prefixed cursor: first the IMAP mirror
+    // (every folder), then the local `messages` table, which holds relay sent
+    // copies and every draft. Without the second phase sent/drafts never got the
+    // labels because they do not live in imap_messages.
+    const messagePhase = cursor.startsWith('m:')
+    const rawCursor =
+      cursor.startsWith('m:') || cursor.startsWith('i:') ? cursor.slice(2) : cursor
 
     const labelStatements: LabelStatement[] = []
     const forwardJobs: { account: AccountRow; row: ImapMessageRow; filterId: string; to: string[] }[] = []
     let matched = 0
+    let processed = 0
+    let nextCursor: string | null = null
 
-    for (const row of rows.results) {
-      const account = accounts.get(row.account_id)
-      if (!account) {
-        continue
-      }
-      const summary = imapMessageSummary(row, account)
-      let hit = false
-      for (const filter of filters) {
-        if (!matchesFilter(filter, summary)) {
+    if (messagePhase) {
+      const rows = await context.env.DB.prepare(
+        'SELECT * FROM messages WHERE id > ? ORDER BY id ASC LIMIT ?',
+      )
+        .bind(rawCursor, limit)
+        .all<MessageRow>()
+      processed = rows.results.length
+      for (const row of rows.results) {
+        const account = accounts.get(row.account_id)
+        if (!account) {
           continue
         }
-        hit = true
-        for (const labelId of filter.labelIds) {
-          labelStatements.push({
-            messageId: row.id,
-            accountId: account.id,
-            folder: row.folder,
-            labelId,
-          })
+        // Same summary shape the message list uses, so labels are stored under
+        // the same `r_<id>` message id.
+        const summary = relayMessageSummary(row, account)
+        let hit = false
+        for (const filter of filters) {
+          if (!matchesFilter(filter, summary)) {
+            continue
+          }
+          hit = true
+          for (const labelId of filter.labelIds) {
+            labelStatements.push({
+              messageId: summary.id,
+              accountId: account.id,
+              folder: row.folder,
+              labelId,
+            })
+          }
         }
-        // Forwarding stays an incoming-mail action: labelling now covers every
-        // folder, but sent/draft/trash mail must not be sent out by a filter.
-        if (forward && filter.forwardTo.length > 0 && row.folder === 'inbox') {
-          forwardJobs.push({ account, row, filterId: filter.id, to: filter.forwardTo })
+        if (hit) {
+          matched += 1
         }
       }
-      if (hit) {
-        matched += 1
+      const last = rows.results[rows.results.length - 1]
+      nextCursor = rows.results.length < limit ? null : `m:${last?.id ?? ''}`
+    } else {
+      const rows = await context.env.DB.prepare(
+        'SELECT * FROM imap_messages WHERE id > ? ORDER BY id ASC LIMIT ?',
+      )
+        .bind(rawCursor, limit)
+        .all<ImapMessageRow>()
+      processed = rows.results.length
+      for (const row of rows.results) {
+        const account = accounts.get(row.account_id)
+        if (!account) {
+          continue
+        }
+        const summary = imapMessageSummary(row, account)
+        let hit = false
+        for (const filter of filters) {
+          if (!matchesFilter(filter, summary)) {
+            continue
+          }
+          hit = true
+          for (const labelId of filter.labelIds) {
+            labelStatements.push({
+              messageId: row.id,
+              accountId: account.id,
+              folder: row.folder,
+              labelId,
+            })
+          }
+          // Forwarding stays an incoming-mail action: labelling now covers every
+          // folder, but sent/draft/trash mail must not be sent out by a filter.
+          if (forward && filter.forwardTo.length > 0 && row.folder === 'inbox') {
+            forwardJobs.push({ account, row, filterId: filter.id, to: filter.forwardTo })
+          }
+        }
+        if (hit) {
+          matched += 1
+        }
       }
+      const last = rows.results[rows.results.length - 1]
+      nextCursor = rows.results.length < limit ? 'm:' : `i:${last?.id ?? ''}`
     }
 
     const createdAt = new Date().toISOString()
@@ -127,13 +184,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       }
     }
 
-    const last = rows.results[rows.results.length - 1]
     return json({
-      processed: rows.results.length,
+      processed,
       matched,
       labelled: labelStatements.length,
       forwarded,
-      nextCursor: rows.results.length < limit ? null : (last?.id ?? null),
+      nextCursor,
     })
   } catch (error) {
     if (isSchemaError(error)) {

@@ -162,7 +162,7 @@ async function accountThreads(
   const relayWhere =
     scope.kind === 'folder'
       ? 'm.account_id = ? AND m.folder = ?'
-      : "m.account_id = ? AND ('r:' || m.id) IN (SELECT message_id FROM message_labels WHERE label_id = ?)"
+      : "m.account_id = ? AND ('r_' || m.id) IN (SELECT message_id FROM message_labels WHERE label_id = ?)"
 
   const imapSql = `SELECT COALESCE(m.thread_key, m.stable_key) AS key, MAX(m.sent_at) AS last_at, COUNT(*) AS total, COALESCE(SUM(m.unread), 0) AS unread
        FROM imap_messages m WHERE ${imapWhere}
