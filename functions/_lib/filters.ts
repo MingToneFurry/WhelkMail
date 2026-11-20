@@ -15,6 +15,7 @@ export interface FilterRow {
   label_ids_json: string
   forward_to_json: string
   enabled: number
+  auto_label: number
   created_at: string
 }
 
@@ -46,6 +47,8 @@ export function parseLabelIds(value: string): string[] {
 export function toFilter(row: FilterRow, last?: ForwardLogSummary): MailFilter {
   return {
     id: row.id,
+    accountId: row.account_id ?? '',
+    autoLabel: Boolean(row.auto_label),
     name: row.name,
     from: row.from_pattern,
     to: row.to_pattern,
@@ -79,7 +82,9 @@ function recipientText(message: MessageSummary): string {
 }
 
 export function matchesFilter(filter: MailFilter, message: MessageSummary): boolean {
-  if (message.folder !== 'inbox') {
+  // An empty accountId is a filter for every account; otherwise it only sees
+  // the mail of the account that owns it.
+  if (filter.accountId && filter.accountId !== message.accountId) {
     return false
   }
   const sender = `${message.from.name ?? ''} ${message.from.email}`
@@ -124,13 +129,15 @@ export async function applyFilters(
   accountId: string,
   messages: MessageSummary[],
 ): Promise<FilterForwardMatch[]> {
-  if (!messages.some((message) => message.folder === 'inbox')) {
+  if (messages.length === 0) {
     return []
   }
   try {
     const result = await env.DB.prepare(
-      'SELECT * FROM filters WHERE enabled = 1',
-    ).all<FilterRow>()
+      "SELECT * FROM filters WHERE enabled = 1 AND (account_id = '' OR account_id = ?)",
+    )
+      .bind(accountId)
+      .all<FilterRow>()
     const filters = result.results.map((row) => toFilter(row))
     if (filters.length === 0) {
       return []
@@ -139,9 +146,6 @@ export async function applyFilters(
     const statements: D1PreparedStatement[] = []
     const forwards: FilterForwardMatch[] = []
     for (const message of messages) {
-      if (message.folder !== 'inbox') {
-        continue
-      }
       for (const filter of filters) {
         if (!matchesFilter(filter, message)) {
           continue
@@ -174,32 +178,56 @@ export async function applyFilters(
   }
 }
 
-export async function applyAccountLabel(
+/**
+ * Keep the filter that implements an account's automatic label in sync.
+ *
+ * The account dropdown and the account creation wizard both set
+ * `incoming_label_id`; the actual labelling is a real filter, so the user can
+ * inspect and edit it from Settings > Filters like any other rule. It has no
+ * criteria and is scoped to the account, so it matches all of its mail in every
+ * folder.
+ */
+export async function syncAccountLabelFilter(
   env: Env,
   accountId: string,
   labelId: string | null,
-  messages: MessageSummary[],
+  labelName: string,
 ): Promise<void> {
-  if (!labelId) {
-    return
-  }
   try {
-    const createdAt = new Date().toISOString()
-    const statements: D1PreparedStatement[] = []
-    for (const message of messages) {
-      if (message.labelIds.includes(labelId)) {
-        continue
+    const existing = await env.DB.prepare(
+      'SELECT id FROM filters WHERE account_id = ? AND auto_label = 1',
+    )
+      .bind(accountId)
+      .first<{ id: string }>()
+    if (!labelId) {
+      if (existing) {
+        await env.DB.batch([
+          env.DB.prepare('DELETE FROM forward_log WHERE filter_id = ?').bind(existing.id),
+          env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(existing.id),
+        ])
       }
-      message.labelIds.push(labelId)
-      statements.push(
-        env.DB.prepare(
-          'INSERT OR IGNORE INTO message_labels (message_id, account_id, folder, label_id, created_at) VALUES (?, ?, ?, ?, ?)',
-        ).bind(message.id, accountId, message.folder, labelId, createdAt),
+      return
+    }
+    if (existing) {
+      await env.DB.prepare(
+        'UPDATE filters SET name = ?, label_ids_json = ?, enabled = 1 WHERE id = ?',
       )
+        .bind(labelName, JSON.stringify([labelId]), existing.id)
+        .run()
+      return
     }
-    if (statements.length > 0) {
-      await env.DB.batch(statements)
-    }
+    await env.DB.prepare(
+      `INSERT INTO filters (id, account_id, name, from_pattern, to_pattern, subject_pattern, has_words, doesnt_have, has_attachment, label_ids_json, forward_to_json, enabled, created_at, auto_label)
+       VALUES (?, ?, ?, NULL, NULL, NULL, NULL, NULL, 0, ?, '[]', 1, ?, 1)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        accountId,
+        labelName,
+        JSON.stringify([labelId]),
+        new Date().toISOString(),
+      )
+      .run()
   } catch (error) {
     if (!isSchemaError(error)) {
       throw error

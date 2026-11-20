@@ -1138,6 +1138,7 @@ export function Settings({
 
         {tab === 'filters' ? (
           <FiltersSettings
+            accounts={accounts}
             labels={labels}
             filters={filters}
             onCreateFilter={onCreateFilter}

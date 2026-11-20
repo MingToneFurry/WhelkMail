@@ -70,6 +70,13 @@ async function updateFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
       id,
     )
     .run()
+  if (row.auto_label) {
+    // The automatic filter is the source of truth for account labelling: keep
+    // the account dropdown pointing at the label the filter now applies.
+    await context.env.DB.prepare('UPDATE accounts SET incoming_label_id = ? WHERE id = ?')
+      .bind(labelIds[0] ?? null, row.account_id)
+      .run()
+  }
   const updated = await context.env.DB.prepare('SELECT * FROM filters WHERE id = ?')
     .bind(id)
     .first<FilterRow>()
@@ -82,9 +89,11 @@ async function updateFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
   try {
     const id = context.params.id as string
-    const row = await context.env.DB.prepare('SELECT id FROM filters WHERE id = ?')
+    const row = await context.env.DB.prepare(
+      'SELECT id, account_id, auto_label FROM filters WHERE id = ?',
+    )
       .bind(id)
-      .first<{ id: string }>()
+      .first<{ id: string; account_id: string; auto_label: number }>()
     if (!row) {
       return fail('Filter not found', 404, undefined, 'filter_not_found')
     }
@@ -92,6 +101,13 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
       context.env.DB.prepare('DELETE FROM forward_log WHERE filter_id = ?').bind(id),
       context.env.DB.prepare('DELETE FROM filters WHERE id = ?').bind(id),
     ])
+    if (row.auto_label) {
+      await context.env.DB.prepare(
+        'UPDATE accounts SET incoming_label_id = NULL WHERE id = ?',
+      )
+        .bind(row.account_id)
+        .run()
+    }
     return json({ ok: true })
   } catch (error) {
     if (isSchemaError(error)) {

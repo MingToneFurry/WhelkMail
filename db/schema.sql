@@ -112,10 +112,12 @@ CREATE TABLE IF NOT EXISTS filters (
   label_ids_json TEXT NOT NULL DEFAULT '[]',
   forward_to_json TEXT NOT NULL DEFAULT '[]',
   enabled INTEGER NOT NULL DEFAULT 1,
+  auto_label INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_filters_account ON filters (account_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_filters_auto_account ON filters (account_id) WHERE auto_label = 1;
 
 CREATE TABLE IF NOT EXISTS contacts (
   id TEXT PRIMARY KEY,

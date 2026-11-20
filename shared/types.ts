@@ -92,6 +92,10 @@ export interface DeletionLog {
 
 export interface MailFilter {
   id: string
+  /** Empty string: the filter applies to every account. */
+  accountId: string
+  /** Created by the account's automatic label: match-all and scoped to accountId. */
+  autoLabel: boolean
   name: string
   from: string | null
   to: string | null
@@ -109,6 +113,7 @@ export interface MailFilter {
 }
 
 export interface FilterInput {
+  accountId?: string | null
   name?: string
   from?: string | null
   to?: string | null

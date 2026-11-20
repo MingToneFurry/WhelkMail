@@ -10,10 +10,11 @@ import { isSchemaError, schemaOutdated } from '../../_lib/schema'
  * Apply the enabled filters to mail that is already in the mirror.
  *
  * Filters normally run on new mail only: when one is created, the mail that
- * arrived before it is untouched. This endpoint walks the inbox mirror in
- * batches so the user can apply a new filter (or all of them) to what is already
- * there. Labels are always applied; forwarding is opt-in per run, because it
- * sends mail to an external address.
+ * arrived before it is untouched. This endpoint walks the mirror of every folder
+ * in batches so the user can apply a new filter (or all of them) to what is
+ * already there. Labels are always applied to every folder; forwarding is opt-in
+ * per run and only touches incoming mail, because it sends mail to an external
+ * address.
  *
  * The work is driven in pages by the client: each request returns a cursor, so
  * no single invocation has to walk a whole mailbox.
@@ -55,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const accounts = new Map((await listAccountRows(context.env)).map((row) => [row.id, row]))
     const limit = forward ? FORWARD_BATCH : LABEL_BATCH
     const rows = await context.env.DB.prepare(
-      `SELECT * FROM imap_messages WHERE folder = 'inbox' AND id > ? ORDER BY id ASC LIMIT ?`,
+      'SELECT * FROM imap_messages WHERE id > ? ORDER BY id ASC LIMIT ?',
     )
       .bind(cursor, limit)
       .all<ImapMessageRow>()
@@ -84,7 +85,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             labelId,
           })
         }
-        if (forward && filter.forwardTo.length > 0) {
+        // Forwarding stays an incoming-mail action: labelling now covers every
+        // folder, but sent/draft/trash mail must not be sent out by a filter.
+        if (forward && filter.forwardTo.length > 0 && row.folder === 'inbox') {
           forwardJobs.push({ account, row, filterId: filter.id, to: filter.forwardTo })
         }
       }

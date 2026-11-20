@@ -10,7 +10,7 @@ import type { Env } from './env'
 import type { PageCursor } from '../../shared/paging'
 import type { ImapConnection, ImapHeader } from './imap/client'
 import { MISSING_FOLDER, withImap, resolveFolderName } from './mail/imap'
-import { applyAccountLabel, applyFilters } from './filters'
+import { applyFilters } from './filters'
 import { archiveUpdateStatement } from './mail/archive-update'
 import {
   isReplySubject,
@@ -1155,10 +1155,9 @@ async function runSyncChunkLocked(
           parsed.map((item) => ({ id: item.id, stableKey: item.stableKey, folder })),
         )
         const summaries = parsed.map((item) => imapMessageSummary(item.row, account))
-        if (folder === 'inbox') {
-          await applyFilters(env, account.id, summaries)
-        }
-        await applyAccountLabel(env, account.id, account.incoming_label_id, summaries)
+        // Filters cover every folder, not just the inbox: the automatic account
+        // label (a match-all account filter) must reach sent, drafts and trash too.
+        await applyFilters(env, account.id, summaries)
       }
 
       if (archiveStorage && parsed.length > 0) {

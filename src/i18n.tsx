@@ -395,8 +395,10 @@ const en: Record<string, string> = {
 
   'filters.title': 'Filters',
   'filters.hint':
-    'Gmail-style rules: when an incoming message matches the criteria, the selected labels are applied automatically.',
+    'Gmail-style rules: when a message matches the criteria, in any folder (inbox, sent, drafts, trash), the selected labels are applied automatically.',
   'filters.account': 'Account',
+  'filters.automatic': 'Automatic',
+  'filters.allMail': 'All mail',
   'filters.empty': 'No filters for this account.',
   'filters.enabled': 'Enabled',
   'filters.disabled': 'Disabled',
@@ -1065,8 +1067,10 @@ const it: Record<string, string> = {
 
   'filters.title': 'Filtri',
   'filters.hint':
-    'Regole in stile Gmail: quando un messaggio in arrivo corrisponde ai criteri, le etichette selezionate vengono applicate automaticamente.',
+    'Regole in stile Gmail: quando un messaggio corrisponde ai criteri, in qualsiasi cartella (in arrivo, inviata, bozze, cestino), le etichette selezionate vengono applicate automaticamente.',
   'filters.account': 'Account',
+  'filters.automatic': 'Automatico',
+  'filters.allMail': 'Tutta la posta',
   'filters.empty': 'Nessun filtro per questo account.',
   'filters.enabled': 'Attivo',
   'filters.disabled': 'Disattivato',

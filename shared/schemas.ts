@@ -162,6 +162,7 @@ export const labelUpdateSchema = z.object({
 const optionalPattern = z.string().trim().max(255).optional().nullable()
 
 export const filterCreateSchema = z.object({
+  accountId: z.string().trim().max(64).optional().nullable(),
   name: z.string().trim().max(80).optional(),
   from: optionalPattern,
   to: optionalPattern,

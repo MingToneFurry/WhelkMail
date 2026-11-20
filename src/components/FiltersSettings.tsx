@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Filter, Loader2, Pencil, Plus, Send, Tag, Trash2 } from 'lucide-react'
-import type { FilterInput, Label, LabelColor, MailFilter } from '../../shared/types'
+import type { Account, FilterInput, Label, LabelColor, MailFilter } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
@@ -8,6 +8,7 @@ import { runFilterApplication } from '../lib/apply-filters'
 import { cn, labelStyle, parseAddresses } from '../lib/utils'
 
 interface FiltersSettingsProps {
+  accounts: Account[]
   labels: Label[]
   filters: MailFilter[]
   onCreateFilter: (input: FilterInput) => Promise<boolean>
@@ -16,7 +17,7 @@ interface FiltersSettingsProps {
   onCreateLabel: (name: string, color: LabelColor) => Promise<Label | null>
 }
 
-function criteriaSummary(filter: MailFilter): string {
+function criteriaSummary(filter: MailFilter, allMail: string): string {
   const parts: string[] = []
   if (filter.from) parts.push(`From: ${filter.from}`)
   if (filter.to) parts.push(`To: ${filter.to}`)
@@ -24,10 +25,11 @@ function criteriaSummary(filter: MailFilter): string {
   if (filter.hasWords) parts.push(`+ ${filter.hasWords}`)
   if (filter.doesntHave) parts.push(`- ${filter.doesntHave}`)
   if (filter.hasAttachment) parts.push('Attachment')
-  return parts.length > 0 ? parts.join(' · ') : '—'
+  return parts.length > 0 ? parts.join(' · ') : allMail
 }
 
 export function FiltersSettings({
+  accounts,
   labels,
   filters,
   onCreateFilter,
@@ -111,8 +113,12 @@ export function FiltersSettings({
         doesntHave.trim() ||
         hasAttachment,
     )
+    const editing = editingId ? filters.find((filter) => filter.id === editingId) : null
+    // The automatic account label is a match-all account filter: editing it
+    // without adding criteria must keep working.
+    const matchAll = Boolean(editing && (editing.autoLabel || editing.accountId))
     const recipients = [...new Set(parseAddresses(forwardTo))]
-    if (!hasCriteria) {
+    if (!hasCriteria && !matchAll) {
       setError(t('filters.criteriaRequired'))
       return
     }
@@ -204,7 +210,25 @@ export function FiltersSettings({
           >
             <div className="min-w-0">
               <p className="text-xs font-medium text-slate-700">{filter.name}</p>
-              <p className="text-[11px] text-muted">{criteriaSummary(filter)}</p>
+              {filter.autoLabel || filter.accountId ? (
+                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                  {filter.autoLabel ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                      {t('filters.automatic')}
+                    </span>
+                  ) : null}
+                  {filter.accountId ? (
+                    <span className="text-[10px] text-muted">
+                      {t('filters.account')}:{' '}
+                      {accounts.find((account) => account.id === filter.accountId)?.email ??
+                        filter.accountId}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              <p className="text-[11px] text-muted">
+                {criteriaSummary(filter, t('filters.allMail'))}
+              </p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {filter.labelIds.map((id) => {
                   const label = labels.find((item) => item.id === id)

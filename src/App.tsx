@@ -1111,10 +1111,14 @@ export default function App() {
       setNotice(input.kind === 'imap' ? t('app.accountCreatedTest') : t('app.accountCreated'))
       setRefreshKey((key) => key + 1)
       try {
-        const labelsResponse = await api.labels()
+        const [labelsResponse, filtersResponse] = await Promise.all([
+          api.labels(),
+          api.filters(),
+        ])
         setLabels(labelsResponse.labels)
+        setFilters(filtersResponse.filters)
       } catch {
-        // labels require the latest schema; the account is still usable
+        // labels/filters require the latest schema; the account is still usable
       }
       return response.account
     } catch (error) {
@@ -1135,6 +1139,15 @@ export default function App() {
     try {
       const response = await api.updateAccount(id, patch)
       setAccounts((current) => current.map((item) => (item.id === id ? response.account : item)))
+      if ('incomingLabelId' in patch) {
+        // The automatic label is a filter: refresh the list Settings shows.
+        try {
+          const filtersResponse = await api.filters()
+          setFilters(filtersResponse.filters)
+        } catch {
+          // filters require the latest schema; the account is still usable
+        }
+      }
       setNotice(t('app.accountUpdated'))
       setRefreshKey((key) => key + 1)
     } catch (error) {

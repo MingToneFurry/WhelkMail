@@ -2,7 +2,7 @@ import { accountCreateSchema } from '../../../shared/schemas'
 import { findPreset, findRelayProvider } from '../../../shared/presets'
 import { encryptString } from '../../_lib/crypto'
 import { getAccountRow, listAccountRows, publicAccount } from '../../_lib/db'
-import { backfillAccountLabel } from '../../_lib/filters'
+import { backfillAccountLabel, syncAccountLabelFilter } from '../../_lib/filters'
 import type { Env } from '../../_lib/env'
 import { ensureGlobalLabel } from '../../_lib/labels'
 import { googleMailConfigured } from '../../_lib/google/oauth'
@@ -194,6 +194,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       await context.env.DB.prepare('UPDATE accounts SET incoming_label_id = ? WHERE id = ?')
         .bind(labelId, id)
         .run()
+      await syncAccountLabelFilter(context.env, id, labelId, input.incomingLabelName.trim())
       await backfillAccountLabel(context.env, id, labelId)
     } catch (error) {
       if (!isSchemaError(error)) {

@@ -4,7 +4,7 @@ import { decryptString, encryptString } from '../../_lib/crypto'
 import { getAccountRow, publicAccount } from '../../_lib/db'
 import { purgeAccountStorage } from '../../_lib/deletion'
 import { recordCleanupFailures } from '../../_lib/storage/cleanup-log'
-import { backfillAccountLabel } from '../../_lib/filters'
+import { backfillAccountLabel, syncAccountLabelFilter } from '../../_lib/filters'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { relayDomainMissing, resolveRelayDomain } from '../../_lib/relay/validation'
@@ -275,8 +275,21 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     )
     .run()
 
-  if (incomingLabelId && incomingLabelId !== row.incoming_label_id) {
-    await backfillAccountLabel(context.env, id, incomingLabelId)
+  if (incomingLabelId !== row.incoming_label_id) {
+    if (incomingLabelId) {
+      const label = await context.env.DB.prepare('SELECT name FROM labels WHERE id = ?')
+        .bind(incomingLabelId)
+        .first<{ name: string }>()
+      await syncAccountLabelFilter(
+        context.env,
+        id,
+        incomingLabelId,
+        label?.name ?? 'Automatic label',
+      )
+      await backfillAccountLabel(context.env, id, incomingLabelId)
+    } else {
+      await syncAccountLabelFilter(context.env, id, null, '')
+    }
   }
 
   const updated = await getAccountRow(context.env, id)
@@ -343,6 +356,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     context.env.DB.prepare('DELETE FROM imap_messages WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM imap_sync WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM forward_log WHERE account_id = ?').bind(id),
+    context.env.DB.prepare('DELETE FROM filters WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM deletion_log WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM push_prefs WHERE account_id = ?').bind(id),
     context.env.DB.prepare('DELETE FROM messages WHERE account_id = ?').bind(id),

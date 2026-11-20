@@ -5,7 +5,7 @@ import { deleteArchivedMessage } from '../../_lib/deletion'
 import type { Env } from '../../_lib/env'
 import { cleanupBodyCache } from '../../_lib/body-cache'
 import { pruneMirroredMetadata } from '../../_lib/retention'
-import { applyAccountLabel, applyFilters } from '../../_lib/filters'
+import { applyFilters } from '../../_lib/filters'
 import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
 import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
@@ -138,15 +138,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
       for (const row of fresh.results) {
         const summary = imapMessageSummary(row, account)
-        if (folder === 'inbox') {
-          const existingLabels = await context.env.DB.prepare(
-            'SELECT label_id FROM message_labels WHERE message_id = ?',
-          )
-            .bind(row.id)
-            .all<{ label_id: string }>()
-          summary.labelIds = existingLabels.results.map((item) => item.label_id)
-          const forwards = await applyFilters(context.env, account.id, [summary])
+        const existingLabels = await context.env.DB.prepare(
+          'SELECT label_id FROM message_labels WHERE message_id = ?',
+        )
+          .bind(row.id)
+          .all<{ label_id: string }>()
+        summary.labelIds = existingLabels.results.map((item) => item.label_id)
+        // Filters run on every folder: the automatic account label is a filter
+        // too, so sent, drafts and trash are labelled like the inbox.
+        const forwards = await applyFilters(context.env, account.id, [summary])
 
+        // Labelling runs everywhere, forwarding only on incoming mail.
+        if (folder === 'inbox') {
           for (const match of forwards) {
             const result = await forwardFilteredMessage(
               context.env,
@@ -159,21 +162,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
               forwarded += 1
             }
           }
-
-          if (account.delete_after_archive) {
-            const result = await deleteArchivedMessage(context.env, account, row)
-            if (result === 'done') {
-              deleted += 1
-            }
-          }
         }
 
-        await applyAccountLabel(
-          context.env,
-          account.id,
-          account.incoming_label_id,
-          [summary],
-        )
+        if (folder === 'inbox' && account.delete_after_archive) {
+          const result = await deleteArchivedMessage(context.env, account, row)
+          if (result === 'done') {
+            deleted += 1
+          }
+        }
 
         if (notify && notifyEnabled && pushFolders.has(folder)) {
           const title = row.from_name || row.from_email || account.display_name

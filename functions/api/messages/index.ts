@@ -9,7 +9,7 @@ import {
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
 import type { ImapHeader } from '../../_lib/imap/client'
-import { applyAccountLabel, applyFilters } from '../../_lib/filters'
+import { applyFilters } from '../../_lib/filters'
 import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { aliasAddresses, dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
@@ -432,7 +432,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
       await applyLabels(context.env, loaded)
       await applyFilters(context.env, account.id, loaded)
-      await applyAccountLabel(context.env, account.id, account.incoming_label_id, loaded)
       messages.push(...loaded)
       console.log(
         `[messages] ${account.id}/${folder} mirror=${mirrorMs}ms live=${liveMs}ms labels=${Date.now() - accountStartedAt - mirrorMs - liveMs}ms sync=${needSync || syncState?.status === 'partial'}`,

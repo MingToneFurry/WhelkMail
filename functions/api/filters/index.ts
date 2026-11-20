@@ -57,6 +57,15 @@ async function createFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
     )
   }
   const input = parsed.data
+  const accountId = input.accountId?.trim() || ''
+  if (accountId) {
+    const account = await context.env.DB.prepare('SELECT id FROM accounts WHERE id = ?')
+      .bind(accountId)
+      .first<{ id: string }>()
+    if (!account) {
+      return fail('Account not found', 404, undefined, 'account_not_found')
+    }
+  }
   const labelIds = input.labelIds ?? []
   const forwardTo = [...new Set(input.forwardTo ?? [])]
   if (labelIds.length === 0 && forwardTo.length === 0) {
@@ -73,12 +82,12 @@ async function createFilter(context: Parameters<PagesFunction<Env>>[0]): Promise
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   await context.env.DB.prepare(
-    `INSERT INTO filters (id, account_id, name, from_pattern, to_pattern, subject_pattern, has_words, doesnt_have, has_attachment, label_ids_json, forward_to_json, enabled, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO filters (id, account_id, name, from_pattern, to_pattern, subject_pattern, has_words, doesnt_have, has_attachment, label_ids_json, forward_to_json, enabled, created_at, auto_label)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   )
     .bind(
       id,
-      '',
+      accountId,
       input.name?.trim() || 'Filter',
       input.from?.trim() || null,
       input.to?.trim() || null,

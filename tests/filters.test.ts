@@ -5,6 +5,8 @@ import { matchesFilter } from '../functions/_lib/filters'
 function makeFilter(overrides: Partial<MailFilter> = {}): MailFilter {
   return {
     id: 'filter-1',
+    accountId: '',
+    autoLabel: false,
     name: 'Test filter',
     from: null,
     to: null,
@@ -81,10 +83,17 @@ describe('matchesFilter', () => {
     expect(matchesFilter(makeFilter({ from: 'mario', subject: 'fattura' }), forwarded)).toBe(true)
   })
 
-  it('never matches messages outside the inbox', () => {
-    expect(matchesFilter(makeFilter({ subject: 'fattura' }), makeMessage({ folder: 'sent' }))).toBe(
-      false,
-    )
+  it('matches messages in every folder', () => {
+    for (const folder of ['inbox', 'sent', 'draft', 'trash'] as const) {
+      expect(matchesFilter(makeFilter({ subject: 'fattura' }), makeMessage({ folder }))).toBe(true)
+    }
+  })
+
+  it('scopes an account filter to that account only', () => {
+    const scoped = makeFilter({ accountId: 'account-1' })
+    expect(matchesFilter(scoped, makeMessage())).toBe(true)
+    expect(matchesFilter(scoped, makeMessage({ accountId: 'account-2' }))).toBe(false)
+    expect(matchesFilter(makeFilter(), makeMessage({ accountId: 'account-2' }))).toBe(true)
   })
 
   it('requires all configured criteria', () => {
