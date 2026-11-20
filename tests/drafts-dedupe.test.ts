@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { draftMirrorIdsFromPointers, imapMessageId } from '../functions/_lib/mail/ids'
+import {
+  draftMirrorIdsFromPointers,
+  imapMessageId,
+  sentMirrorIdsFromPointers,
+} from '../functions/_lib/mail/ids'
 import { encodeImapPointer } from '../shared/relay-copy'
 
 describe('draft mirror ids', () => {
@@ -33,5 +37,15 @@ describe('draft mirror ids', () => {
     expect(id.startsWith('i_acct-2.')).toBe(true)
     expect(id.endsWith('.5')).toBe(true)
     expect(id).not.toBe(imapMessageId('acct-2', 'sent', 5))
+  })
+
+  it('maps a sent copy pointer to the Sent mirror, not to a draft', () => {
+    const key = encodeImapPointer({ accountId: 'acct-3', folder: 'Sent', uid: 12 })
+    expect(sentMirrorIdsFromPointers([key])).toEqual([
+      imapMessageId('acct-3', 'sent', 12),
+    ])
+    expect(sentMirrorIdsFromPointers([key])).not.toEqual(
+      draftMirrorIdsFromPointers([key]),
+    )
   })
 })

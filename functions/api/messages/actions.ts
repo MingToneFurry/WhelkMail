@@ -4,8 +4,8 @@ import { getAccountRow, type AccountRow } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { moveMessages } from '../../_lib/mail/imap'
-import { parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
-import { removeStoredCopy } from '../../_lib/mail/relay-target'
+import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
+import { parseImapPointer, removeStoredCopy } from '../../_lib/mail/relay-target'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 import { queueSync } from '../../_lib/sync'
 
@@ -44,6 +44,7 @@ async function deleteRelayMessages(
   env: Env,
   ids: string[],
   errors: ActionError[],
+  waitUntil: (promise: Promise<unknown>) => void,
 ): Promise<number> {
   let deleted = 0
   for (const id of ids) {
@@ -52,18 +53,20 @@ async function deleteRelayMessages(
       continue
     }
     const row = await env.DB.prepare(
-      'SELECT account_id, storage_driver, storage_key FROM messages WHERE id = ?',
+      'SELECT account_id, folder, storage_driver, storage_key FROM messages WHERE id = ?',
     )
       .bind(rawId)
-      .first<{ account_id: string; storage_driver: string; storage_key: string }>()
+      .first<{ account_id: string; folder: Folder; storage_driver: string; storage_key: string }>()
     if (!row) {
       errors.push({ ids: [id], message: 'Message not found' })
       continue
     }
     const account = await getAccountRow(env, row.account_id)
-    if (account) {
+    let copyCleared = !row.storage_key
+    if (account && row.storage_key) {
       try {
         await removeStoredCopy(env, account, row.storage_driver, row.storage_key)
+        copyCleared = true
       } catch {
         // The D1 row is still removed if the copy cleanup fails.
       }
@@ -72,9 +75,83 @@ async function deleteRelayMessages(
       env.DB.prepare('DELETE FROM message_labels WHERE message_id = ?').bind(id),
       env.DB.prepare('DELETE FROM messages WHERE id = ?').bind(rawId),
     ])
+    // The same physical message is also a mirror of the target account. Remove
+    // that row too, or it would reappear as a ghost once the relay row is gone.
+    const pointer = parseImapPointer(row.storage_key)
+    if (pointer && copyCleared && (row.folder === 'sent' || row.folder === 'draft')) {
+      await removeMirrorRows(env, [
+        imapMessageId(pointer.accountId, row.folder, pointer.uid),
+      ])
+      const target = await getAccountRow(env, pointer.accountId)
+      if (target) {
+        await queueSync(env, target, row.folder, waitUntil).catch(() => undefined)
+      }
+    }
     deleted += 1
   }
   return deleted
+}
+
+/**
+ * Move a relay copy that lives in an IMAP mailbox.
+ *
+ * There is no folder of its own on the relay account: the message is moved in
+ * the target mailbox and the relay row is dropped, so the mirror of the target
+ * account owns the message from its new folder. Without the mailbox pointer the
+ * operation is not possible and the caller reports it as before.
+ */
+async function moveRelayMessages(
+  env: Env,
+  ids: string[],
+  target: 'inbox' | 'spam' | 'trash',
+  errors: ActionError[],
+  queue: (account: AccountRow, folder: Folder) => Promise<void>,
+): Promise<number> {
+  let moved = 0
+  for (const id of ids) {
+    const rawId = parseRelayMessageId(id)
+    if (!rawId) {
+      continue
+    }
+    const row = await env.DB.prepare(
+      'SELECT account_id, folder, storage_driver, storage_key FROM messages WHERE id = ?',
+    )
+      .bind(rawId)
+      .first<{ account_id: string; folder: Folder; storage_driver: string; storage_key: string }>()
+    if (!row) {
+      errors.push({ ids: [id], message: 'Message not found' })
+      continue
+    }
+    const pointer = parseImapPointer(row.storage_key)
+    if (row.folder !== 'sent' || row.storage_driver !== 'imap' || !pointer) {
+      errors.push({ ids: [id], message: 'Moving messages is not supported for send-only accounts' })
+      continue
+    }
+    const account = await getAccountRow(env, pointer.accountId)
+    if (!account || account.kind !== 'imap' || !account.secret_enc) {
+      errors.push({ ids: [id], message: 'Account not available' })
+      continue
+    }
+    try {
+      await moveMessages(env, account, 'sent', [pointer.uid], target)
+      await removeMirrorRows(env, [imapMessageId(pointer.accountId, 'sent', pointer.uid)])
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM message_labels WHERE message_id = ?').bind(id),
+        env.DB.prepare('DELETE FROM messages WHERE id = ?').bind(rawId),
+      ])
+      await queue(account, 'sent')
+      if (target !== 'trash') {
+        await queue(account, target)
+      }
+      moved += 1
+    } catch (error) {
+      errors.push({
+        ids: [id],
+        message: error instanceof Error ? error.message : 'IMAP error',
+      })
+    }
+  }
+  return moved
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -173,13 +250,12 @@ async function runActions(context: Parameters<PagesFunction<Env>>[0]): Promise<R
   }
 
   if (relayIds.length > 0) {
-    if (target !== 'trash') {
-      errors.push({
-        ids: relayIds,
-        message: 'Moving messages is not supported for send-only accounts',
-      })
+    if (action === 'delete') {
+      moved += await deleteRelayMessages(context.env, relayIds, errors, (promise) =>
+        context.waitUntil(promise),
+      )
     } else {
-      moved += await deleteRelayMessages(context.env, relayIds, errors)
+      moved += await moveRelayMessages(context.env, relayIds, target, errors, queue)
     }
   }
 

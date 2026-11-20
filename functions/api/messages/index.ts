@@ -13,7 +13,7 @@ import { applyAccountLabel, applyFilters } from '../../_lib/filters'
 import { listFolder, listFolderByUids } from '../../_lib/mail/imap'
 import { imapMessageId, parseImapMessageId, parseRelayMessageId } from '../../_lib/mail/ids'
 import { aliasAddresses, dateOf, parseHeaders, toMailbox, toMailboxes } from '../../_lib/mail/parse'
-import { relayDraftMirrorIds } from '../../_lib/mail/relay-target'
+import { relayDraftMirrorIds, relaySentMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
 import { needsBackgroundSync, runBackgroundSync } from '../../_lib/sync-trigger'
 import {
@@ -334,10 +334,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const messages: MessageSummary[] = []
   const errors: AccountError[] = []
   let syncing = false
-  // Drafts that a relay account stores in another mailbox are mirrored there as
-  // ordinary drafts; hide those rows so the draft is listed once, under the
+  // Copies that a relay account stores in another mailbox are mirrored there as
+  // ordinary messages; hide those rows so each message is listed once, under the
   // relay account that owns it.
-  const hiddenDraftIds = folder === 'draft' ? await relayDraftMirrorIds(context.env) : []
+  const hiddenMirrorIds =
+    folder === 'sent'
+      ? await relaySentMirrorIds(context.env)
+      : folder === 'draft'
+        ? await relayDraftMirrorIds(context.env)
+        : []
 
   for (const account of accounts) {
     if (account.kind === 'imap' && !account.secret_enc) {
@@ -363,7 +368,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
             folder,
             limit,
             before,
-            hiddenDraftIds,
+              hiddenMirrorIds,
           )
           syncState = await getSyncState(context.env, account.id, folder)
         } catch (error) {
@@ -386,7 +391,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
               folder,
               limit,
               before,
-              hiddenDraftIds,
+            hiddenMirrorIds,
             )
             mirrorMs += Date.now() - rereadStartedAt
             loaded =

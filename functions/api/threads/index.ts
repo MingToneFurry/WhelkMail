@@ -9,7 +9,7 @@ import {
 } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
-import { relayDraftMirrorIds } from '../../_lib/mail/relay-target'
+import { relayDraftMirrorIds, relaySentMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
 import { getSyncState, imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
 import { listActiveSyncLocks, needsBackgroundSync } from '../../_lib/sync-trigger'
@@ -70,11 +70,11 @@ async function draftThreads(
   account: AccountRow,
   limit: number,
   before: { date: string; id: string } | null,
-  hiddenDraftIds: string[],
+  hiddenMirrorIds: string[],
 ): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
   const groups: GroupRow[] = []
   const threads = new Map<string, ThreadRows>()
-  const exclusion = idExclusionClause('id', hiddenDraftIds)
+  const exclusion = idExclusionClause('id', hiddenMirrorIds)
   const cursor = before ? ' AND (sent_at < ? OR (sent_at = ? AND id < ?))' : ''
   const cursorParams = before ? [before.date, before.date, before.id] : []
   // One extra row per source: the caller only returns a next cursor when it can
@@ -137,20 +137,24 @@ async function accountThreads(
   scope: ThreadScope,
   limit: number,
   before: { date: string; id: string } | null,
-  hiddenDraftIds: string[] = [],
+  hiddenMirrorIds: string[] = [],
 ): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
   if (scope.kind === 'folder' && scope.folder === 'draft') {
-    return draftThreads(env, account, limit, before, hiddenDraftIds)
+    return draftThreads(env, account, limit, before, hiddenMirrorIds)
   }
   const groups: GroupRow[] = []
   const threads = new Map<string, ThreadRows>()
 
   // The scoped query only decides *which* conversations are on the page and how
   // they are ordered; counts and participants come from the whole thread below.
+  // A sent copy mirrored from a relay account is hidden here as well, so the
+  // conversation does not count the same message twice.
   const imapWhere =
-    scope.kind === 'folder'
+    (scope.kind === 'folder'
       ? 'm.account_id = ? AND m.folder = ?'
-      : 'm.account_id = ? AND m.id IN (SELECT message_id FROM message_labels WHERE label_id = ?)'
+      : 'm.account_id = ? AND m.id IN (SELECT message_id FROM message_labels WHERE label_id = ?)') +
+    idExclusionClause('m.id', hiddenMirrorIds)
+  const plainImapExclusion = idExclusionClause('id', hiddenMirrorIds)
   const imapParams: string[] = [
     account.id,
     scope.kind === 'folder' ? scope.folder : scope.labelId,
@@ -197,7 +201,7 @@ async function accountThreads(
       `SELECT * FROM (
          SELECT *, ROW_NUMBER() OVER (PARTITION BY ${imapKey} ORDER BY sent_at DESC) AS rn
          FROM imap_messages
-         WHERE account_id = ? AND folder <> 'draft' AND ${imapKey} IN (${placeholders})
+         WHERE account_id = ? AND folder <> 'draft' AND ${imapKey} IN (${placeholders})${plainImapExclusion}
        ) WHERE rn <= ? ORDER BY sent_at ASC`,
     )
       .bind(account.id, ...keys, PER_THREAD)
@@ -214,7 +218,7 @@ async function accountThreads(
     env.DB.prepare(
       `SELECT ${imapKey} AS key, COUNT(*) AS total, COALESCE(SUM(unread), 0) AS unread
        FROM imap_messages
-       WHERE account_id = ? AND folder <> 'draft' AND ${imapKey} IN (${placeholders})
+       WHERE account_id = ? AND folder <> 'draft' AND ${imapKey} IN (${placeholders})${plainImapExclusion}
        GROUP BY key`,
     )
       .bind(account.id, ...keys)
@@ -317,13 +321,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const scope: ThreadScope = labelId ? { kind: 'label', labelId } : { kind: 'folder', folder }
   const limit = clampPageSize(Number(url.searchParams.get('limit') ?? ''))
   const before = decodePageCursor(url.searchParams.get('before'))
-  // A relay draft stored in another mailbox is mirrored there as an ordinary
-  // draft: hide the mirror so it is listed once, under the account that owns it,
+  // A relay copy stored in another mailbox is mirrored there as an ordinary
+  // message: hide the mirror so it is listed once, under the account that owns it,
   // exactly like the flat list does.
-  const hiddenDraftIds =
-    scope.kind === 'folder' && scope.folder === 'draft'
-      ? await relayDraftMirrorIds(context.env)
-      : []
+  const hiddenMirrorIds =
+    scope.kind === 'folder' && scope.folder === 'sent'
+      ? await relaySentMirrorIds(context.env)
+      : scope.kind === 'folder' && scope.folder === 'draft'
+        ? await relayDraftMirrorIds(context.env)
+        : []
 
   let accounts: AccountRow[]
   if (accountId === 'all') {
@@ -355,7 +361,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           accountSyncing = state?.status === 'partial'
           accountStale = needsBackgroundSync(state)
         }
-        const loaded = await accountThreads(context.env, account, scope, limit, before, hiddenDraftIds)
+        const loaded = await accountThreads(context.env, account, scope, limit, before, hiddenMirrorIds)
         return {
           account,
           loaded,

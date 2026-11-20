@@ -10,7 +10,7 @@ import {
 import { toContact, type ContactRow } from '../../_lib/contacts'
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
-import { relayDraftMirrorIds } from '../../_lib/mail/relay-target'
+import { relayDraftMirrorIds, relaySentMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
 import { imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
 import {
@@ -102,11 +102,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const accountIds = accounts.map((account) => account.id)
   const needle = likeNeedle(query)
   const messages: MessageSummary[] = []
-  // A relay draft also exists as a mirrored draft of the mailbox that stores it;
+  // A relay copy also exists as a mirrored message of the mailbox that stores it;
   // list it once, under the relay account that owns it.
-  const hiddenDraftIds =
-    folder === null || folder === 'draft' ? await relayDraftMirrorIds(context.env) : []
-  const exclusion = idExclusionClause('id', hiddenDraftIds)
+  const includeDraftCopies = folder === null || folder === 'draft'
+  const includeSentCopies = folder === null || folder === 'sent'
+  const hiddenMirrorIds = [
+    ...(includeSentCopies ? await relaySentMirrorIds(context.env) : []),
+    ...(includeDraftCopies ? await relayDraftMirrorIds(context.env) : []),
+  ]
+  const exclusion = idExclusionClause('id', hiddenMirrorIds)
 
   if (accountIds.length > 0) {
     const placeholders = accountIds.map(() => '?').join(', ')

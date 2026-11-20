@@ -47,22 +47,35 @@ export function parseRelayMessageId(id: string): string | null {
 }
 
 /**
- * Mirror ids of the drafts that a relay account appends to another mailbox.
+ * Mirror ids of the copies that a relay account keeps in another mailbox.
  *
- * A relay draft is listed from its `messages` row; the mailbox copy is mirrored
- * as a normal IMAP draft of the target account, so its id is filtered out of the
- * Drafts list and of draft searches. Non-pointer storage keys (Drive/R2 objects)
- * are ignored.
+ * A relay copy is listed from its `messages` row; the mailbox copy is mirrored
+ * as a normal message of the target account (`i_<account>.<folder>.<uid>`), so
+ * its id is filtered out of the folder list and of searches. Non-pointer storage
+ * keys (Drive/R2 objects) are ignored.
  */
-export function draftMirrorIdsFromPointers(
+export function mirrorIdsFromPointers(
   keys: Array<string | null | undefined>,
+  folder: 'sent' | 'draft',
 ): string[] {
   const ids: string[] = []
   for (const key of keys) {
     const pointer = parseImapPointer(key)
     if (pointer) {
-      ids.push(imapMessageId(pointer.accountId, 'draft', pointer.uid))
+      ids.push(imapMessageId(pointer.accountId, folder, pointer.uid))
     }
   }
   return ids
+}
+
+export function draftMirrorIdsFromPointers(
+  keys: Array<string | null | undefined>,
+): string[] {
+  return mirrorIdsFromPointers(keys, 'draft')
+}
+
+export function sentMirrorIdsFromPointers(
+  keys: Array<string | null | undefined>,
+): string[] {
+  return mirrorIdsFromPointers(keys, 'sent')
 }

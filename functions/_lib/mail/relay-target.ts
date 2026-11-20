@@ -7,7 +7,7 @@ import {
   type ImapCopyPointer,
 } from '../../../shared/relay-copy'
 import { deleteMessageAt, fetchMessageAt, saveDraft, appendToSent } from './imap'
-import { draftMirrorIdsFromPointers } from './ids'
+import { mirrorIdsFromPointers } from './ids'
 import { isSchemaError } from '../schema'
 import { storageForDriver } from '../storage'
 
@@ -50,19 +50,23 @@ export async function storeCopyInMailbox(
 }
 
 /**
- * Mirror ids of the drafts that a relay account keeps in another mailbox.
+ * Mirror ids of the copies that a relay account keeps in another mailbox.
  *
- * The appended draft is mirrored as a normal IMAP draft of the target account
- * (\`i_<account>.draft.<uid>\`), while the app lists the relay row. Passing these
- * ids to the Drafts query keeps the same draft from appearing twice.
+ * The appended copy is mirrored as a normal message of the target account
+ * (`i_<account>.<folder>.<uid>`), while the app lists the relay row. Passing
+ * these ids to the folder query keeps the same message from appearing twice.
  */
-export async function relayDraftMirrorIds(env: Env, limit = 500): Promise<string[]> {
+async function relayMirrorIds(
+  env: Env,
+  folder: 'sent' | 'draft',
+  limit = 500,
+): Promise<string[]> {
   let rows: { storage_key: string }[]
   try {
     const result = await env.DB.prepare(
-      "SELECT storage_key FROM messages WHERE folder = 'draft' AND storage_driver = 'imap' AND storage_key LIKE 'imap:%' ORDER BY sent_at DESC LIMIT ?",
+      "SELECT storage_key FROM messages WHERE folder = ? AND storage_driver = 'imap' AND storage_key LIKE 'imap:%' ORDER BY sent_at DESC LIMIT ?",
     )
-      .bind(limit)
+      .bind(folder, limit)
       .all<{ storage_key: string }>()
     rows = result.results
   } catch (error) {
@@ -71,7 +75,15 @@ export async function relayDraftMirrorIds(env: Env, limit = 500): Promise<string
     }
     return []
   }
-  return draftMirrorIdsFromPointers(rows.map((row) => row.storage_key))
+  return mirrorIdsFromPointers(rows.map((row) => row.storage_key), folder)
+}
+
+export async function relayDraftMirrorIds(env: Env, limit = 500): Promise<string[]> {
+  return relayMirrorIds(env, 'draft', limit)
+}
+
+export async function relaySentMirrorIds(env: Env, limit = 500): Promise<string[]> {
+  return relayMirrorIds(env, 'sent', limit)
 }
 
 export async function loadCopyBytes(env: Env, pointer: ImapCopyPointer): Promise<Uint8Array | null> {

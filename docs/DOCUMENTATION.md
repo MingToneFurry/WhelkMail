@@ -137,7 +137,9 @@ Key constraints:
 | `r2` | `accounts/<id>/sent/<id>.eml` in R2 | `accounts/<id>/drafts/<id>.eml` in R2 | `BUCKET` binding |
 | `imap` | `APPEND` to the target account's Sent folder | `APPEND` to the target account's Drafts folder | `sent_copy_account_id` pointing at a connected IMAP account |
 
-Switching back to `drive` or `r2` clears `sent_copy_account_id`. Copies appended to a mailbox are real messages on the provider: deleting the account or a row in D1 never deletes them. Each message keeps the destination it was written with, so changing destination does not orphan the older copies: they stay readable and deletable wherever they are stored.
+Switching back to `drive` or `r2` clears `sent_copy_account_id`. Copies appended to a mailbox are real messages on the provider: deleting the account never deletes them, while deleting the message from the app removes the copy wherever it is stored. Each message keeps the destination it was written with, so changing destination does not orphan the older copies: they stay readable and deletable wherever they are stored.
+
+When the destination is an IMAP mailbox, each sent copy is also mirrored in that account's Sent folder. The mirror ids are derived from the relay pointers (`relaySentMirrorIds` → `sentMirrorIdsFromPointers`) and excluded from the Sent list, conversation counts and searches, so the message is listed once under the relay account. Deleting the merged row removes the physical message and the mirror row; moving it moves the physical message in the target mailbox, drops the relay row and queues a sync, so the target account's mirror owns the message from its new folder. Moving a relay row that is not backed by a mailbox pointer is still refused.
 
 ## 4. Project structure
 
