@@ -1,6 +1,7 @@
 import type { Folder, MailThread } from '../../../shared/types'
 import {
   getAccountRow,
+  idExclusionClause,
   listAccountRows,
   relayMessageSummary,
   type AccountRow,
@@ -8,6 +9,7 @@ import {
 } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
 import { fail, json } from '../../_lib/http'
+import { relayDraftMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
 import { getSyncState, imapMessageSummary, type ImapMessageRow } from '../../_lib/sync'
 import { listActiveSyncLocks, needsBackgroundSync } from '../../_lib/sync-trigger'
@@ -56,13 +58,90 @@ type ThreadScope =
   | { kind: 'folder'; folder: Folder }
   | { kind: 'label'; labelId: string }
 
+/**
+ * Drafts are work in progress, not conversation history: the Drafts folder lists
+ * each draft on its own, even when it carries the thread key of an existing
+ * conversation. Loading them through the conversation queries below dropped them
+ * (those deliberately exclude `folder = 'draft'`), so the folder always looked
+ * empty.
+ */
+async function draftThreads(
+  env: Env,
+  account: AccountRow,
+  limit: number,
+  before: { date: string; id: string } | null,
+  hiddenDraftIds: string[],
+): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
+  const groups: GroupRow[] = []
+  const threads = new Map<string, ThreadRows>()
+  const exclusion = idExclusionClause('id', hiddenDraftIds)
+  const cursor = before ? ' AND (sent_at < ? OR (sent_at = ? AND id < ?))' : ''
+  const cursorParams = before ? [before.date, before.date, before.id] : []
+  // One extra row per source: the caller only returns a next cursor when it can
+  // tell there is something older than the page it is about to send.
+  const fetchLimit = limit + 1
+  const [imapRows, relayRows] = await Promise.all([
+    env.DB.prepare(
+      `SELECT * FROM imap_messages
+       WHERE account_id = ? AND folder = 'draft'${exclusion}${cursor}
+       ORDER BY sent_at DESC, id DESC LIMIT ?`,
+    )
+      .bind(account.id, ...cursorParams, fetchLimit)
+      .all<ImapMessageRow>(),
+    env.DB.prepare(
+      `SELECT * FROM messages
+       WHERE account_id = ? AND folder = 'draft'${cursor}
+       ORDER BY sent_at DESC, id DESC LIMIT ?`,
+    )
+      .bind(account.id, ...cursorParams, fetchLimit)
+      .all<MessageRow>(),
+  ])
+  const rows = [
+    ...imapRows.results.map((row) => ({
+      key: row.id,
+      row,
+      name: row.from_name,
+      email: row.from_email,
+      date: row.sent_at,
+    })),
+    ...relayRows.results.map((row) => ({
+      key: row.id,
+      row,
+      name: row.from_name,
+      email: row.from_email,
+      date: row.sent_at,
+    })),
+  ]
+  rows.sort((left, right) =>
+    compareByDateDesc(
+      { date: left.date, id: left.key },
+      { date: right.date, id: right.key },
+    ),
+  )
+  for (const item of rows.slice(0, fetchLimit)) {
+    addThreadRow(threads, item.key, item.row, item.name, item.email, false)
+    const entry = threads.get(item.key)
+    if (!entry) {
+      continue
+    }
+    entry.messages = 1
+    entry.unread = 0
+    groups.push({ key: item.key, last_at: item.date, total: 1, unread: 0 })
+  }
+  return { groups, threads }
+}
+
 async function accountThreads(
   env: Env,
   account: AccountRow,
   scope: ThreadScope,
   limit: number,
   before: { date: string; id: string } | null,
+  hiddenDraftIds: string[] = [],
 ): Promise<{ groups: GroupRow[]; threads: Map<string, ThreadRows> }> {
+  if (scope.kind === 'folder' && scope.folder === 'draft') {
+    return draftThreads(env, account, limit, before, hiddenDraftIds)
+  }
   const groups: GroupRow[] = []
   const threads = new Map<string, ThreadRows>()
 
@@ -238,6 +317,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const scope: ThreadScope = labelId ? { kind: 'label', labelId } : { kind: 'folder', folder }
   const limit = clampPageSize(Number(url.searchParams.get('limit') ?? ''))
   const before = decodePageCursor(url.searchParams.get('before'))
+  // A relay draft stored in another mailbox is mirrored there as an ordinary
+  // draft: hide the mirror so it is listed once, under the account that owns it,
+  // exactly like the flat list does.
+  const hiddenDraftIds =
+    scope.kind === 'folder' && scope.folder === 'draft'
+      ? await relayDraftMirrorIds(context.env)
+      : []
 
   let accounts: AccountRow[]
   if (accountId === 'all') {
@@ -269,7 +355,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           accountSyncing = state?.status === 'partial'
           accountStale = needsBackgroundSync(state)
         }
-        const loaded = await accountThreads(context.env, account, scope, limit, before)
+        const loaded = await accountThreads(context.env, account, scope, limit, before, hiddenDraftIds)
         return {
           account,
           loaded,

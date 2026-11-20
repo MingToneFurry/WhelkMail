@@ -125,6 +125,7 @@ Key constraints:
   - The mailbox copy is mirrored as an ordinary draft of the target account (`i_<account>.draft.<uid>`). The Drafts list and draft searches filter those ids out (`relayDraftMirrorIds` → `draftMirrorIdsFromPointers`), so the draft is listed once, under the relay account that owns it. Saving or deleting a draft queues a sync of the target Drafts folder, so the mirror follows the copy that was just appended or expunged. The exclusion runs inside SQL, before `LIMIT`, because filtering a page afterwards would shorten it and drop the next cursor. The ids are inlined as validated literals instead of bound parameters: D1 caps a statement at 100 parameters and a mailbox can hold many copies, so the list is filtered to `i_<account>.<folder>.<uid>` shapes and capped at 500 entries.
 - Autosave runs 5 seconds after the last change and every 30 seconds while changes remain. Closing the composer saves pending changes first; if the draft cannot be saved the user is asked whether to discard it.
 - An explicit **Save draft** closes the composer and opens the Drafts folder.
+- The Drafts folder is **not grouped into conversations**: each draft is its own row, even when it carries the thread key of an existing conversation. The thread queries deliberately exclude `folder = 'draft'`, so the list has a dedicated draft query; otherwise the folder would always look empty. A relay draft stored in another mailbox is still listed once, under the relay account.
 
 ### Where a send-only account keeps its copies
 
