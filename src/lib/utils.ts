@@ -100,6 +100,29 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+/**
+ * Prefix matching for recipient suggestions: every typed token must start a
+ * word of the name/company, or the email must start with it. Typing "m" no
+ * longer matches indirizzo@gmail.com; "rossi" matches "Mario Rossi".
+ */
+export function matchesContactPrefix(
+  contact: { name: string; email: string; company?: string },
+  query: string,
+): boolean {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) {
+    return false
+  }
+  const words = `${contact.name} ${contact.company ?? ''}`
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+  const email = contact.email.toLowerCase()
+  return tokens.every(
+    (token) => email.startsWith(token) || words.some((word) => word.startsWith(token)),
+  )
+}
+
 /** Readable display name for an address that is not in the address book yet. */
 export function nameFromEmail(email: string): string {
   const local = email.split('@')[0] ?? email

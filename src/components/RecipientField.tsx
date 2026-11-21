@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import type { Contact } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { displayAddress, isValidEmail } from '../lib/utils'
+import { displayAddress, isValidEmail, matchesContactPrefix } from '../lib/utils'
 
 interface RecipientFieldProps {
   value: string
@@ -41,7 +41,7 @@ export function RecipientField({
       if (needle.length === 0 || usedEmails.has(contact.email.toLowerCase())) {
         return false
       }
-      return `${contact.name} ${contact.email} ${contact.company}`.toLowerCase().includes(needle)
+      return matchesContactPrefix(contact, token)
     })
     .slice(0, 8)
   const tokenEmail = token.match(/[^\s,<>]+@[^\s,<>]+\.[^\s,<>]+/)?.[0].replace(/[>,;]+$/, '')
