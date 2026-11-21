@@ -1,4 +1,4 @@
-import type { Contact, ContactSource, Mailbox } from '../../shared/types'
+import type { Contact, ContactInput, ContactSource, Mailbox } from '../../shared/types'
 import type { Env } from './env'
 import { isSchemaError } from './schema'
 
@@ -8,11 +8,35 @@ export interface ContactRow {
   email: string
   note: string | null
   source: string | null
+  first_name: string | null
+  last_name: string | null
+  company: string | null
+  job_title: string | null
+  phone: string | null
+  address: string | null
+  website: string | null
+  birthday: string | null
+  emails_json: string | null
+  phones_json: string | null
   created_at: string
 }
 
 function sourceOf(value: string | null | undefined): ContactSource {
   return value === 'auto' ? 'auto' : 'manual'
+}
+
+export function parseStringList(value: string | null | undefined): string[] {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0)
+      : []
+  } catch {
+    return []
+  }
 }
 
 export function toContact(row: ContactRow): Contact {
@@ -22,6 +46,16 @@ export function toContact(row: ContactRow): Contact {
     email: row.email,
     note: row.note ?? '',
     source: sourceOf(row.source),
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
+    company: row.company ?? '',
+    jobTitle: row.job_title ?? '',
+    phone: row.phone ?? '',
+    address: row.address ?? '',
+    website: row.website ?? '',
+    birthday: row.birthday ?? '',
+    additionalEmails: parseStringList(row.emails_json),
+    additionalPhones: parseStringList(row.phones_json),
     createdAt: row.created_at,
   }
 }
@@ -41,6 +75,63 @@ export function displayNameFromEmail(email: string): string {
 }
 
 export const AUTO_CONTACTS_SETTING = 'contact_auto_add'
+
+export interface ContactValues {
+  name: string
+  email: string
+  note: string | null
+  firstName: string
+  lastName: string
+  company: string
+  jobTitle: string
+  phone: string
+  address: string
+  website: string
+  birthday: string
+  additionalEmails: string[]
+  additionalPhones: string[]
+}
+
+type ContactInputLike = Partial<Omit<ContactInput, 'name' | 'email'>> & {
+  name?: string
+  email?: string
+}
+
+/** Merge an input with the current row, keeping omitted fields unchanged. */
+export function contactValues(input: ContactInputLike, existing?: ContactRow): ContactValues {
+  const email = normalizeEmail(input.email ?? existing?.email ?? '')
+  const stringField = (value: string | undefined, fallback: string | null | undefined) =>
+    (value === undefined ? (fallback ?? '') : value).trim()
+  const emailList = (value: string[] | undefined, fallback: string | null | undefined) => {
+    const list = value === undefined ? parseStringList(fallback) : value
+    return [
+      ...new Set(
+        list
+          .map((item) => normalizeEmail(item))
+          .filter((item) => item && item !== email),
+      ),
+    ]
+  }
+  const phoneList = (value: string[] | undefined, fallback: string | null | undefined) => {
+    const list = value === undefined ? parseStringList(fallback) : value
+    return [...new Set(list.map((item) => item.trim()).filter(Boolean))]
+  }
+  return {
+    name: (input.name === undefined ? (existing?.name ?? '') : input.name).trim(),
+    email,
+    note: input.note === undefined ? (existing?.note ?? null) : input.note,
+    firstName: stringField(input.firstName, existing?.first_name),
+    lastName: stringField(input.lastName, existing?.last_name),
+    company: stringField(input.company, existing?.company),
+    jobTitle: stringField(input.jobTitle, existing?.job_title),
+    phone: stringField(input.phone, existing?.phone),
+    address: stringField(input.address, existing?.address),
+    website: stringField(input.website, existing?.website),
+    birthday: stringField(input.birthday, existing?.birthday),
+    additionalEmails: emailList(input.additionalEmails, existing?.emails_json),
+    additionalPhones: phoneList(input.additionalPhones, existing?.phones_json),
+  }
+}
 
 /**
  * Gmail-style "Other contacts": every address a message was sent to is kept for

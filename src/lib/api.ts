@@ -171,6 +171,12 @@ export const api = {
   createContact(input: ContactInput): Promise<{ contact: Contact }> {
     return request('/api/contacts', { method: 'POST', body: JSON.stringify(input) })
   },
+  importContacts(contacts: ContactInput[]): Promise<{ imported: number; updated: number }> {
+    return request('/api/contacts/import', {
+      method: 'POST',
+      body: JSON.stringify({ contacts }),
+    })
+  },
   updateContact(id: string, input: ContactInput): Promise<{ contact: Contact }> {
     return request(`/api/contacts/${encodeURIComponent(id)}`, {
       method: 'PATCH',

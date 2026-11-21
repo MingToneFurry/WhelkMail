@@ -61,7 +61,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 
 - Gmail-style labels shared across all accounts, with a label view that collects messages from Inbox, Sent, Drafts and Spam.
 - Per-account incoming labels applied automatically.
-- Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc. Recipients of sent messages are added to **Other contacts** for autocomplete (on by default; Settings → General switches to manual only). Typing an unknown address offers **Add … to contacts** in the autocomplete menu, and replying to an unknown sender adds it silently. Contacts live in D1, so they do not need R2 or Drive.
+- Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc. Each contact has first/last name, email, phone, company, job title, address, website, birthday, additional emails/phones and notes. **vCard import auto-detects 3.0/4.0**, export defaults to vCard 3.0 with optional 4.0, and CSV stays available. Recipients of sent messages are added to **Other contacts** for autocomplete (on by default; Settings → General switches to manual only). Typing an unknown address offers **Add … to contacts** in the autocomplete menu, and replying to an unknown sender adds it silently. Contacts live in D1, so they do not need R2 or Drive.
 - Signatures: one shared signature or a different signature per account, with rich-text formatting.
 - Vacation responder (auto-reply): one shared message for all accounts or a different one per account, with rich-text body.
 

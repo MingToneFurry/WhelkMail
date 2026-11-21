@@ -194,9 +194,23 @@ export const contactCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(254),
   note: z.string().trim().max(1000).optional(),
+  firstName: z.string().trim().max(80).optional(),
+  lastName: z.string().trim().max(80).optional(),
+  company: z.string().trim().max(160).optional(),
+  jobTitle: z.string().trim().max(160).optional(),
+  phone: z.string().trim().max(80).optional(),
+  address: z.string().trim().max(500).optional(),
+  website: z.string().trim().max(300).optional(),
+  birthday: z.string().trim().max(32).optional(),
+  additionalEmails: z.array(email).max(20).optional(),
+  additionalPhones: z.array(z.string().trim().max(80)).max(20).optional(),
 })
 
 export const contactUpdateSchema = contactCreateSchema.partial()
+
+export const contactImportSchema = z.object({
+  contacts: z.array(contactCreateSchema).min(1).max(1000),
+})
 
 export const pushSubscribeSchema = z.object({
   endpoint: z

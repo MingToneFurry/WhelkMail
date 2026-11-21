@@ -1,5 +1,5 @@
 import { contactUpdateSchema } from '../../../shared/schemas'
-import { normalizeEmail, toContact, type ContactRow } from '../../_lib/contacts'
+import { contactValues, toContact, type ContactRow } from '../../_lib/contacts'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
@@ -33,34 +33,37 @@ async function updateContact(context: Parameters<PagesFunction<Env>>[0]): Promis
       'contact_invalid',
     )
   }
-  const name = parsed.data.name ?? row.name
-  const email = parsed.data.email === undefined ? row.email : normalizeEmail(parsed.data.email)
-  const note = parsed.data.note === undefined ? row.note : parsed.data.note
-  if (email !== row.email) {
+  const values = contactValues(parsed.data, row)
+  if (values.email !== row.email) {
     const duplicate = await context.env.DB.prepare(
       'SELECT id FROM contacts WHERE lower(email) = ? AND id <> ?',
     )
-      .bind(email, id)
+      .bind(values.email, id)
       .first<{ id: string }>()
     if (duplicate) {
       return fail('A contact with this email already exists', 409, undefined, 'contact_exists')
     }
   }
-  try {
-    await context.env.DB.prepare(
-      "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual' WHERE id = ?",
+  await context.env.DB.prepare(
+    "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual', first_name = ?, last_name = ?, company = ?, job_title = ?, phone = ?, address = ?, website = ?, birthday = ?, emails_json = ?, phones_json = ? WHERE id = ?",
+  )
+    .bind(
+      values.name,
+      values.email,
+      values.note,
+      values.firstName,
+      values.lastName,
+      values.company,
+      values.jobTitle,
+      values.phone,
+      values.address,
+      values.website,
+      values.birthday,
+      JSON.stringify(values.additionalEmails),
+      JSON.stringify(values.additionalPhones),
+      id,
     )
-      .bind(name, email, note, id)
-      .run()
-  } catch (error) {
-    if (!isSchemaError(error)) {
-      throw error
-    }
-    // Migration 032 not applied yet: the edit still gets saved.
-    await context.env.DB.prepare('UPDATE contacts SET name = ?, email = ?, note = ? WHERE id = ?')
-      .bind(name, email, note, id)
-      .run()
-  }
+    .run()
   const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
     .bind(id)
     .first<ContactRow>()

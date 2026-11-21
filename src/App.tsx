@@ -1445,6 +1445,26 @@ export default function App() {
     return createContact({ name: nameFromEmail(email), email })
   }
 
+  async function importContacts(
+    inputs: ContactInput[],
+  ): Promise<{ imported: number; updated: number } | null> {
+    try {
+      let imported = 0
+      let updated = 0
+      for (let index = 0; index < inputs.length; index += 500) {
+        const result = await api.importContacts(inputs.slice(index, index + 500))
+        imported += result.imported
+        updated += result.updated
+      }
+      const response = await api.contacts()
+      setContacts(response.contacts)
+      return { imported, updated }
+    } catch (error) {
+      setSettingsError(errorText(error, t))
+      return null
+    }
+  }
+
   async function updateContact(id: string, input: ContactInput): Promise<boolean> {
     try {
       const response = await api.updateContact(id, input)
@@ -1903,6 +1923,7 @@ export default function App() {
             onCreate={createContact}
             onUpdate={updateContact}
             onDelete={(id) => void deleteContact(id)}
+            onImport={importContacts}
           />
         ) : (
           <>

@@ -1,6 +1,10 @@
 import { contactCreateSchema } from '../../../shared/schemas'
-import type { Contact } from '../../../shared/types'
-import { normalizeEmail, toContact, type ContactRow } from '../../_lib/contacts'
+import {
+  contactValues,
+  normalizeEmail,
+  toContact,
+  type ContactRow,
+} from '../../_lib/contacts'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
@@ -11,12 +15,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const query = url.searchParams.get('q')?.trim() ?? ''
     const rows = query
       ? await context.env.DB.prepare(
-          'SELECT * FROM contacts WHERE lower(name) LIKE ? OR lower(email) LIKE ? ORDER BY name COLLATE NOCASE ASC LIMIT 500',
+          'SELECT * FROM contacts WHERE lower(name) LIKE ? OR lower(email) LIKE ? ORDER BY name COLLATE NOCASE ASC LIMIT 5000',
         )
           .bind(`%${query.toLowerCase()}%`, `%${query.toLowerCase()}%`)
           .all<ContactRow>()
       : await context.env.DB.prepare(
-          'SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC LIMIT 500',
+          'SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC LIMIT 5000',
         ).all<ContactRow>()
     return json({ contacts: rows.results.map(toContact) })
   } catch (error) {
@@ -55,24 +59,28 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   )
     .bind(email)
     .first<ContactRow>()
+  const values = contactValues(parsed.data, existing ?? undefined)
   if (existing) {
-    const name = parsed.data.name
-    const note = parsed.data.note === undefined ? existing.note : parsed.data.note
-    try {
-      await context.env.DB.prepare(
-        "UPDATE contacts SET name = ?, note = ?, source = 'manual' WHERE id = ?",
+    await context.env.DB.prepare(
+      "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual', first_name = ?, last_name = ?, company = ?, job_title = ?, phone = ?, address = ?, website = ?, birthday = ?, emails_json = ?, phones_json = ? WHERE id = ?",
+    )
+      .bind(
+        values.name,
+        values.email,
+        values.note,
+        values.firstName,
+        values.lastName,
+        values.company,
+        values.jobTitle,
+        values.phone,
+        values.address,
+        values.website,
+        values.birthday,
+        JSON.stringify(values.additionalEmails),
+        JSON.stringify(values.additionalPhones),
+        existing.id,
       )
-        .bind(name, note, existing.id)
-        .run()
-    } catch (error) {
-      if (!isSchemaError(error)) {
-        throw error
-      }
-      // Migration 032 not applied yet: the contact still gets saved.
-      await context.env.DB.prepare('UPDATE contacts SET name = ?, note = ? WHERE id = ?')
-        .bind(name, note, existing.id)
-        .run()
-    }
+      .run()
     const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
       .bind(existing.id)
       .first<ContactRow>()
@@ -83,33 +91,32 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   }
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  try {
-    await context.env.DB.prepare(
-      "INSERT INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, ?, ?, 'manual')",
-    )
-      .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
-      .run()
-  } catch (error) {
-    if (!isSchemaError(error)) {
-      throw error
-    }
-    await context.env.DB.prepare(
-      'INSERT INTO contacts (id, name, email, note, created_at) VALUES (?, ?, ?, ?, ?)',
-    )
-      .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
-      .run()
-  }
-  return json(
-    {
-      contact: {
-        id,
-        name: parsed.data.name,
-        email,
-        note: parsed.data.note ?? '',
-        source: 'manual',
-        createdAt,
-      } satisfies Contact,
-    },
-    201,
+  await context.env.DB.prepare(
+    "INSERT INTO contacts (id, name, email, note, source, first_name, last_name, company, job_title, phone, address, website, birthday, emails_json, phones_json, created_at) VALUES (?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
+    .bind(
+      id,
+      values.name,
+      values.email,
+      values.note,
+      values.firstName,
+      values.lastName,
+      values.company,
+      values.jobTitle,
+      values.phone,
+      values.address,
+      values.website,
+      values.birthday,
+      JSON.stringify(values.additionalEmails),
+      JSON.stringify(values.additionalPhones),
+      createdAt,
+    )
+    .run()
+  const inserted = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
+    .bind(id)
+    .first<ContactRow>()
+  if (!inserted) {
+    return fail('Internal error', 500, undefined, 'internal')
+  }
+  return json({ contact: toContact(inserted) }, 201)
 }

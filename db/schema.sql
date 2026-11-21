@@ -130,6 +130,16 @@ CREATE TABLE IF NOT EXISTS contacts (
   email TEXT NOT NULL,
   note TEXT,
   source TEXT NOT NULL DEFAULT 'manual',
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  company TEXT NOT NULL DEFAULT '',
+  job_title TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  website TEXT NOT NULL DEFAULT '',
+  birthday TEXT NOT NULL DEFAULT '',
+  emails_json TEXT NOT NULL DEFAULT '[]',
+  phones_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL
 );
 

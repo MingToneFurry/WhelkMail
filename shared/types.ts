@@ -28,6 +28,16 @@ export interface Contact {
   note: string
   /** `auto` entries are the Gmail-style "Other contacts" created when sending. */
   source: ContactSource
+  firstName: string
+  lastName: string
+  company: string
+  jobTitle: string
+  phone: string
+  address: string
+  website: string
+  birthday: string
+  additionalEmails: string[]
+  additionalPhones: string[]
   createdAt: string
 }
 
@@ -35,6 +45,16 @@ export interface ContactInput {
   name: string
   email: string
   note?: string
+  firstName?: string
+  lastName?: string
+  company?: string
+  jobTitle?: string
+  phone?: string
+  address?: string
+  website?: string
+  birthday?: string
+  additionalEmails?: string[]
+  additionalPhones?: string[]
 }
 
 export type SyncStatus = 'idle' | 'partial' | 'done' | 'error'

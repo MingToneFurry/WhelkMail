@@ -38,12 +38,10 @@ export function RecipientField({
   const needle = token.toLowerCase()
   const suggestions = contacts
     .filter((contact) => {
-      if (usedEmails.has(contact.email.toLowerCase())) {
+      if (needle.length === 0 || usedEmails.has(contact.email.toLowerCase())) {
         return false
       }
-      return (
-        needle.length === 0 || `${contact.name} ${contact.email}`.toLowerCase().includes(needle)
-      )
+      return `${contact.name} ${contact.email} ${contact.company}`.toLowerCase().includes(needle)
     })
     .slice(0, 8)
   const tokenEmail = token.match(/[^\s,<>]+@[^\s,<>]+\.[^\s,<>]+/)?.[0].replace(/[>,;]+$/, '')
@@ -149,7 +147,7 @@ export function RecipientField({
         className={inputClassName}
         autoComplete="off"
       />
-      {open && options.length > 0 ? (
+      {open && token.length > 0 && options.length > 0 ? (
         <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-lg">
           {options.map((option, index) => (
             <button
