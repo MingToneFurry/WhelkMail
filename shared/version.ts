@@ -6,7 +6,7 @@
  * compares against the latest GitHub release. `tests/version.test.ts` keeps it
  * in step with package.json.
  */
-export const APP_VERSION = '1.3.0'
+export const APP_VERSION = '1.3.1'
 
 export interface ParsedVersion {
   major: number
