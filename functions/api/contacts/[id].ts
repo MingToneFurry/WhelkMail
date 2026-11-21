@@ -46,11 +46,21 @@ async function updateContact(context: Parameters<PagesFunction<Env>>[0]): Promis
       return fail('A contact with this email already exists', 409, undefined, 'contact_exists')
     }
   }
-  await context.env.DB.prepare(
-    "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual' WHERE id = ?",
-  )
-    .bind(name, email, note, id)
-    .run()
+  try {
+    await context.env.DB.prepare(
+      "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual' WHERE id = ?",
+    )
+      .bind(name, email, note, id)
+      .run()
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+    // Migration 032 not applied yet: the edit still gets saved.
+    await context.env.DB.prepare('UPDATE contacts SET name = ?, email = ?, note = ? WHERE id = ?')
+      .bind(name, email, note, id)
+      .run()
+  }
   const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
     .bind(id)
     .first<ContactRow>()

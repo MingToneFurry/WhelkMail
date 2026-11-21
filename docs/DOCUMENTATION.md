@@ -213,7 +213,7 @@ Enabled filters are also evaluated when the inbox is listed and when the cron wo
 
 ### `contacts`
 
-Shared address book: `id`, `name`, `email`, `note`, `source`, `created_at`. `source` is `manual` or `auto`: sending a message adds its recipients to the Gmail-style **Other contacts** for autocomplete unless `app_settings.contact_auto_add` is `0`; editing an automatic contact promotes it to `manual`. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
+Shared address book: `id`, `name`, `email`, `note`, `source`, `created_at`. It lives in D1 (`contacts`), not in R2/Drive. `source` is `manual` or `auto`: sending a message adds its recipients to the Gmail-style **Other contacts** for autocomplete unless `app_settings.contact_auto_add` is `0`; editing an automatic contact promotes it to `manual`. Typing an unknown address in To/Cc/Bcc offers an explicit **Add to contacts** entry, and opening a reply silently adds the unknown recipients. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
 
 ### Auto-reply (vacation responder)
 

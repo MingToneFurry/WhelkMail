@@ -34,7 +34,7 @@ import { syncSignature } from './lib/sync-signature'
 import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
 import { mergePage } from '../shared/paging'
 import { pickReplySender } from './lib/sender'
-import { displayAddress } from './lib/utils'
+import { displayAddress, isValidEmail, nameFromEmail } from './lib/utils'
 import { Compose } from './components/Compose'
 import { Contacts } from './components/Contacts'
 import { Login } from './components/Login'
@@ -1108,6 +1108,23 @@ export default function App() {
     const text = `\n\nOn ${new Date(message.date).toLocaleString()}, ${displayAddress(
       message.from,
     )} wrote:\n${quoted}`
+    // Gmail quietly keeps people you reply to in Other contacts. Doing it when
+    // the reply opens means an interrupted reply still remembers the address.
+    if (contactAutoAdd) {
+      const known = new Set(contacts.map((contact) => contact.email.toLowerCase()))
+      const own = new Set(accounts.map((account) => account.email.toLowerCase()))
+      for (const email of [...to, ...cc]) {
+        const normalized = email.trim().toLowerCase()
+        if (
+          isValidEmail(normalized) &&
+          !known.has(normalized) &&
+          !own.has(normalized)
+        ) {
+          known.add(normalized)
+          void addContactFromEmail(normalized)
+        }
+      }
+    }
     openCompose(null, {
       accountId: sendingAccountId,
       fromEmail,
@@ -1422,6 +1439,10 @@ export default function App() {
       setSettingsError(errorText(error, t))
       return null
     }
+  }
+
+  function addContactFromEmail(email: string): Promise<Contact | null> {
+    return createContact({ name: nameFromEmail(email), email })
   }
 
   async function updateContact(id: string, input: ContactInput): Promise<boolean> {
@@ -2087,6 +2108,7 @@ export default function App() {
           key={composeKey}
           accounts={accounts}
           contacts={contacts}
+          onAddContact={addContactFromEmail}
           defaultAccountId={composeAccountId}
           defaultSignature={defaultSignature}
           defaultSignatureHtml={defaultSignatureHtml}

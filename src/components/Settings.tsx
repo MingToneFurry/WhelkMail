@@ -1006,7 +1006,7 @@ function AutoReplySettings({
               className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
             />
           </label>
-          <label className="mt-3 block text-xs">
+          <div className="mt-3 block text-xs">
             <span className="mb-1 block font-medium text-muted">
               {t('settings.autoReplyBody')}
             </span>
@@ -1016,7 +1016,7 @@ function AutoReplySettings({
               minHeight="min-h-28"
               onChange={(nextHtml) => setBodyDraft(nextHtml)}
             />
-          </label>
+          </div>
           <div className="mt-3 flex justify-end">
             <button
               type="button"
@@ -1096,7 +1096,7 @@ function AccountAutoReplyEditor({
           className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
         />
       </label>
-      <label className="mt-3 block text-xs">
+      <div className="mt-3 block text-xs">
         <span className="mb-1 block font-medium text-muted">{t('settings.autoReplyBody')}</span>
         <RichTextField
           html={body}
@@ -1104,7 +1104,7 @@ function AccountAutoReplyEditor({
           minHeight="min-h-24"
           onChange={(nextHtml) => setBody(nextHtml)}
         />
-      </label>
+      </div>
       <div className="mt-3 flex justify-end">
         <button
           type="button"
@@ -1456,7 +1456,7 @@ export function Settings({
 
           {signatureMode === 'shared' ? (
             <div className="mt-4">
-              <label className="block text-xs">
+              <div className="block text-xs">
                 <span className="mb-1 block font-medium text-muted">
                   {t('settings.defaultSignature')}
                 </span>
@@ -1466,7 +1466,7 @@ export function Settings({
                   minHeight="min-h-28"
                   onChange={(nextHtml) => setSignatureHtmlDraft(nextHtml)}
                 />
-              </label>
+              </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-muted">{t('settings.defaultSignatureHint')}</p>
                 <button

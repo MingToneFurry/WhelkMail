@@ -100,6 +100,18 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+/** Readable display name for an address that is not in the address book yet. */
+export function nameFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? email
+  return (
+    local
+      .replace(/[._+-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase()) || email
+  )
+}
+
 export async function fileToBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   let binary = ''

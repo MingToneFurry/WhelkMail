@@ -77,19 +77,33 @@ export async function addAutoContacts(env: Env, recipients: Mailbox[]): Promise<
       return
     }
     const createdAt = new Date().toISOString()
-    const statements: D1PreparedStatement[] = []
-    for (const [email, recipient] of byEmail) {
-      const name = recipient.name?.trim() || displayNameFromEmail(email)
-      statements.push(
-        env.DB.prepare(
-          "INSERT OR IGNORE INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, NULL, ?, 'auto')",
-        ).bind(crypto.randomUUID(), name, email, createdAt),
-      )
-    }
-    if (statements.length > 0) {
+    const insert = async (withSource: boolean) => {
+      const statements: D1PreparedStatement[] = []
+      for (const [email, recipient] of byEmail) {
+        const name = recipient.name?.trim() || displayNameFromEmail(email)
+        statements.push(
+          withSource
+            ? env.DB.prepare(
+                "INSERT OR IGNORE INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, NULL, ?, 'auto')",
+              ).bind(crypto.randomUUID(), name, email, createdAt)
+            : env.DB.prepare(
+                'INSERT OR IGNORE INTO contacts (id, name, email, note, created_at) VALUES (?, ?, ?, NULL, ?)',
+              ).bind(crypto.randomUUID(), name, email, createdAt),
+        )
+      }
       for (let index = 0; index < statements.length; index += 100) {
         await env.DB.batch(statements.slice(index, index + 100))
       }
+    }
+    try {
+      await insert(true)
+    } catch (error) {
+      if (!isSchemaError(error)) {
+        throw error
+      }
+      // The `source` column comes from migration 032. Saving the address is more
+      // important than the Other-contacts badge: keep working on an older schema.
+      await insert(false)
     }
   } catch (error) {
     // Recording recipients must never turn a successful send into an error.

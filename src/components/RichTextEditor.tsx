@@ -1,4 +1,13 @@
-import { useEffect, useImperativeHandle, useRef, type ClipboardEvent, type RefObject } from 'react'
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import {
   Bold,
   Italic,
@@ -87,12 +96,23 @@ export function RichTextEditor({
       return
     }
     editor.focus()
-    const range = savedRange.current
     const selection = window.getSelection()
-    if (range && selection && editor.contains(range.commonAncestorContainer)) {
+    if (!selection) {
+      return
+    }
+    const range = savedRange.current
+    if (range && editor.contains(range.commonAncestorContainer)) {
       selection.removeAllRanges()
       selection.addRange(range)
+      return
     }
+    // No usable range: do not leave a stale selection that would make the next
+    // command wrap the whole signature in <b>. Put the caret at the end instead.
+    const end = document.createRange()
+    end.selectNodeContents(editor)
+    end.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(end)
   }
 
   function command(name: string, value?: string) {
@@ -162,104 +182,87 @@ interface RichTextToolbarProps {
   onLink: () => void
 }
 
+function ToolButton({
+  label,
+  onAction,
+  children,
+}: {
+  label: string
+  onAction: () => void
+  children: ReactNode
+}) {
+  function runPointer(event: ReactPointerEvent<HTMLButtonElement>) {
+    // Run on pointerdown: the selection dies on click because the button takes
+    // focus, which made "bold" wrap the entire signature or do nothing.
+    event.preventDefault()
+    onAction()
+  }
+  function runKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onAction()
+    }
+  }
+  return (
+    <button
+      type="button"
+      onPointerDown={runPointer}
+      onKeyDown={runKey}
+      className="rounded p-1.5 text-muted hover:bg-slate-100 hover:text-slate-800"
+      aria-label={label}
+      title={label}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function RichTextToolbar({ className, onCommand, onLink }: RichTextToolbarProps) {
   const { t } = useI18n()
-  const buttonClass = 'rounded p-1.5 text-muted hover:bg-slate-100 hover:text-slate-800'
 
   return (
     <div className={`flex flex-wrap items-center gap-0.5 ${className ?? ''}`}>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('bold')}
-        className={buttonClass}
-        aria-label={t('compose.bold')}
-        title={t('compose.bold')}
-      >
+      <ToolButton label={t('compose.bold')} onAction={() => onCommand('bold')}>
         <Bold size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('italic')}
-        className={buttonClass}
-        aria-label={t('compose.italic')}
-        title={t('compose.italic')}
-      >
+      </ToolButton>
+      <ToolButton label={t('compose.italic')} onAction={() => onCommand('italic')}>
         <Italic size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('underline')}
-        className={buttonClass}
-        aria-label={t('compose.underline')}
-        title={t('compose.underline')}
-      >
+      </ToolButton>
+      <ToolButton label={t('compose.underline')} onAction={() => onCommand('underline')}>
         <Underline size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('strikeThrough')}
-        className={buttonClass}
-        aria-label={t('compose.strike')}
-        title={t('compose.strike')}
-      >
+      </ToolButton>
+      <ToolButton label={t('compose.strike')} onAction={() => onCommand('strikeThrough')}>
         <Strikethrough size={16} />
-      </button>
+      </ToolButton>
       <span className="mx-1 h-4 w-px bg-line" />
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('insertUnorderedList')}
-        className={buttonClass}
-        aria-label={t('compose.bulletList')}
-        title={t('compose.bulletList')}
+      <ToolButton
+        label={t('compose.bulletList')}
+        onAction={() => onCommand('insertUnorderedList')}
       >
         <List size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('insertOrderedList')}
-        className={buttonClass}
-        aria-label={t('compose.numberedList')}
-        title={t('compose.numberedList')}
+      </ToolButton>
+      <ToolButton
+        label={t('compose.numberedList')}
+        onAction={() => onCommand('insertOrderedList')}
       >
         <ListOrdered size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('formatBlock', 'blockquote')}
-        className={buttonClass}
-        aria-label={t('compose.quote')}
-        title={t('compose.quote')}
+      </ToolButton>
+      <ToolButton
+        label={t('compose.quote')}
+        onAction={() => onCommand('formatBlock', 'blockquote')}
       >
         <Quote size={16} />
-      </button>
+      </ToolButton>
       <span className="mx-1 h-4 w-px bg-line" />
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={onLink}
-        className={buttonClass}
-        aria-label={t('compose.link')}
-        title={t('compose.link')}
-      >
+      <ToolButton label={t('compose.link')} onAction={onLink}>
         <Link2 size={16} />
-      </button>
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onCommand('removeFormat')}
-        className={buttonClass}
-        aria-label={t('compose.clearFormatting')}
-        title={t('compose.clearFormatting')}
+      </ToolButton>
+      <ToolButton
+        label={t('compose.clearFormatting')}
+        onAction={() => onCommand('removeFormat')}
       >
         <RemoveFormatting size={16} />
-      </button>
+      </ToolButton>
     </div>
   )
 }

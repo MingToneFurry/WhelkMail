@@ -44,6 +44,7 @@ interface PendingAttachment {
 interface ComposeProps {
   accounts: Account[]
   contacts: Contact[]
+  onAddContact: (email: string) => Promise<Contact | null>
   defaultAccountId: string | null
   maxAttachmentBytes: number
   defaultSignature: string
@@ -87,6 +88,7 @@ function signatureOf(
 export function Compose({
   accounts,
   contacts,
+  onAddContact,
   defaultAccountId,
   maxAttachmentBytes,
   defaultSignature,
@@ -537,6 +539,7 @@ export function Compose({
               value={to}
               onChange={setTo}
               contacts={contacts}
+              onAddContact={onAddContact}
               placeholder="destinatario@dominio.it"
               inputClassName="w-full bg-transparent outline-none"
             />
@@ -561,6 +564,7 @@ export function Compose({
                 value={cc}
                 onChange={setCc}
                 contacts={contacts}
+                onAddContact={onAddContact}
                 inputClassName="w-full bg-transparent outline-none"
               />
             </div>
@@ -573,6 +577,7 @@ export function Compose({
                 value={bcc}
                 onChange={setBcc}
                 contacts={contacts}
+                onAddContact={onAddContact}
                 inputClassName="w-full bg-transparent outline-none"
               />
             </div>

@@ -58,11 +58,21 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   if (existing) {
     const name = parsed.data.name
     const note = parsed.data.note === undefined ? existing.note : parsed.data.note
-    await context.env.DB.prepare(
-      "UPDATE contacts SET name = ?, note = ?, source = 'manual' WHERE id = ?",
-    )
-      .bind(name, note, existing.id)
-      .run()
+    try {
+      await context.env.DB.prepare(
+        "UPDATE contacts SET name = ?, note = ?, source = 'manual' WHERE id = ?",
+      )
+        .bind(name, note, existing.id)
+        .run()
+    } catch (error) {
+      if (!isSchemaError(error)) {
+        throw error
+      }
+      // Migration 032 not applied yet: the contact still gets saved.
+      await context.env.DB.prepare('UPDATE contacts SET name = ?, note = ? WHERE id = ?')
+        .bind(name, note, existing.id)
+        .run()
+    }
     const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
       .bind(existing.id)
       .first<ContactRow>()
@@ -73,11 +83,22 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   }
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  await context.env.DB.prepare(
-    "INSERT INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, ?, ?, 'manual')",
-  )
-    .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
-    .run()
+  try {
+    await context.env.DB.prepare(
+      "INSERT INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, ?, ?, 'manual')",
+    )
+      .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
+      .run()
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+    await context.env.DB.prepare(
+      'INSERT INTO contacts (id, name, email, note, created_at) VALUES (?, ?, ?, ?, ?)',
+    )
+      .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
+      .run()
+  }
   return json(
     {
       contact: {
