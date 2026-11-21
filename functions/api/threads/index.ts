@@ -1,4 +1,4 @@
-import type { Folder, MailThread } from '../../../shared/types'
+import type { Folder, MailThread, MessageSummary } from '../../../shared/types'
 import {
   getAccountRow,
   idExclusionClause,
@@ -8,6 +8,7 @@ import {
   type MessageRow,
 } from '../../_lib/db'
 import type { Env } from '../../_lib/env'
+import { applyFilters } from '../../_lib/filters'
 import { fail, json } from '../../_lib/http'
 import { relayDraftMirrorIds, relaySentMirrorIds } from '../../_lib/mail/relay-target'
 import { isSchemaError } from '../../_lib/schema'
@@ -307,6 +308,70 @@ async function labelIdsFor(env: Env, ids: string[]): Promise<Map<string, string[
   return assignments
 }
 
+/**
+ * Labels of the whole conversation, not only of its newest message.
+ *
+ * A label view selects a thread because *some* message carries the label; if the
+ * row showed only `latest`'s assignments the label would vanish from the view as
+ * soon as a newer, unlabelled reply arrived. It also lets the list render the
+ * same chips on every client instead of depending on which message is newest.
+ */
+async function threadLabelIds(
+  env: Env,
+  threads: MailThread[],
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>()
+  const byAccount = new Map<string, Set<string>>()
+  for (const thread of threads) {
+    const keys = byAccount.get(thread.accountId) ?? new Set<string>()
+    keys.add(thread.threadKey)
+    byAccount.set(thread.accountId, keys)
+  }
+  const add = (accountId: string, key: string, labelId: string) => {
+    const mapKey = `${accountId}|${key}`
+    const current = result.get(mapKey) ?? []
+    if (!current.includes(labelId)) {
+      current.push(labelId)
+      result.set(mapKey, current)
+    }
+  }
+  try {
+    for (const [accountId, keys] of byAccount) {
+      const list = [...keys]
+      for (let index = 0; index < list.length; index += 40) {
+        const chunk = list.slice(index, index + 40)
+        const placeholders = chunk.map(() => '?').join(', ')
+        const [imapRows, relayRows] = await Promise.all([
+          env.DB.prepare(
+            `SELECT COALESCE(m.thread_key, m.stable_key) AS thread_key, ml.label_id AS label_id
+             FROM imap_messages m
+             JOIN message_labels ml ON ml.message_id = m.id
+             WHERE m.account_id = ? AND COALESCE(m.thread_key, m.stable_key) IN (${placeholders})`,
+          )
+            .bind(accountId, ...chunk)
+            .all<{ thread_key: string; label_id: string }>(),
+          env.DB.prepare(
+            `SELECT COALESCE(m.thread_key, 'r:' || m.id) AS thread_key, ml.label_id AS label_id
+             FROM messages m
+             JOIN message_labels ml ON ml.message_id = ('r_' || m.id)
+             WHERE m.account_id = ? AND COALESCE(m.thread_key, 'r:' || m.id) IN (${placeholders})`,
+          )
+            .bind(accountId, ...chunk)
+            .all<{ thread_key: string; label_id: string }>(),
+        ])
+        for (const row of [...imapRows.results, ...relayRows.results]) {
+          add(accountId, row.thread_key, row.label_id)
+        }
+      }
+    }
+  } catch (error) {
+    if (!isSchemaError(error)) {
+      throw error
+    }
+  }
+  return result
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const startedAt = Date.now()
   const url = new URL(context.request.url)
@@ -456,6 +521,34 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   )
   for (const thread of threads) {
     thread.latest.labelIds = labels.get(thread.latest.id) ?? []
+  }
+
+  // Filters also run when the list is loaded: mail labelled by the last sync may
+  // have arrived without a body yet, and a failed sync chunk must not leave the
+  // visible page unlabelled. Forwarding stays an action of the cron/sync paths.
+  const byAccount = new Map<string, MessageSummary[]>()
+  for (const thread of threads) {
+    const current = byAccount.get(thread.accountId) ?? []
+    current.push(thread.latest)
+    byAccount.set(thread.accountId, current)
+  }
+  for (const [accountId, summaries] of byAccount) {
+    await applyFilters(context.env, accountId, summaries)
+  }
+
+  // The row shows the labels of the whole conversation, like Gmail: a thread
+  // selected by a label view keeps showing that label even when a newer reply is
+  // not labelled yet. Drafts are their own row and are keyed by message id, so
+  // their labels already come from `labelIdsFor` above.
+  if (scope.kind === 'label' || scope.folder !== 'draft') {
+    const threadLabels = await threadLabelIds(context.env, threads)
+    for (const thread of threads) {
+      const merged = threadLabels.get(`${thread.accountId}|${thread.threadKey}`) ?? []
+      thread.latest.labelIds =
+        scope.kind === 'label' && !merged.includes(scope.labelId)
+          ? [...merged, scope.labelId]
+          : merged
+    }
   }
 
   // Same pair as the SQL ORDER BY (last_at DESC, key DESC) and as the cursor,

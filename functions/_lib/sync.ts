@@ -552,6 +552,7 @@ async function backfillSnippets(
     .bind(account.id, folder, MAX_INDEXED_BODY_BYTES, limit)
     .all<{ id: string; uid: number }>()
   let indexed = 0
+  const indexedIds: string[] = []
   for (const row of pending.results) {
     try {
       const bytes = await connection.fetchFull(row.uid)
@@ -562,11 +563,42 @@ async function backfillSnippets(
       }
       await indexMessageText(env, row.id, text)
       indexed += 1
+      indexedIds.push(row.id)
     } catch {
       // Transient fetch errors: the next chunk retries the same messages.
     }
   }
+  // Filters that read the snippet could not run at ingest, when the body was not
+  // downloaded yet. Re-evaluate them now that it is known; the labeling is
+  // idempotent, so running them again costs a lookup, not a duplicate.
+  await reapplyFilters(env, account, indexedIds)
   return indexed
+}
+
+/**
+ * Run the enabled filters again on the rows identified by `ids`.
+ *
+ * Used after a body is indexed: a header-only ingest cannot evaluate the
+ * `has_words`/`doesnt_have` criteria, and the first sync pass would otherwise
+ * leave that mail unlabelled forever.
+ */
+async function reapplyFilters(env: Env, account: AccountRow, ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)]
+  if (unique.length === 0) {
+    return
+  }
+  for (let index = 0; index < unique.length; index += 50) {
+    const chunk = unique.slice(index, index + 50)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const rows = await env.DB.prepare(
+      `SELECT * FROM imap_messages WHERE id IN (${placeholders})`,
+    )
+      .bind(...chunk)
+      .all<ImapMessageRow>()
+    // The return value is the forwarding matches: applying labels from a body
+    // backfill never forwards old mail.
+    await applyFilters(env, account.id, rows.results.map((row) => imapMessageSummary(row, account)))
+  }
 }
 
 interface ThreadCandidate {
@@ -1163,6 +1195,7 @@ async function runSyncChunkLocked(
       if (archiveStorage && parsed.length > 0) {
         await renewSyncLock(env, account.id, folder, lock)
         const updates: D1PreparedStatement[] = []
+        const indexedIds: string[] = []
         for (const [index, item] of parsed.entries()) {
           if (index > 0 && index % 4 === 0) {
             await renewSyncLock(env, account.id, folder, lock)
@@ -1171,6 +1204,7 @@ async function runSyncChunkLocked(
             const bytes = await connection.fetchFull(item.header.uid)
             try {
               await indexMessageText(env, item.id, bodyText(await parseFull(bytes)))
+              indexedIds.push(item.id)
             } catch {
               // Indexing is best effort; the snippet backfill retries later.
             }
@@ -1190,6 +1224,7 @@ async function runSyncChunkLocked(
         if (updates.length > 0) {
           await env.DB.batch(updates)
         }
+        await reapplyFilters(env, account, indexedIds)
       }
 
       const nextWindow = advanceSyncWindow({ maxUid, minUid }, uidsToFetch, phase)
@@ -1205,6 +1240,7 @@ async function runSyncChunkLocked(
         .bind(account.id, folder, chunkSize)
         .all<{ id: string; uid: number }>()
       const updates: D1PreparedStatement[] = []
+      const indexedIds: string[] = []
       for (const [index, item] of pending.results.entries()) {
         if (index > 0 && index % 4 === 0) {
           await renewSyncLock(env, account.id, folder, lock)
@@ -1213,6 +1249,7 @@ async function runSyncChunkLocked(
           const bytes = await connection.fetchFull(item.uid)
           try {
             await indexMessageText(env, item.id, bodyText(await parseFull(bytes)))
+            indexedIds.push(item.id)
           } catch {
             // Indexing is best effort; the snippet backfill retries later.
           }
@@ -1232,6 +1269,7 @@ async function runSyncChunkLocked(
       if (updates.length > 0) {
         await env.DB.batch(updates)
       }
+      await reapplyFilters(env, account, indexedIds)
       const remaining = await env.DB.prepare(
         'SELECT COUNT(*) AS count FROM imap_messages WHERE account_id = ? AND folder = ? AND archived = 0',
       )

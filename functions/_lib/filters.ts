@@ -90,6 +90,14 @@ export function matchesFilter(filter: MailFilter, message: MessageSummary): bool
   const sender = `${message.from.name ?? ''} ${message.from.email}`
   const recipients = recipientText(message)
   const haystack = `${sender} ${recipients} ${message.subject} ${message.snippet}`
+  // A header-only message has no snippet yet, and the body is indexed later.
+  // Treating that empty snippet as real text made "has words" filters never match
+  // and, worse, "doesn't have" filters match every new message. Leave the
+  // decision to the pass that runs once the body is indexed.
+  const bodyKnown = message.snippet.trim().length > 0
+  if ((filter.hasWords || filter.doesntHave) && !bodyKnown) {
+    return false
+  }
   if (filter.from && !includesText(sender, filter.from)) {
     return false
   }

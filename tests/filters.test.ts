@@ -106,6 +106,17 @@ describe('matchesFilter', () => {
     expect(matchesFilter(makeFilter({ doesntHave: 'allegato' }), makeMessage())).toBe(false)
   })
 
+  it('waits for the body before deciding word criteria', () => {
+    // New mail is mirrored from headers only: the snippet is empty until the
+    // body backfill runs. Deciding now would make "has words" never match and
+    // "doesn't have" match every message.
+    const headerOnly = makeMessage({ snippet: '' })
+    expect(matchesFilter(makeFilter({ hasWords: 'fattura' }), headerOnly)).toBe(false)
+    expect(matchesFilter(makeFilter({ doesntHave: 'spam' }), headerOnly)).toBe(false)
+    // Criteria that only need the headers are still evaluated immediately.
+    expect(matchesFilter(makeFilter({ from: 'mario', subject: 'fattura' }), headerOnly)).toBe(true)
+  })
+
   it('checks attachments when requested', () => {
     expect(matchesFilter(makeFilter({ hasAttachment: true }), makeMessage())).toBe(true)
     expect(

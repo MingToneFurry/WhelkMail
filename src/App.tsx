@@ -331,6 +331,36 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [auth])
 
+  // A mobile PWA can stay alive for days: when it comes back to the foreground,
+  // labels and filters may have changed on another device and a sync may have
+  // labelled new mail. Refresh both the definitions and the list instead of
+  // showing the state captured at the last full load.
+  useEffect(() => {
+    if (auth !== 'ok') {
+      return
+    }
+    let lastRefresh = 0
+    function onVisible() {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
+      const now = Date.now()
+      if (now - lastRefresh < 5000) {
+        return
+      }
+      lastRefresh = now
+      void Promise.all([api.labels(), api.filters()])
+        .then(([labelsResponse, filtersResponse]) => {
+          setLabels(labelsResponse.labels)
+          setFilters(filtersResponse.filters)
+        })
+        .catch(() => undefined)
+      setRefreshKey((key) => key + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [auth])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const oauth = params.get('microsoft') ?? params.get('google') ?? params.get('drive')

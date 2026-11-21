@@ -1,4 +1,4 @@
-const CACHE = 'whelkmail-v2'
+const CACHE = 'whelkmail-v3'
 const SHELL = [
   '/',
   '/favicon.svg',
@@ -39,7 +39,9 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      // Revalidate the shell with the network: a stale index.html keeps an
+      // installed PWA on an old bundle even after a deploy.
+      fetch(request, { cache: 'no-cache' })
         .then((response) => {
           const copy = response.clone()
           caches.open(CACHE).then((cache) => cache.put('/', copy)).catch(() => undefined)

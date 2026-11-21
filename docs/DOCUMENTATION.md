@@ -310,7 +310,7 @@ Custom labels are separate and user-defined, shared across accounts. They can be
 
 Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created.
 
-Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed and matching is case-insensitive. Actions can apply one or more labels, forward to recipients, or both, like Gmail. Matching runs when the inbox is listed and when the cron worker syncs new inbox messages. The match text covers sender, recipients, subject and snippet, not the full body.
+Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed and matching is case-insensitive. Actions can apply one or more labels, forward to recipients, or both, like Gmail. Matching runs when the inbox is listed and when the cron worker syncs new inbox messages. The match text covers sender, recipients, subject and snippet, not the full body; a message mirrored from headers only is evaluated again as soon as its body has been indexed, so `has_words`/`doesnt_have` never decide on an empty snippet.
 
 When a message moves to another folder on the provider, its UID changes and the local label assignment no longer applies. The optional IMAP metadata sync mirrors headers and UIDs, but labels still follow the UID, so a move can lose the local assignment until the message is labeled again.
 
