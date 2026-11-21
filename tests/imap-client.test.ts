@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  IMAP_HEADER_FIELDS,
   ImapConnection,
   ImapError,
   type ImapConnector,
@@ -135,6 +136,22 @@ describe('IMAP connection', () => {
 })
 
 describe('IMAP responses', () => {
+  it('requests the forwarding headers a "to" filter matches on', () => {
+    // These are the only place a forwarding alias appears when the forwarder
+    // rewrites To; omitting them left aliases_json empty for every message.
+    for (const field of [
+      'DELIVERED-TO',
+      'X-ORIGINAL-TO',
+      'X-FORWARDED-TO',
+      'X-FORWARDED-FOR',
+      'RECEIVED',
+    ]) {
+      expect(IMAP_HEADER_FIELDS).toContain(field)
+    }
+    expect(IMAP_HEADER_FIELDS).toContain('TO')
+    expect(IMAP_HEADER_FIELDS).toContain('SUBJECT')
+  })
+
   it('reads UIDVALIDITY, UIDNEXT and EXISTS from SELECT', async () => {
     const { socket } = fakeImap({
       greeting,

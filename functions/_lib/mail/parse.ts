@@ -98,7 +98,7 @@ export function stripHtml(html: string): string {
  * headers, so the forwarder's record comes before anything the original sender
  * wrote further down: `pickDomainAlias()` relies on that.
  */
-const ALIAS_HEADERS = new Set([
+export const ALIAS_HEADERS = new Set([
   'delivered-to',
   'x-delivered-to',
   'x-original-to',

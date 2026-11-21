@@ -1,6 +1,28 @@
 import { connect } from 'cloudflare:sockets'
 import { toBase64 } from '../crypto'
+import { ALIAS_HEADERS } from '../mail/parse'
 import { bodyStructureHasAttachment, extractBodyStructure } from './bodystructure'
+
+/**
+ * Header fields read for every mirrored message.
+ *
+ * The forwarding headers are part of this list on purpose: `X-Original-To`,
+ * `Delivered-To` and friends are the only place a forwarding alias appears when
+ * the forwarder rewrites To, and a filter on "to" matches against them. Reading
+ * only From/To/Subject made `aliases_json` empty for exactly those messages.
+ */
+export const IMAP_HEADER_FIELDS = [
+  'FROM',
+  'TO',
+  'CC',
+  'SUBJECT',
+  'DATE',
+  'MESSAGE-ID',
+  'IN-REPLY-TO',
+  'REFERENCES',
+  ...[...ALIAS_HEADERS].map((name) => name.toUpperCase()),
+  'RECEIVED',
+].join(' ')
 
 export type ImapSecurity = 'tls' | 'starttls'
 
@@ -396,7 +418,7 @@ export class ImapConnection {
       return []
     }
     const { parts } = await this.command(
-      `UID FETCH ${uids.join(',')} (UID FLAGS RFC822.SIZE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID IN-REPLY-TO REFERENCES)])`,
+      `UID FETCH ${uids.join(',')} (UID FLAGS RFC822.SIZE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (${IMAP_HEADER_FIELDS})])`,
     )
     const headers: ImapHeader[] = []
     for (const part of parts) {
