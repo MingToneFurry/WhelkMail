@@ -81,14 +81,35 @@ function recipientText(message: MessageSummary): string {
   return aliases ? `${recipients} ${aliases}` : recipients
 }
 
-export function matchesFilter(filter: MailFilter, message: MessageSummary): boolean {
-  // An empty accountId is a filter for every account; otherwise it only sees
-  // the mail of the account that owns it.
-  if (filter.accountId && filter.accountId !== message.accountId) {
-    return false
-  }
+export interface FilterMatchContext {
+  /**
+   * Address of the account that owns a scoped filter, when that account is a
+   * send-only relay. Such an account has no mailbox of its own: its mail arrives
+   * in the IMAP mailbox it forwards to, so the scope means "mail for this
+   * address", not "rows under this account id".
+   */
+  accountEmail?: string
+  accountIsRelay?: boolean
+}
+
+export function matchesFilter(
+  filter: MailFilter,
+  message: MessageSummary,
+  context: FilterMatchContext = {},
+): boolean {
   const sender = `${message.from.name ?? ''} ${message.from.email}`
   const recipients = recipientText(message)
+  // An empty accountId is a filter for every account; otherwise it only sees
+  // the mail of the account that owns it. A relay account owns no mailbox, so
+  // its automatic label follows the address into the mailbox that receives it.
+  if (filter.accountId && filter.accountId !== message.accountId) {
+    if (!context.accountIsRelay || !context.accountEmail) {
+      return false
+    }
+    if (!includesText(recipients, context.accountEmail)) {
+      return false
+    }
+  }
   const haystack = `${sender} ${recipients} ${message.subject} ${message.snippet}`
   // A header-only message has no snippet yet, and the body is indexed later.
   // Treating that empty snippet as real text made "has words" filters never match
@@ -141,36 +162,88 @@ export async function applyFilters(
     return []
   }
   try {
-    const result = await env.DB.prepare(
-      "SELECT * FROM filters WHERE enabled = 1 AND (account_id = '' OR account_id = ?)",
-    )
-      .bind(accountId)
-      .all<FilterRow>()
+    const [result, accountRows] = await Promise.all([
+      env.DB.prepare('SELECT * FROM filters WHERE enabled = 1').all<FilterRow>(),
+      env.DB.prepare('SELECT id, email, kind, incoming_label_id FROM accounts').all<{
+        id: string
+        email: string
+        kind: string
+        incoming_label_id: string | null
+      }>(),
+    ])
     const filters = result.results.map((row) => toFilter(row))
-    if (filters.length === 0) {
-      return []
+    const accounts = new Map(accountRows.results.map((row) => [row.id, row]))
+    // An automatic-label filter is the editable form of `incoming_label_id`.
+    // Keep the direct label as a fallback for databases whose filters table has
+    // no automatic rows yet (or no auto_label column at all): otherwise the
+    // account label stops working for new mail while old mail stays labelled.
+    let autoFilterOwners = new Set<string>()
+    try {
+      const autoRows = await env.DB.prepare(
+        'SELECT account_id FROM filters WHERE auto_label = 1',
+      ).all<{ account_id: string }>()
+      autoFilterOwners = new Set(autoRows.results.map((row) => row.account_id))
+    } catch (error) {
+      if (!isSchemaError(error)) {
+        throw error
+      }
     }
     const createdAt = new Date().toISOString()
     const statements: D1PreparedStatement[] = []
     const forwards: FilterForwardMatch[] = []
+    const mailbox = accounts.get(accountId)
+    // Relay accounts have no mailbox of their own: their incoming label follows
+    // the alias into the IMAP mailbox that actually receives the forwarded mail.
+    const relayLabels = accountRows.results.filter(
+      (row) => row.kind === 'relay' && row.id !== accountId && row.incoming_label_id,
+    )
     for (const message of messages) {
+      const addLabel = (labelId: string) => {
+        if (message.labelIds.includes(labelId)) {
+          return
+        }
+        message.labelIds.push(labelId)
+        statements.push(
+          env.DB.prepare(
+            'INSERT OR IGNORE INTO message_labels (message_id, account_id, folder, label_id, created_at) VALUES (?, ?, ?, ?, ?)',
+          ).bind(message.id, accountId, message.folder, labelId, createdAt),
+        )
+      }
+      if (mailbox?.incoming_label_id && !autoFilterOwners.has(mailbox.id)) {
+        addLabel(mailbox.incoming_label_id)
+      }
+      if (relayLabels.length > 0) {
+        const recipients = recipientText(message)
+        for (const relay of relayLabels) {
+          if (
+            relay.incoming_label_id &&
+            !autoFilterOwners.has(relay.id) &&
+            includesText(recipients, relay.email)
+          ) {
+            addLabel(relay.incoming_label_id)
+          }
+        }
+      }
       for (const filter of filters) {
-        if (!matchesFilter(filter, message)) {
+        // A relay account stores no incoming mail: its mail lives in the IMAP
+        // mailbox the address forwards to. Match its automatic label against the
+        // recipient/alias instead of the row's account id.
+        const owner = filter.accountId ? accounts.get(filter.accountId) : undefined
+        const context: FilterMatchContext | undefined =
+          owner && owner.kind === 'relay' && filter.accountId !== accountId
+            ? { accountEmail: owner.email, accountIsRelay: true }
+            : undefined
+        if (filter.accountId && filter.accountId !== accountId && !context) {
+          continue
+        }
+        if (!matchesFilter(filter, message, context)) {
           continue
         }
         if (filter.forwardTo.length > 0) {
           forwards.push({ filterId: filter.id, forwardTo: filter.forwardTo })
         }
         for (const labelId of filter.labelIds) {
-          if (message.labelIds.includes(labelId)) {
-            continue
-          }
-          message.labelIds.push(labelId)
-          statements.push(
-            env.DB.prepare(
-              'INSERT OR IGNORE INTO message_labels (message_id, account_id, folder, label_id, created_at) VALUES (?, ?, ?, ?, ?)',
-            ).bind(message.id, accountId, message.folder, labelId, createdAt),
-          )
+          addLabel(labelId)
         }
       }
     }

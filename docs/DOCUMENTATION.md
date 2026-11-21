@@ -183,7 +183,7 @@ Important fields:
 - `sync_interval_minutes`: IMAP accounts only. Minutes between automatic checks (1, 2, 5, 10, 15 or 30, default 5).
 - `relay_any_address`: relay accounts only. When set, replies may leave from any address on the account's exact domain (see Reply). Off by default
 - `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
-- `incoming_label_id`: optional shared label applied automatically to every incoming message of this account
+- `incoming_label_id`: optional shared label applied automatically to every incoming message of this account. A send-only relay account has no mailbox: its label follows the relay address and is applied to the forwarded mail in the IMAP account that receives it
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash
 - `auto_sync`: opt-in automatic background sync for Inbox, Sent, Drafts and Spam via the cron worker
 - `storage_driver`: `provider`, `drive`, `r2` or `imap` (relay accounts only: `imap` = the mailbox of `sent_copy_account_id` instead of an object archive)
@@ -308,7 +308,7 @@ Messages carry `accountId`, `accountName` and `accountEmail`. The unified view s
 
 Custom labels are separate and user-defined, shared across accounts. They can be created from the sidebar or from the filter editor. Clicking a label opens a label view: the API reads `message_labels`, groups the assigned message ids by account and folder, fetches those IMAP UIDs directly from the provider and merges them with relay messages. The view therefore covers Inbox, Sent, Drafts and Spam across the selected accounts, like Gmail, without mirroring the whole mailbox locally. Removed or expunged messages simply disappear from the view.
 
-Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created.
+Each account can also define an `incoming_label_id`. When the inbox is listed, every incoming message of that account receives the shared label automatically. The label is chosen while adding the account or in Settings; if it does not exist, it is created. A send-only relay account owns no mailbox: its incoming label follows the relay address and is applied to messages addressed to that alias in the IMAP mailbox that receives the forwarding.
 
 Automatic filtering is managed in Settings → Filters and is shared across accounts. Criteria are ANDed and matching is case-insensitive. Actions can apply one or more labels, forward to recipients, or both, like Gmail. Matching runs when the inbox is listed and when the cron worker syncs new inbox messages. The match text covers sender, recipients, subject and snippet, not the full body; a message mirrored from headers only is evaluated again as soon as its body has been indexed, so `has_words`/`doesnt_have` never decide on an empty snippet.
 

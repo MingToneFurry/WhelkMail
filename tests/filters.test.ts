@@ -96,6 +96,29 @@ describe('matchesFilter', () => {
     expect(matchesFilter(makeFilter(), makeMessage({ accountId: 'account-2' }))).toBe(true)
   })
 
+  it('follows a relay account label into the mailbox that receives its mail', () => {
+    // info@domain is a send-only relay account: its incoming mail is mirrored
+    // under the IMAP account the address forwards to. Its automatic label must
+    // still match that mail, or setting it does nothing at all.
+    const relayFilter = makeFilter({ accountId: 'relay-1' })
+    const forwarded = makeMessage({
+      accountId: 'imap-1',
+      to: [{ name: null, email: 'me@infomaniak.example' }],
+      aliases: ['info@whelkmail.example'],
+    })
+    const context = { accountEmail: 'info@whelkmail.example', accountIsRelay: true }
+    expect(matchesFilter(relayFilter, forwarded, context)).toBe(true)
+    expect(
+      matchesFilter(
+        relayFilter,
+        makeMessage({ accountId: 'imap-1', to: [{ name: null, email: 'other@example.com' }] }),
+        context,
+      ),
+    ).toBe(false)
+    // The same scope without the relay context still means "that account only".
+    expect(matchesFilter(relayFilter, forwarded)).toBe(false)
+  })
+
   it('requires all configured criteria', () => {
     expect(matchesFilter(makeFilter({ from: 'mario', subject: 'natale' }), makeMessage())).toBe(
       false,

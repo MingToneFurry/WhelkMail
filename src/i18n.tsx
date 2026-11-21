@@ -511,7 +511,7 @@ const en: Record<string, string> = {
   'settings.incomingLabel': 'Label for incoming mail',
   'settings.incomingLabelNone': 'No automatic label',
   'settings.incomingLabelHint':
-    'Every incoming message of this account receives this label automatically.',
+    'Every incoming message of this account receives this label automatically. For a send-only relay account the label follows its address into the mailbox that receives the forwarded mail.',
   'settings.defaultSignature': 'Signature',
   'settings.defaultSignatureHint': 'Inserted automatically in new messages and replies.',
   'settings.signaturePlaceholder': 'Name, phone, links…',
@@ -1186,7 +1186,7 @@ const it: Record<string, string> = {
   'settings.incomingLabel': 'Etichetta per le email in arrivo',
   'settings.incomingLabelNone': 'Nessuna etichetta automatica',
   'settings.incomingLabelHint':
-    'Ogni email in arrivo di questo account riceve automaticamente questa etichetta.',
+    'Ogni email in arrivo di questo account riceve automaticamente questa etichetta. Per un account relay di solo invio, l’etichetta segue il suo indirizzo nella casella che riceve le email inoltrate.',
   'settings.defaultSignature': 'Firma',
   'settings.defaultSignatureHint': 'Inserita automaticamente nelle nuove email e nelle risposte.',
   'settings.signaturePlaceholder': 'Nome, telefono, link…',

@@ -1,3 +1,4 @@
+import type { MailFilter } from '../../../shared/types'
 import {
   listAccountRows,
   relayMessageSummary,
@@ -60,6 +61,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const filters = filterRows.results.map((row) => toFilter(row))
 
     const accounts = new Map((await listAccountRows(context.env)).map((row) => [row.id, row]))
+    // A relay account owns no mailbox: its automatic label applies to the mail
+    // addressed to that alias, which is mirrored under the IMAP account that
+    // receives the forwarding.
+    const contextFor = (filter: MailFilter, account: AccountRow) => {
+      if (!filter.accountId || filter.accountId === account.id) {
+        return undefined
+      }
+      const owner = accounts.get(filter.accountId)
+      if (!owner || owner.kind !== 'relay') {
+        return null
+      }
+      return { accountEmail: owner.email, accountIsRelay: true }
+    }
     const limit = forward ? FORWARD_BATCH : LABEL_BATCH
 
     // The walk runs in two phases with a prefixed cursor: first the IMAP mirror
@@ -93,7 +107,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const summary = relayMessageSummary(row, account)
         let hit = false
         for (const filter of filters) {
-          if (!matchesFilter(filter, summary)) {
+          const matchContext = contextFor(filter, account)
+          if (matchContext === null || !matchesFilter(filter, summary, matchContext)) {
             continue
           }
           hit = true
@@ -127,7 +142,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const summary = imapMessageSummary(row, account)
         let hit = false
         for (const filter of filters) {
-          if (!matchesFilter(filter, summary)) {
+          const matchContext = contextFor(filter, account)
+          if (matchContext === null || !matchesFilter(filter, summary, matchContext)) {
             continue
           }
           hit = true
