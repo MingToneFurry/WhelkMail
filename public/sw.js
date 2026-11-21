@@ -71,6 +71,91 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+function base64UrlToBytes(value) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
+}
+
+async function fetchApplicationServerKey() {
+  try {
+    const response = await fetch('/api/push/key', { credentials: 'same-origin' })
+    if (!response.ok) {
+      return null
+    }
+    const data = await response.json()
+    return data && data.publicKey ? base64UrlToBytes(data.publicKey) : null
+  } catch {
+    return null
+  }
+}
+
+async function postSubscription(subscription) {
+  const json = subscription.toJSON()
+  if (!json.endpoint || !json.keys || !json.keys.p256dh || !json.keys.auth) {
+    return
+  }
+  await fetch('/api/push/subscribe', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      endpoint: json.endpoint,
+      keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+      userAgent: self.navigator ? self.navigator.userAgent : undefined,
+    }),
+  })
+}
+
+async function forgetSubscription(endpoint) {
+  if (!endpoint) {
+    return
+  }
+  try {
+    await fetch('/api/push/subscribe', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    })
+  } catch {
+    // The cron worker also drops endpoints that answer 404/410.
+  }
+}
+
+// Chrome can rotate or invalidate the subscription while the app is closed.
+// Resubscribe and re-register so the server stops sending to a dead endpoint.
+// The app also re-registers on every start (src/lib/push.ts), which covers
+// browsers that never fire this event and sessions that expire here.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      let subscription = event.newSubscription
+      if (!subscription) {
+        const options = event.oldSubscription ? event.oldSubscription.options : null
+        const applicationServerKey =
+          (options && options.applicationServerKey) || (await fetchApplicationServerKey())
+        if (!applicationServerKey) {
+          return
+        }
+        subscription = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        })
+      }
+      if (event.oldSubscription && event.oldSubscription.endpoint !== subscription.endpoint) {
+        await forgetSubscription(event.oldSubscription.endpoint)
+      }
+      await postSubscription(subscription)
+    })().catch(() => undefined),
+  )
+})
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {

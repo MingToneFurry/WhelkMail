@@ -17,6 +17,32 @@ export interface PushPayload {
   badge?: string
 }
 
+export type PushUrgency = 'very-low' | 'low' | 'normal' | 'high'
+
+export interface PushDeliveryOptions {
+  /**
+   * RFC 8030 urgency. Chrome maps it to the delivery priority used by FCM under
+   * the hood: `normal` can be deferred in Doze, `high` wakes the device.
+   */
+  urgency?: PushUrgency
+  /** Seconds the push service keeps the message while the device is offline. */
+  ttlSeconds?: number
+}
+
+export function pushHeaders(
+  authorization: string,
+  options: PushDeliveryOptions = {},
+): Record<string, string> {
+  const ttl = Math.max(0, Math.floor(options.ttlSeconds ?? 86_400))
+  return {
+    Authorization: authorization,
+    TTL: String(ttl),
+    Urgency: options.urgency ?? 'normal',
+    'Content-Encoding': 'aes128gcm',
+    'Content-Type': 'application/octet-stream',
+  }
+}
+
 const encoder = new TextEncoder()
 
 export function pushConfigured(env: Env): boolean {
@@ -168,17 +194,13 @@ export async function sendWebPush(
   env: Env,
   subscription: PushSubscriptionRecord,
   payload: PushPayload,
+  options: PushDeliveryOptions = {},
 ): Promise<{ ok: boolean; gone: boolean; status: number }> {
   const authorization = await vapidAuthorization(env, subscription.endpoint)
   const body = await encryptPayload(subscription, payload)
   const response = await fetch(subscription.endpoint, {
     method: 'POST',
-    headers: {
-      Authorization: authorization,
-      TTL: '86400',
-      'Content-Encoding': 'aes128gcm',
-      'Content-Type': 'application/octet-stream',
-    },
+    headers: pushHeaders(authorization, options),
     body,
   })
   return {

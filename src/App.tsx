@@ -30,6 +30,7 @@ import { api, ApiError, type AccountError } from './lib/api'
 import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
 import { errorText } from './lib/errors'
+import { syncPushSubscription } from './lib/push'
 import { syncSignature } from './lib/sync-signature'
 import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
 import { mergePage } from '../shared/paging'
@@ -325,6 +326,7 @@ export default function App() {
         setContacts(contactsResponse.contacts)
       }
       setAuth('ok')
+      void syncPushSubscription()
     } catch (error) {
       if (error instanceof ApiError && error.isUnauthorized) {
         setAuth('needed')

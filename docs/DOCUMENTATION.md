@@ -321,13 +321,15 @@ When a message moves to another folder on the provider, its UID changes and the 
 
 ## 10. PWA and Web Push
 
-`public/manifest.webmanifest` and `public/sw.js` make the app installable. The service worker caches the app shell and static assets, never `/api/`, and handles `push` and `notificationclick`.
+`public/manifest.webmanifest` and `public/sw.js` make the app installable. The service worker caches the app shell and static assets, never `/api/`, and handles `push`, `notificationclick` and `pushsubscriptionchange`.
 
 Web Push works in three parts:
 
 1. The client asks for browser permission, registers the service worker and subscribes with the VAPID public key.
 2. `push_subscriptions` and `push_prefs` persist the subscription and per-account/folder preferences.
 3. The `worker/` cron Worker runs every minute and calls `POST /api/cron/notifications` with `CRON_SECRET`. That endpoint syncs the selected folders, detects new UIDs and sends encrypted Web Push messages with VAPID.
+
+Subscriptions are kept alive automatically. When the browser rotates or invalidates a subscription, `pushsubscriptionchange` resubscribes and registers the new endpoint, and the app re-registers its existing subscription on every start and after login. That covers browsers that never fire the event, cleared site data and expired sessions, so the server does not keep sending to an endpoint that answers 404/410 (the cron worker removes those as well). New-mail notifications are sent with `Urgency: high` (RFC 8030), which stops Chrome and FCM from deferring them while the device is in Doze.
 
 VAPID keys are generated with `npm run vapid` and stored as Pages secrets. The cron worker needs `APP_URL` and the same `CRON_SECRET`.
 

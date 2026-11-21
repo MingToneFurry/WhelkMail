@@ -190,7 +190,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
               continue
             }
             try {
-              const result = await sendWebPush(context.env, subscription, payload)
+              const result = await sendWebPush(context.env, subscription, payload, {
+                urgency: 'high',
+              })
               if (result.ok) {
                 sent += 1
               }
