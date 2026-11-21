@@ -191,6 +191,7 @@ export type SettingsTab =
 
 export interface AppSettings {
   defaultSignature: string
+  defaultSignatureHtml: string
   signatureMode: SignatureMode
   allowRemoteImages: boolean
   /** Delete mirrored IMAP metadata older than this many days. 0 keeps everything. */
@@ -201,6 +202,7 @@ export interface AppSettings {
   autoReplyEnabled: boolean
   autoReplySubject: string
   autoReplyBody: string
+  autoReplyBodyHtml: string
 }
 
 export interface Mailbox {
@@ -232,6 +234,7 @@ export interface Account {
   oauthProvider: 'google' | 'microsoft' | null
   connected: boolean
   signature: string
+  signatureHtml: string
   incomingLabelId: string | null
   archiveImapBodies: boolean
   imapArchiveDriver: ImapArchiveDriver
@@ -243,6 +246,7 @@ export interface Account {
   autoReplyEnabled: boolean
   autoReplySubject: string
   autoReplyBody: string
+  autoReplyBodyHtml: string
   sentFolder: string
   autoSavesSent: boolean
   /** IMAP account that receives a copy of the sent mail (relay accounts only). */
@@ -464,6 +468,7 @@ export interface LabelInput {
 export interface AccountPatch {
   displayName?: string
   signature?: string
+  signatureHtml?: string
   incomingLabelId?: string | null
   archiveImapBodies?: boolean
   imapArchiveDriver?: ImapArchiveDriver
@@ -473,6 +478,7 @@ export interface AccountPatch {
   autoReplyEnabled?: boolean
   autoReplySubject?: string
   autoReplyBody?: string
+  autoReplyBodyHtml?: string
   sentFolder?: string
   autoSavesSent?: boolean
   sentCopyAccountId?: string | null

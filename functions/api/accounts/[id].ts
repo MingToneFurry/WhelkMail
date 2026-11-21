@@ -39,6 +39,8 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
   const displayName = input.displayName ?? row.display_name
   const signature = input.signature === undefined ? row.signature : input.signature
+  const signatureHtml =
+    input.signatureHtml === undefined ? (row.signature_html ?? '') : input.signatureHtml
   const incomingLabelId =
     input.incomingLabelId === undefined ? row.incoming_label_id : input.incomingLabelId
   const archiveImapBodies =
@@ -73,6 +75,8 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     input.autoReplySubject === undefined ? (row.auto_reply_subject ?? '') : input.autoReplySubject
   const autoReplyBody =
     input.autoReplyBody === undefined ? (row.auto_reply_body ?? '') : input.autoReplyBody
+  const autoReplyBodyHtml =
+    input.autoReplyBodyHtml === undefined ? (row.auto_reply_body_html ?? '') : input.autoReplyBodyHtml
   if (incomingLabelId) {
     const label = await context.env.DB.prepare('SELECT id FROM labels WHERE id = ?')
       .bind(incomingLabelId)
@@ -247,11 +251,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   await context.env.DB.prepare(
-    'UPDATE accounts SET display_name = ?, signature = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, delete_after_archive = ?, auto_sync = ?, sync_interval_minutes = ?, auto_reply_enabled = ?, auto_reply_subject = ?, auto_reply_body = ?, sent_folder = ?, auto_saves_sent = ?, sent_copy_account_id = ?, reply_account_id = ?, relay_any_address = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
+    'UPDATE accounts SET display_name = ?, signature = ?, signature_html = ?, incoming_label_id = ?, archive_imap_bodies = ?, imap_archive_driver = ?, delete_after_archive = ?, auto_sync = ?, sync_interval_minutes = ?, auto_reply_enabled = ?, auto_reply_subject = ?, auto_reply_body = ?, auto_reply_body_html = ?, sent_folder = ?, auto_saves_sent = ?, sent_copy_account_id = ?, reply_account_id = ?, relay_any_address = ?, storage_driver = ?, username = ?, secret_enc = ?, relay_provider = ?, relay_api_key_enc = ?, relay_api_secret_enc = ?, relay_domain = ?, relay_region = ?, imap_host = ?, imap_port = ?, imap_security = ?, smtp_host = ?, smtp_port = ?, smtp_security = ? WHERE id = ?',
   )
     .bind(
       displayName,
       signature,
+      signatureHtml,
       incomingLabelId,
       archiveImapBodies,
       imapArchiveDriver,
@@ -261,6 +266,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
       autoReplyEnabled ? 1 : 0,
       autoReplySubject,
       autoReplyBody,
+      autoReplyBodyHtml,
       sentFolder,
       autoSavesSent,
       sentCopyAccountId,

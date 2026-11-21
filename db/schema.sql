@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   drive_access_token_enc TEXT,
   drive_token_expires_at INTEGER,
   signature TEXT,
+  signature_html TEXT NOT NULL DEFAULT '',
   incoming_label_id TEXT,
   archive_imap_bodies INTEGER NOT NULL DEFAULT 0,
   imap_archive_driver TEXT NOT NULL DEFAULT 'r2',
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   auto_reply_enabled INTEGER NOT NULL DEFAULT 0,
   auto_reply_subject TEXT NOT NULL DEFAULT '',
   auto_reply_body TEXT NOT NULL DEFAULT '',
+  auto_reply_body_html TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 

@@ -47,6 +47,7 @@ export interface AccountRow {
   drive_access_token_enc: string | null
   drive_token_expires_at: number | null
   signature: string | null
+  signature_html: string | null
   incoming_label_id: string | null
   archive_imap_bodies: number
   imap_archive_driver: string
@@ -56,6 +57,7 @@ export interface AccountRow {
   auto_reply_enabled: number
   auto_reply_subject: string | null
   auto_reply_body: string | null
+  auto_reply_body_html: string | null
   created_at: string
 }
 
@@ -114,6 +116,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
         : null,
     connected,
     signature: row.signature ?? '',
+    signatureHtml: row.signature_html ?? '',
     incomingLabelId: row.incoming_label_id ?? null,
     archiveImapBodies: Boolean(row.archive_imap_bodies),
     imapArchiveDriver: row.imap_archive_driver === 'drive' ? 'drive' : 'r2',
@@ -123,6 +126,7 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     autoReplyEnabled: Boolean(row.auto_reply_enabled),
     autoReplySubject: row.auto_reply_subject ?? '',
     autoReplyBody: row.auto_reply_body ?? '',
+    autoReplyBodyHtml: row.auto_reply_body_html ?? '',
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     sentCopyAccountId: row.sent_copy_account_id ?? null,

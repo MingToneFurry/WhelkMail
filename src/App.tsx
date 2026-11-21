@@ -168,6 +168,7 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [filters, setFilters] = useState<MailFilter[]>([])
   const [defaultSignature, setDefaultSignature] = useState('')
+  const [defaultSignatureHtml, setDefaultSignatureHtml] = useState('')
   const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
   const [allowRemoteImages, setAllowRemoteImages] = useState(false)
   const [contactAutoAdd, setContactAutoAdd] = useState(true)
@@ -175,6 +176,7 @@ export default function App() {
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false)
   const [autoReplySubject, setAutoReplySubject] = useState('')
   const [autoReplyBody, setAutoReplyBody] = useState('')
+  const [autoReplyBodyHtml, setAutoReplyBodyHtml] = useState('')
   const [metadataRetentionDays, setMetadataRetentionDays] = useState(0)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
@@ -305,6 +307,7 @@ export default function App() {
       }
       if (settingsResponse) {
         setDefaultSignature(settingsResponse.defaultSignature)
+        setDefaultSignatureHtml(settingsResponse.defaultSignatureHtml ?? '')
         setSignatureMode(settingsResponse.signatureMode)
         setAllowRemoteImages(settingsResponse.allowRemoteImages)
         setContactAutoAdd(settingsResponse.contactAutoAdd ?? true)
@@ -312,6 +315,7 @@ export default function App() {
         setAutoReplyEnabled(settingsResponse.autoReplyEnabled ?? false)
         setAutoReplySubject(settingsResponse.autoReplySubject ?? '')
         setAutoReplyBody(settingsResponse.autoReplyBody ?? '')
+        setAutoReplyBodyHtml(settingsResponse.autoReplyBodyHtml ?? '')
         setMetadataRetentionDays(settingsResponse.metadataRetentionDays)
       }
       if (filtersResponse) {
@@ -1459,10 +1463,11 @@ export default function App() {
     }
   }
 
-  async function changeDefaultSignature(value: string) {
+  async function changeDefaultSignature(value: string, html: string) {
     setDefaultSignature(value)
+    setDefaultSignatureHtml(html)
     try {
-      await api.updateSettings({ defaultSignature: value })
+      await api.updateSettings({ defaultSignature: value, defaultSignatureHtml: html })
     } catch (error) {
       setSettingsError(errorText(error, t))
     }
@@ -1587,6 +1592,7 @@ export default function App() {
     enabled?: boolean
     subject?: string
     body?: string
+    bodyHtml?: string
   }) {
     if (patch.mode !== undefined) {
       setAutoReplyMode(patch.mode)
@@ -1600,12 +1606,16 @@ export default function App() {
     if (patch.body !== undefined) {
       setAutoReplyBody(patch.body)
     }
+    if (patch.bodyHtml !== undefined) {
+      setAutoReplyBodyHtml(patch.bodyHtml)
+    }
     try {
       await api.updateSettings({
         autoReplyMode: patch.mode,
         autoReplyEnabled: patch.enabled,
         autoReplySubject: patch.subject,
         autoReplyBody: patch.body,
+        autoReplyBodyHtml: patch.bodyHtml,
       })
     } catch (error) {
       setSettingsError(errorText(error, tRef.current))
@@ -1850,6 +1860,7 @@ export default function App() {
             autoReplyEnabled={autoReplyEnabled}
             autoReplySubject={autoReplySubject}
             autoReplyBody={autoReplyBody}
+            autoReplyBodyHtml={autoReplyBodyHtml}
             onAutoReplyChange={changeAutoReply}
             metadataRetentionDays={metadataRetentionDays}
             onMetadataRetentionChange={(value) => void changeMetadataRetention(value)}
@@ -1858,7 +1869,8 @@ export default function App() {
             defaultSenderReply={defaultSenderReply}
             onDefaultSenderReplyChange={changeDefaultSenderReply}
             defaultSignature={defaultSignature}
-            onDefaultSignatureChange={(value) => void changeDefaultSignature(value)}
+            defaultSignatureHtml={defaultSignatureHtml}
+            onDefaultSignatureChange={changeDefaultSignature}
             signatureMode={signatureMode}
             onSignatureModeChange={(value) => void changeSignatureMode(value)}
             onSyncComplete={() => setRefreshKey((key) => key + 1)}
@@ -2077,6 +2089,7 @@ export default function App() {
           contacts={contacts}
           defaultAccountId={composeAccountId}
           defaultSignature={defaultSignature}
+          defaultSignatureHtml={defaultSignatureHtml}
           signatureMode={signatureMode}
           composeRichDefault={composeRich}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}

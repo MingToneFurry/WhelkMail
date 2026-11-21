@@ -19,6 +19,7 @@ interface AutoReplyConfig {
   enabled: boolean
   subject: string
   body: string
+  bodyHtml: string
 }
 
 interface MessageRowLike {
@@ -34,9 +35,15 @@ interface MessageRowLike {
 
 export async function autoReplyConfig(env: Env, account: AccountRow): Promise<AutoReplyConfig> {
   const result = await env.DB.prepare(
-    'SELECT key, value FROM app_settings WHERE key IN (?, ?, ?, ?)',
+    'SELECT key, value FROM app_settings WHERE key IN (?, ?, ?, ?, ?)',
   )
-    .bind('auto_reply_mode', 'auto_reply_enabled', 'auto_reply_subject', 'auto_reply_body')
+    .bind(
+      'auto_reply_mode',
+      'auto_reply_enabled',
+      'auto_reply_subject',
+      'auto_reply_body',
+      'auto_reply_body_html',
+    )
     .all<{ key: string; value: string }>()
   const values = new Map(result.results.map((row) => [row.key, row.value]))
   const perAccount = values.get('auto_reply_mode') === 'per_account'
@@ -45,12 +52,14 @@ export async function autoReplyConfig(env: Env, account: AccountRow): Promise<Au
       enabled: Boolean(account.auto_reply_enabled),
       subject: account.auto_reply_subject ?? '',
       body: account.auto_reply_body ?? '',
+      bodyHtml: account.auto_reply_body_html ?? '',
     }
   }
   return {
     enabled: values.get('auto_reply_enabled') === '1',
     subject: values.get('auto_reply_subject') ?? '',
     body: values.get('auto_reply_body') ?? '',
+    bodyHtml: values.get('auto_reply_body_html') ?? '',
   }
 }
 
@@ -113,6 +122,7 @@ export async function processAutoReply(
   }
 
   const body = config.body.trim() || DEFAULT_BODY
+  const bodyHtml = config.bodyHtml.trim()
   const subject = (config.subject.trim() || `Re: ${row.subject || 'your message'}`).slice(0, 200)
   const domain = account.email.split('@')[1] ?? 'localhost'
   const outboundId = `<auto-${crypto.randomUUID()}@${domain}>`
@@ -123,6 +133,7 @@ export async function processAutoReply(
     bcc: [],
     subject,
     text: body,
+    html: bodyHtml || undefined,
     attachments: [],
     messageId: outboundId,
     inReplyTo: row.message_id,

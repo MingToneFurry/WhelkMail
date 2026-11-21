@@ -62,8 +62,8 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 - Gmail-style labels shared across all accounts, with a label view that collects messages from Inbox, Sent, Drafts and Spam.
 - Per-account incoming labels applied automatically.
 - Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc. Recipients of sent messages are added to **Other contacts** for autocomplete (on by default; Settings → General switches to manual only).
-- Signatures: one shared signature or a different signature per account.
-- Vacation responder (auto-reply): one shared message for all accounts or a different one per account.
+- Signatures: one shared signature or a different signature per account, with rich-text formatting.
+- Vacation responder (auto-reply): one shared message for all accounts or a different one per account, with rich-text body.
 
 ### Automation
 

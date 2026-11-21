@@ -5,6 +5,7 @@ import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
 
 const DEFAULT_SIGNATURE_KEY = 'default_signature'
+const DEFAULT_SIGNATURE_HTML_KEY = 'default_signature_html'
 const SIGNATURE_MODE_KEY = 'signature_mode'
 const ALLOW_REMOTE_IMAGES_KEY = 'allow_remote_images'
 const METADATA_RETENTION_KEY = 'metadata_retention_days'
@@ -13,13 +14,15 @@ const AUTO_REPLY_MODE_KEY = 'auto_reply_mode'
 const AUTO_REPLY_ENABLED_KEY = 'auto_reply_enabled'
 const AUTO_REPLY_SUBJECT_KEY = 'auto_reply_subject'
 const AUTO_REPLY_BODY_KEY = 'auto_reply_body'
+const AUTO_REPLY_BODY_HTML_KEY = 'auto_reply_body_html'
 
 export async function getSettings(env: Env): Promise<AppSettings> {
   const result = await env.DB.prepare(
-    'SELECT key, value FROM app_settings WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'SELECT key, value FROM app_settings WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   )
     .bind(
       DEFAULT_SIGNATURE_KEY,
+      DEFAULT_SIGNATURE_HTML_KEY,
       SIGNATURE_MODE_KEY,
       ALLOW_REMOTE_IMAGES_KEY,
       METADATA_RETENTION_KEY,
@@ -28,6 +31,7 @@ export async function getSettings(env: Env): Promise<AppSettings> {
       AUTO_REPLY_ENABLED_KEY,
       AUTO_REPLY_SUBJECT_KEY,
       AUTO_REPLY_BODY_KEY,
+      AUTO_REPLY_BODY_HTML_KEY,
     )
     .all<{ key: string; value: string }>()
   const values = new Map(result.results.map((row) => [row.key, row.value]))
@@ -35,6 +39,7 @@ export async function getSettings(env: Env): Promise<AppSettings> {
   const retention = Number(values.get(METADATA_RETENTION_KEY) ?? '0')
   return {
     defaultSignature: values.get(DEFAULT_SIGNATURE_KEY) ?? '',
+    defaultSignatureHtml: values.get(DEFAULT_SIGNATURE_HTML_KEY) ?? '',
     signatureMode: mode === 'per_account' ? 'per_account' : 'shared',
     allowRemoteImages: values.get(ALLOW_REMOTE_IMAGES_KEY) === '1',
     metadataRetentionDays: Number.isFinite(retention) && retention > 0 ? Math.floor(retention) : 0,
@@ -43,6 +48,7 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     autoReplyEnabled: values.get(AUTO_REPLY_ENABLED_KEY) === '1',
     autoReplySubject: values.get(AUTO_REPLY_SUBJECT_KEY) ?? '',
     autoReplyBody: values.get(AUTO_REPLY_BODY_KEY) ?? '',
+    autoReplyBodyHtml: values.get(AUTO_REPLY_BODY_HTML_KEY) ?? '',
   }
 }
 
@@ -85,6 +91,13 @@ async function updateSettings(context: Parameters<PagesFunction<Env>>[0]): Promi
       context.env.DB.prepare(
         'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ).bind(DEFAULT_SIGNATURE_KEY, parsed.data.defaultSignature),
+    )
+  }
+  if (parsed.data.defaultSignatureHtml !== undefined) {
+    statements.push(
+      context.env.DB.prepare(
+        'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ).bind(DEFAULT_SIGNATURE_HTML_KEY, parsed.data.defaultSignatureHtml),
     )
   }
   if (parsed.data.signatureMode !== undefined) {
@@ -133,6 +146,9 @@ async function updateSettings(context: Parameters<PagesFunction<Env>>[0]): Promi
   }
   if (parsed.data.autoReplyBody !== undefined) {
     put(AUTO_REPLY_BODY_KEY, parsed.data.autoReplyBody)
+  }
+  if (parsed.data.autoReplyBodyHtml !== undefined) {
+    put(AUTO_REPLY_BODY_HTML_KEY, parsed.data.autoReplyBodyHtml)
   }
   if (statements.length > 0) {
     await context.env.DB.batch(statements)

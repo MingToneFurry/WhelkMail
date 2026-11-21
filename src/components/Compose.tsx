@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
   ArrowLeft,
+  Baseline,
   Cloud,
   FileText,
   HardDrive,
@@ -26,7 +27,11 @@ import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { cn, fileToBase64, formatBytes, isValidEmail, parseAddresses } from '../lib/utils'
 import { htmlToPlainText, plainTextToHtml, sanitizeComposeHtml } from '../lib/rich-text'
-import { RichTextEditor } from './RichTextEditor'
+import {
+  RichTextEditor,
+  RichTextToolbar,
+  type RichTextEditorHandle,
+} from './RichTextEditor'
 import { RecipientField } from './RecipientField'
 
 interface PendingAttachment {
@@ -42,6 +47,7 @@ interface ComposeProps {
   defaultAccountId: string | null
   maxAttachmentBytes: number
   defaultSignature: string
+  defaultSignatureHtml: string
   signatureMode: SignatureMode
   composeRichDefault: boolean
   initialDraft: DraftPayload | null
@@ -59,15 +65,23 @@ function base64Size(value: string): number {
   return Math.floor((value.length * 3) / 4)
 }
 
+interface ComposeSignature {
+  text: string
+  html: string
+}
+
 function signatureOf(
   account: Account | undefined,
-  fallback: string,
+  fallbackText: string,
+  fallbackHtml: string,
   mode: SignatureMode,
-): string {
+): ComposeSignature {
   if (mode === 'shared') {
-    return fallback.trim()
+    const text = fallbackText.trim()
+    return { text, html: fallbackHtml.trim() || plainTextToHtml(text) }
   }
-  return account?.signature?.trim() ?? ''
+  const text = account?.signature?.trim() ?? ''
+  return { text, html: (account?.signatureHtml ?? '').trim() || plainTextToHtml(text) }
 }
 
 export function Compose({
@@ -76,6 +90,7 @@ export function Compose({
   defaultAccountId,
   maxAttachmentBytes,
   defaultSignature,
+  defaultSignatureHtml,
   signatureMode,
   composeRichDefault,
   initialDraft,
@@ -94,15 +109,24 @@ export function Compose({
   const initialSignature = signatureOf(
     accounts.find((item) => item.id === initialAccountId),
     defaultSignature,
+    defaultSignatureHtml,
     signatureMode,
   )
   const initialText = initialDraft
     ? initialDraft.text
     : seed
-      ? initialSignature
-        ? `${initialSignature}\n\n${seed.text.trimStart()}`
+      ? initialSignature.text
+        ? `${initialSignature.text}\n\n${seed.text.trimStart()}`
         : seed.text
-      : initialSignature
+      : initialSignature.text
+  const seedHtml = seed ? plainTextToHtml(seed.text.trimStart()) : ''
+  const initialHtml =
+    initialDraft?.html ||
+    (seed
+      ? initialSignature.html
+        ? `${initialSignature.html}<br><br>${seedHtml}`
+        : seedHtml
+      : initialSignature.html)
   const [accountId, setAccountId] = useState(initialAccountId)
   // A reply from a relay allowed to send as any address on its domain starts
   // from the address the message was sent to. It's offered as its own entry in
@@ -118,9 +142,14 @@ export function Compose({
   const [showBcc, setShowBcc] = useState(Boolean(initialBcc.length))
   const [subject, setSubject] = useState(initialDraft?.subject ?? seed?.subject ?? '')
   const [text, setText] = useState(initialText)
-  const [html, setHtml] = useState(initialDraft?.html || plainTextToHtml(initialText))
+  const [html, setHtml] = useState(initialHtml)
   const [rich, setRich] = useState(composeRichDefault)
-  const signatureRef = useRef(initialSignature)
+  const [mobileFormatting, setMobileFormatting] = useState(false)
+  const richEditorRef = useRef<RichTextEditorHandle | null>(null)
+  const signatureRef = useRef({
+    text: initialSignature.text,
+    html: initialSignature.html,
+  })
   const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null)
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialDraft?.attachments ?? []).map((attachment) => ({
@@ -220,7 +249,7 @@ export function Compose({
         cc.trim() ||
         bcc.trim() ||
         subject.trim() ||
-        (body && body !== signatureRef.current.trim()) ||
+        (body && body !== signatureRef.current.text.trim()) ||
         attachments.length > 0,
     )
   }
@@ -276,28 +305,29 @@ export function Compose({
     const next = signatureOf(
       accounts.find((item) => item.id === accountId),
       defaultSignature,
+      defaultSignatureHtml,
       signatureMode,
     )
-    if (next === signatureRef.current) {
+    if (next.text === signatureRef.current.text && next.html === signatureRef.current.html) {
       return
     }
     const previous = signatureRef.current
     signatureRef.current = next
     setText((current) => {
       const trimmed = current.trim()
-      if (!trimmed || trimmed === previous.trim()) {
-        return next
+      if (!trimmed || trimmed === previous.text.trim()) {
+        return next.text
       }
       return current
     })
     setHtml((current) => {
       const currentText = htmlToPlainText(current).trim()
-      if (!currentText || currentText === previous.trim()) {
-        return plainTextToHtml(next)
+      if (!currentText || currentText === previous.text.trim()) {
+        return next.html
       }
       return current
     })
-  }, [accountId, accounts, defaultSignature, signatureMode])
+  }, [accountId, accounts, defaultSignature, defaultSignatureHtml, signatureMode])
 
   async function saveDraftManually() {
     const saved = await persistDraft(false)
@@ -373,11 +403,16 @@ export function Compose({
 
   function toggleRich() {
     if (rich) {
+      setMobileFormatting(false)
       setRich(false)
       return
     }
     setHtml(plainTextToHtml(text))
     setRich(true)
+  }
+
+  function runEditorCommand(name: string, value?: string) {
+    richEditorRef.current?.command(name, value)
   }
 
   async function submit(event: FormEvent) {
@@ -556,6 +591,7 @@ export function Compose({
           {rich ? (
             <RichTextEditor
               html={html}
+              handleRef={richEditorRef}
               placeholder={t('compose.body')}
               onChange={(nextHtml, nextText) => {
                 setHtml(nextHtml)
@@ -611,6 +647,15 @@ export function Compose({
           ) : null}
         </div>
 
+        {rich && mobileFormatting ? (
+          <div className="border-t border-line bg-slate-50 px-3 py-1 sm:hidden">
+            <RichTextToolbar
+              onCommand={runEditorCommand}
+              onLink={() => richEditorRef.current?.createLink()}
+            />
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
           <div className="flex items-center gap-3">
             <input ref={fileInput} type="file" multiple onChange={addFiles} className="hidden" />
@@ -622,6 +667,18 @@ export function Compose({
               <Paperclip size={16} />
               {t('compose.attach')}
             </button>
+            {rich ? (
+              <button
+                type="button"
+                onClick={() => setMobileFormatting((value) => !value)}
+                className="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-slate-100 sm:hidden"
+                aria-label={t('compose.formatting')}
+                aria-expanded={mobileFormatting}
+                title={t('compose.formatting')}
+              >
+                <Baseline size={16} />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={toggleRich}
@@ -629,6 +686,16 @@ export function Compose({
             >
               {rich ? t('compose.plainTextMode') : t('compose.richTextMode')}
             </button>
+            {rich ? (
+              <>
+                <span className="hidden h-5 w-px bg-line sm:block" />
+                <RichTextToolbar
+                  className="hidden sm:flex"
+                  onCommand={runEditorCommand}
+                  onLink={() => richEditorRef.current?.createLink()}
+                />
+              </>
+            ) : null}
             {totalBytes > 0 ? (
               <span className="text-[10px] text-muted">
                 {formatBytes(totalBytes)} / {limitMb} MB

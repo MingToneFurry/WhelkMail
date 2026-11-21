@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -29,7 +29,13 @@ import type {
   UpdateStatus,
 } from '../../shared/types'
 import { LOCALES, useI18n, type Locale } from '../i18n'
+import { htmlToPlainText, plainTextToHtml } from '../lib/rich-text'
 import { cn, formatBytes } from '../lib/utils'
+import {
+  RichTextEditor,
+  RichTextToolbar,
+  type RichTextEditorHandle,
+} from './RichTextEditor'
 import { DeletionPanel } from './DeletionPanel'
 import { FiltersSettings } from './FiltersSettings'
 import { PushSettings } from './PushSettings'
@@ -77,11 +83,13 @@ interface SettingsProps {
   autoReplyEnabled: boolean
   autoReplySubject: string
   autoReplyBody: string
+  autoReplyBodyHtml: string
   onAutoReplyChange: (patch: {
     mode?: AutoReplyMode
     enabled?: boolean
     subject?: string
     body?: string
+    bodyHtml?: string
   }) => Promise<void>
   metadataRetentionDays: number
   onMetadataRetentionChange: (value: number) => void
@@ -90,11 +98,46 @@ interface SettingsProps {
   defaultSenderReply: string
   onDefaultSenderReplyChange: (value: string) => void
   defaultSignature: string
-  onDefaultSignatureChange: (value: string) => void
+  defaultSignatureHtml: string
+  onDefaultSignatureChange: (value: string, html: string) => void
   signatureMode: SignatureMode
   onSignatureModeChange: (value: SignatureMode) => void
   onSyncComplete: () => void
   onLogout: () => void
+}
+
+function RichTextField({
+  html,
+  placeholder,
+  minHeight = 'min-h-24',
+  onChange,
+}: {
+  html: string
+  placeholder?: string
+  minHeight?: string
+  onChange: (html: string, text: string) => void
+}) {
+  const editorRef = useRef<RichTextEditorHandle | null>(null)
+  return (
+    <div className="overflow-hidden rounded-lg border border-line">
+      <RichTextEditor
+        html={html}
+        handleRef={editorRef}
+        placeholder={placeholder}
+        onChange={onChange}
+        className={cn(
+          'rich-editor w-full overflow-y-auto px-3 py-2 text-sm leading-6 outline-none',
+          minHeight,
+        )}
+      />
+      <div className="flex items-center gap-0.5 border-t border-line bg-slate-50 px-2 py-1">
+        <RichTextToolbar
+          onCommand={(name, value) => editorRef.current?.command(name, value)}
+          onLink={() => editorRef.current?.createLink()}
+        />
+      </div>
+    </div>
+  )
 }
 
 function ConfigBadge({ ok, label }: { ok: boolean; label: string }) {
@@ -824,24 +867,30 @@ interface AccountSignatureEditorProps {
 
 function AccountSignatureEditor({ account, busy, onUpdate }: AccountSignatureEditorProps) {
   const { t } = useI18n()
-  const [value, setValue] = useState(account.signature)
+  const [value, setValue] = useState(
+    account.signatureHtml.trim() || plainTextToHtml(account.signature),
+  )
   return (
     <div className="rounded-xl border border-line p-3">
       <p className="mb-1 text-xs font-medium text-slate-700">
         {account.displayName} <span className="font-normal text-muted">&lt;{account.email}&gt;</span>
       </p>
-      <textarea
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        rows={3}
+      <RichTextField
+        html={value}
         placeholder={t('settings.signaturePlaceholder')}
-        className="w-full resize-y rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
+        minHeight="min-h-20"
+        onChange={(nextHtml) => setValue(nextHtml)}
       />
       <div className="mt-2 flex justify-end">
         <button
           type="button"
-          disabled={busy || value === account.signature}
-          onClick={() => void onUpdate(account.id, { signature: value })}
+          disabled={busy || value === account.signatureHtml}
+          onClick={() =>
+            void onUpdate(account.id, {
+              signature: htmlToPlainText(value),
+              signatureHtml: value,
+            })
+          }
           className="rounded-lg border border-line px-2 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
         >
           {t('common.save')}
@@ -857,12 +906,14 @@ interface AutoReplySettingsProps {
   enabled: boolean
   subject: string
   body: string
+  bodyHtml: string
   busyId: string | null
   onChange: (patch: {
     mode?: AutoReplyMode
     enabled?: boolean
     subject?: string
     body?: string
+    bodyHtml?: string
   }) => Promise<void>
   onUpdate: (id: string, patch: AccountPatch) => Promise<void>
 }
@@ -873,19 +924,24 @@ function AutoReplySettings({
   enabled,
   subject,
   body,
+  bodyHtml,
   busyId,
   onChange,
   onUpdate,
 }: AutoReplySettingsProps) {
   const { t } = useI18n()
   const [subjectDraft, setSubjectDraft] = useState(subject)
-  const [bodyDraft, setBodyDraft] = useState(body)
+  const [bodyDraft, setBodyDraft] = useState(bodyHtml.trim() || plainTextToHtml(body))
   const [saving, setSaving] = useState(false)
   const receiving = accounts.filter((account) => account.kind === 'imap')
 
   async function saveShared() {
     setSaving(true)
-    await onChange({ subject: subjectDraft.trim(), body: bodyDraft })
+    await onChange({
+      subject: subjectDraft.trim(),
+      body: htmlToPlainText(bodyDraft),
+      bodyHtml: bodyDraft,
+    })
     setSaving(false)
   }
 
@@ -954,19 +1010,17 @@ function AutoReplySettings({
             <span className="mb-1 block font-medium text-muted">
               {t('settings.autoReplyBody')}
             </span>
-            <textarea
-              value={bodyDraft}
-              onChange={(event) => setBodyDraft(event.target.value)}
-              rows={5}
-              maxLength={5000}
+            <RichTextField
+              html={bodyDraft}
               placeholder={t('settings.autoReplyBodyPlaceholder')}
-              className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+              minHeight="min-h-28"
+              onChange={(nextHtml) => setBodyDraft(nextHtml)}
             />
           </label>
           <div className="mt-3 flex justify-end">
             <button
               type="button"
-              disabled={saving || (subjectDraft.trim() === subject && bodyDraft === body)}
+              disabled={saving || (subjectDraft.trim() === subject && bodyDraft === bodyHtml)}
               onClick={() => void saveShared()}
               className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
             >
@@ -1007,13 +1061,16 @@ function AccountAutoReplyEditor({
   const { t } = useI18n()
   const [enabled, setEnabled] = useState(account.autoReplyEnabled)
   const [subject, setSubject] = useState(account.autoReplySubject)
-  const [body, setBody] = useState(account.autoReplyBody)
+  const [body, setBody] = useState(
+    account.autoReplyBodyHtml.trim() || plainTextToHtml(account.autoReplyBody),
+  )
 
   async function save() {
     await onUpdate(account.id, {
       autoReplyEnabled: enabled,
       autoReplySubject: subject.trim(),
-      autoReplyBody: body,
+      autoReplyBody: htmlToPlainText(body),
+      autoReplyBodyHtml: body,
     })
   }
 
@@ -1041,13 +1098,11 @@ function AccountAutoReplyEditor({
       </label>
       <label className="mt-3 block text-xs">
         <span className="mb-1 block font-medium text-muted">{t('settings.autoReplyBody')}</span>
-        <textarea
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          rows={4}
-          maxLength={5000}
+        <RichTextField
+          html={body}
           placeholder={t('settings.autoReplyBodyPlaceholder')}
-          className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+          minHeight="min-h-24"
+          onChange={(nextHtml) => setBody(nextHtml)}
         />
       </label>
       <div className="mt-3 flex justify-end">
@@ -1099,6 +1154,7 @@ export function Settings({
   autoReplyEnabled,
   autoReplySubject,
   autoReplyBody,
+  autoReplyBodyHtml,
   onAutoReplyChange,
   metadataRetentionDays,
   onMetadataRetentionChange,
@@ -1107,6 +1163,7 @@ export function Settings({
   defaultSenderReply,
   onDefaultSenderReplyChange,
   defaultSignature,
+  defaultSignatureHtml,
   onDefaultSignatureChange,
   signatureMode,
   onSignatureModeChange,
@@ -1114,7 +1171,9 @@ export function Settings({
   onLogout,
 }: SettingsProps) {
   const { t, locale, setLocale } = useI18n()
-  const [signatureDraft, setSignatureDraft] = useState(defaultSignature)
+  const [signatureHtmlDraft, setSignatureHtmlDraft] = useState(
+    defaultSignatureHtml.trim() || plainTextToHtml(defaultSignature),
+  )
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'accounts' as const, label: t('settings.tabAccounts') },
     { id: 'general' as const, label: t('settings.tabGeneral') },
@@ -1401,20 +1460,24 @@ export function Settings({
                 <span className="mb-1 block font-medium text-muted">
                   {t('settings.defaultSignature')}
                 </span>
-                <textarea
-                  value={signatureDraft}
-                  onChange={(event) => setSignatureDraft(event.target.value)}
-                  rows={4}
+                <RichTextField
+                  html={signatureHtmlDraft}
                   placeholder={t('settings.signaturePlaceholder')}
-                  className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+                  minHeight="min-h-28"
+                  onChange={(nextHtml) => setSignatureHtmlDraft(nextHtml)}
                 />
               </label>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-muted">{t('settings.defaultSignatureHint')}</p>
                 <button
                   type="button"
-                  disabled={signatureDraft === defaultSignature}
-                  onClick={() => onDefaultSignatureChange(signatureDraft)}
+                  disabled={signatureHtmlDraft === defaultSignatureHtml}
+                  onClick={() =>
+                    onDefaultSignatureChange(
+                      htmlToPlainText(signatureHtmlDraft),
+                      signatureHtmlDraft,
+                    )
+                  }
                   className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
                 >
                   {t('common.save')}
@@ -1443,6 +1506,7 @@ export function Settings({
             enabled={autoReplyEnabled}
             subject={autoReplySubject}
             body={autoReplyBody}
+            bodyHtml={autoReplyBodyHtml}
             busyId={busyId}
             onChange={onAutoReplyChange}
             onUpdate={onUpdate}

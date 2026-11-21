@@ -183,7 +183,7 @@ Important fields:
 - `reply_account_id`: account that sends the replies to messages received here. Used when a domain only forwards to this mailbox and sends through a relay account; cleared when that account is deleted
 - `sync_interval_minutes`: IMAP accounts only. Minutes between automatic checks (1, 2, 5, 10, 15 or 30, default 5).
 - `relay_any_address`: relay accounts only. When set, replies may leave from any address on the account's exact domain (see Reply). Off by default
-- `signature`: optional per-account signature, used only when `signature_mode` is `per_account`
+- `signature` / `signature_html`: optional per-account signature (plain text and rich HTML), used only when `signature_mode` is `per_account`
 - `incoming_label_id`: optional shared label applied automatically to every incoming message of this account. A send-only relay account has no mailbox: its label follows the relay address and is applied to the forwarded mail in the IMAP account that receives it
 - `delete_after_archive`: opt-in provider cleanup; archived incoming messages are moved to the provider Trash
 - `auto_sync`: opt-in automatic background sync for Inbox, Sent, Drafts and Spam via the cron worker
@@ -217,7 +217,7 @@ Shared address book: `id`, `name`, `email`, `note`, `source`, `created_at`. `sou
 
 ### Auto-reply (vacation responder)
 
-`auto_reply_mode` (`shared` or `per_account`) picks where the configuration lives: the shared mode reads `auto_reply_enabled`, `auto_reply_subject` and `auto_reply_body` from `app_settings`; the per-account mode reads `accounts.auto_reply_enabled/subject/body`. The reply is sent from the notification cron after new inbox messages are mirrored: `auto_reply_log` has a unique `(account_id, message_id)` key and a sender index, so a message gets at most one reply and a sender at most one per 24 hours. Own account addresses, `no-reply`/`postmaster`/`mailer-daemon` senders, automated subjects and mail older than seven days are skipped; replies carry `Auto-Submitted: auto-replied` and `X-Auto-Response-Suppress: All` to prevent loops.
+`auto_reply_mode` (`shared` or `per_account`) picks where the configuration lives: the shared mode reads `auto_reply_enabled`, `auto_reply_subject`, `auto_reply_body` and `auto_reply_body_html` from `app_settings`; the per-account mode reads `accounts.auto_reply_enabled/subject/body/body_html`. The reply is sent from the notification cron after new inbox messages are mirrored: `auto_reply_log` has a unique `(account_id, message_id)` key and a sender index, so a message gets at most one reply and a sender at most one per 24 hours. Own account addresses, `no-reply`/`postmaster`/`mailer-daemon` senders, automated subjects and mail older than seven days are skipped; replies carry `Auto-Submitted: auto-replied` and `X-Auto-Response-Suppress: All` to prevent loops. The body is sent as HTML when `body_html` is set, with the plain text as fallback.
 
 ### `imap_sync` and `imap_messages`
 
@@ -251,12 +251,12 @@ Provider cleanup only runs when `archive_imap_bodies` and `delete_after_archive`
 
 ### `app_settings`
 
-Key/value store for deployment-wide preferences: signatures (`default_signature`, `signature_mode`), remote images (`allow_remote_images`), retention (`metadata_retention_days`, `retention_stats`), 2FA material, and the release check (`update_check` cache, `update_notice_dismissed`).
+Key/value store for deployment-wide preferences: signatures (`default_signature`, `default_signature_html`, `signature_mode`), auto-reply (`auto_reply_mode`, `auto_reply_enabled`, `auto_reply_subject`, `auto_reply_body`, `auto_reply_body_html`), remote images (`allow_remote_images`), retention (`metadata_retention_days`, `retention_stats`), 2FA material, and the release check (`update_check` cache, `update_notice_dismissed`).
 
 `signature_mode` is `shared` (default) or `per_account`:
 
-- `shared`: `default_signature` is used for every account and `accounts.signature` is ignored.
-- `per_account`: every account uses its own `accounts.signature`; an empty value means no signature.
+- `shared`: `default_signature` / `default_signature_html` are used for every account and `accounts.signature` is ignored.
+- `per_account`: every account uses its own `accounts.signature` / `accounts.signature_html`; an empty value means no signature.
 
 ## 6. Security model
 

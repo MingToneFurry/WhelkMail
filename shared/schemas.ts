@@ -69,6 +69,7 @@ export const accountCreateSchema = z.discriminatedUnion('kind', [
 export const accountUpdateSchema = z.object({
   displayName: safeText(120).optional(),
   signature: z.string().max(5000).optional(),
+  signatureHtml: z.string().max(50000).optional(),
   incomingLabelId: z.string().min(1).nullable().optional(),
   archiveImapBodies: z.boolean().optional(),
   imapArchiveDriver: z.enum(['r2', 'drive']).optional(),
@@ -83,6 +84,7 @@ export const accountUpdateSchema = z.object({
   autoReplyEnabled: z.boolean().optional(),
   autoReplySubject: z.string().trim().max(200).optional(),
   autoReplyBody: z.string().max(5000).optional(),
+  autoReplyBodyHtml: z.string().max(50000).optional(),
   sentFolder: safeText(255).optional(),
   autoSavesSent: z.boolean().optional(),
   sentCopyAccountId: z.string().min(1).max(64).nullable().optional(),
@@ -227,6 +229,7 @@ export const pushPrefsSchema = z.object({
 
 export const appSettingsSchema = z.object({
   defaultSignature: z.string().max(5000).optional(),
+  defaultSignatureHtml: z.string().max(50000).optional(),
   signatureMode: z.enum(['shared', 'per_account']).optional(),
   allowRemoteImages: z.boolean().optional(),
   metadataRetentionDays: z.number().int().min(0).max(3650).optional(),
@@ -235,5 +238,6 @@ export const appSettingsSchema = z.object({
   autoReplyEnabled: z.boolean().optional(),
   autoReplySubject: z.string().trim().max(200).optional(),
   autoReplyBody: z.string().max(5000).optional(),
+  autoReplyBodyHtml: z.string().max(50000).optional(),
 })
 
