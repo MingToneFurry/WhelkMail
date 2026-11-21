@@ -1,4 +1,4 @@
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
@@ -417,8 +417,7 @@ export function Compose({
     richEditorRef.current?.command(name, value)
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
+  async function sendMessage() {
     if (savingRef.current) {
       return
     }
@@ -454,7 +453,14 @@ export function Compose({
       }}
     >
       <form
-        onSubmit={submit}
+        // Sending only happens from the Send button. Enter in a field must never
+        // submit the whole message.
+        onSubmit={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+            event.preventDefault()
+          }
+        }}
         className="flex h-full w-full max-w-none flex-col rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-line px-3 py-2 sm:px-5 sm:py-3">
@@ -739,8 +745,17 @@ export function Compose({
               {saving ? t('compose.savingDraft') : t('compose.saveDraft')}
             </button>
             <button
-              type="submit"
+              type="button"
               disabled={busy || saving || autoSaving || !account}
+              onClick={(event) => {
+                // Keyboard activation (Enter/Space on the focused button) has
+                // detail 0. Only a real pointer click sends the message.
+                if (event.detail === 0) {
+                  event.preventDefault()
+                  return
+                }
+                void sendMessage()
+              }}
               className={cn(
                 'flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-medium text-white hover:bg-brand-strong',
                 (busy || saving || autoSaving || !account) && 'opacity-60',

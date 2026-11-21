@@ -66,6 +66,20 @@ export function RecipientField({
     setActive(0)
   }
 
+  function commitToken() {
+    const trimmed = token.trim()
+    if (!trimmed || !tokenEmail || !isValidEmail(tokenEmail)) {
+      return
+    }
+    const separator = prefix ? `${prefix.trimEnd()} ` : ''
+    const next = `${separator}${trimmed}, `
+    if (next !== value) {
+      onChange(next)
+    }
+    setOpen(false)
+    setActive(0)
+  }
+
   async function addToContacts(email: string) {
     if (!onAddContact || adding) {
       return
@@ -73,8 +87,7 @@ export function RecipientField({
     setAdding(true)
     await onAddContact(email)
     setAdding(false)
-    setOpen(false)
-    setActive(0)
+    commitToken()
   }
 
   function chooseOption(option: (typeof options)[number] | undefined) {
@@ -100,6 +113,24 @@ export function RecipientField({
         onFocus={() => setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            // Enter only commits the address (or picks a suggestion). It must
+            // never reach the form and send the message.
+            event.preventDefault()
+            if (tokenEmail && isValidEmail(tokenEmail)) {
+              commitToken()
+            } else if (open && options.length > 0) {
+              chooseOption(options[active] ?? options[0])
+            }
+            return
+          }
+          if (event.key === 'Tab') {
+            if (open && options.length > 0) {
+              event.preventDefault()
+              chooseOption(options[active] ?? options[0])
+            }
+            return
+          }
           if (!open || options.length === 0) {
             return
           }
@@ -109,9 +140,6 @@ export function RecipientField({
           } else if (event.key === 'ArrowUp') {
             event.preventDefault()
             setActive((current) => (current - 1 + options.length) % options.length)
-          } else if (event.key === 'Enter' || event.key === 'Tab') {
-            event.preventDefault()
-            chooseOption(options[active] ?? options[0])
           } else if (event.key === 'Escape') {
             setOpen(false)
           }
