@@ -26,7 +26,7 @@ import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { cn, fileToBase64, formatBytes, isValidEmail, parseAddresses } from '../lib/utils'
-import { htmlToPlainText, plainTextToHtml, sanitizeComposeHtml } from '../lib/rich-text'
+import { htmlToPlainText, plainTextToHtml, sanitizeComposeHtml, signatureBlockHtml } from '../lib/rich-text'
 import {
   RichTextEditor,
   RichTextToolbar,
@@ -61,6 +61,14 @@ interface ComposeProps {
 
 /** Value of the From entry for the alias; account IDs are UUIDs, so it can't clash. */
 const ALIAS_OPTION = 'alias'
+
+/** An empty paragraph that always leaves room to write above the signature. */
+const EMPTY_BODY_HTML = '<div><br></div>'
+
+function emptyBodyWithSignature(signatureHtml: string): string {
+  const block = signatureBlockHtml(signatureHtml)
+  return block ? `${EMPTY_BODY_HTML}${block}` : ''
+}
 
 function base64Size(value: string): number {
   return Math.floor((value.length * 3) / 4)
@@ -126,9 +134,9 @@ export function Compose({
     initialDraft?.html ||
     (seed
       ? initialSignature.html
-        ? `${initialSignature.html}<br><br>${seedHtml}`
+        ? `${emptyBodyWithSignature(initialSignature.html)}<br><br>${seedHtml}`
         : seedHtml
-      : initialSignature.html)
+      : emptyBodyWithSignature(initialSignature.html))
   const [accountId, setAccountId] = useState(initialAccountId)
   // A reply from a relay allowed to send as any address on its domain starts
   // from the address the message was sent to. It's offered as its own entry in
@@ -325,7 +333,7 @@ export function Compose({
     setHtml((current) => {
       const currentText = htmlToPlainText(current).trim()
       if (!currentText || currentText === previous.text.trim()) {
-        return next.html
+        return emptyBodyWithSignature(next.html)
       }
       return current
     })
@@ -604,6 +612,7 @@ export function Compose({
               html={html}
               handleRef={richEditorRef}
               placeholder={t('compose.body')}
+              autoFocus={!initialDraft && !seed}
               onChange={(nextHtml, nextText) => {
                 setHtml(nextHtml)
                 setText(nextText)

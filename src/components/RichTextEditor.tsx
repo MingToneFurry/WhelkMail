@@ -32,6 +32,7 @@ interface RichTextEditorProps {
   html: string
   placeholder?: string
   className?: string
+  autoFocus?: boolean
   handleRef?: RefObject<RichTextEditorHandle | null>
   onChange: (html: string, text: string) => void
 }
@@ -40,6 +41,7 @@ export function RichTextEditor({
   html,
   placeholder,
   className,
+  autoFocus,
   handleRef,
   onChange,
 }: RichTextEditorProps) {
@@ -61,6 +63,30 @@ export function RichTextEditor({
       editor.innerHTML = html
     }
   }, [html])
+
+  useEffect(() => {
+    if (!autoFocus) {
+      return
+    }
+    const editor = editorRef.current
+    if (!editor) {
+      return
+    }
+    // Start writing at the top, in the empty body paragraph above an existing
+    // signature, so the signature's formatting is never inherited.
+    editor.focus()
+    const range = document.createRange()
+    const first = editor.firstElementChild
+    if (first) {
+      range.selectNodeContents(first)
+    } else {
+      range.selectNodeContents(editor)
+    }
+    range.collapse(true)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }, [autoFocus])
 
   useEffect(() => {
     function saveSelection() {

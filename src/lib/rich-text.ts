@@ -18,6 +18,9 @@ const ALLOWED_TAGS = new Set([
 
 const BLOCK_TAGS = new Set(['P', 'DIV', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'TR'])
 
+/** Marks the signature block so the composer can separate it from the body. */
+export const SIGNATURE_ATTR = 'data-signature'
+
 function escapeText(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -52,6 +55,9 @@ function cleanNode(node: Element): void {
   }
   for (const attribute of Array.from(node.attributes)) {
     if (node.tagName === 'A' && attribute.name.toLowerCase() === 'href') {
+      continue
+    }
+    if (node.tagName === 'DIV' && attribute.name.toLowerCase() === SIGNATURE_ATTR) {
       continue
     }
     node.removeAttribute(attribute.name)
@@ -117,4 +123,17 @@ export function plainTextToHtml(text: string): string {
     return ''
   }
   return escapeText(text).replace(/\r?\n/g, '<br>')
+}
+
+/**
+ * Wraps the signature in a marked block. The marker survives sanitization and
+ * lets the composer draw a separator and keep the signature styling isolated
+ * from the message body.
+ */
+export function signatureBlockHtml(signatureHtml: string): string {
+  const inner = signatureHtml.trim()
+  if (!inner) {
+    return ''
+  }
+  return `<div ${SIGNATURE_ATTR}="1">${inner}</div>`
 }
