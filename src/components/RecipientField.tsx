@@ -114,13 +114,14 @@ export function RecipientField({
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
-            // Enter only commits the address (or picks a suggestion). It must
-            // never reach the form and send the message.
+            // Enter only picks the highlighted suggestion (including "Add to
+            // contacts") or commits the address. It must never reach the form
+            // and send the message.
             event.preventDefault()
-            if (tokenEmail && isValidEmail(tokenEmail)) {
-              commitToken()
-            } else if (open && options.length > 0) {
+            if (open && options.length > 0) {
               chooseOption(options[active] ?? options[0])
+            } else {
+              commitToken()
             }
             return
           }
