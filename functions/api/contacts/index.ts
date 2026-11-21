@@ -58,7 +58,9 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   if (existing) {
     const name = parsed.data.name
     const note = parsed.data.note === undefined ? existing.note : parsed.data.note
-    await context.env.DB.prepare('UPDATE contacts SET name = ?, note = ? WHERE id = ?')
+    await context.env.DB.prepare(
+      "UPDATE contacts SET name = ?, note = ?, source = 'manual' WHERE id = ?",
+    )
       .bind(name, note, existing.id)
       .run()
     const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')
@@ -72,7 +74,7 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   await context.env.DB.prepare(
-    'INSERT INTO contacts (id, name, email, note, created_at) VALUES (?, ?, ?, ?, ?)',
+    "INSERT INTO contacts (id, name, email, note, created_at, source) VALUES (?, ?, ?, ?, ?, 'manual')",
   )
     .bind(id, parsed.data.name, email, parsed.data.note ?? null, createdAt)
     .run()
@@ -83,6 +85,7 @@ async function createContact(context: Parameters<PagesFunction<Env>>[0]): Promis
         name: parsed.data.name,
         email,
         note: parsed.data.note ?? '',
+        source: 'manual',
         createdAt,
       } satisfies Contact,
     },

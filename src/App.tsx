@@ -4,6 +4,7 @@ import type {
   Account,
   AccountCreateInput,
   AccountPatch,
+  AutoReplyMode,
   ComposeSeed,
   Contact,
   ContactInput,
@@ -61,6 +62,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   'accounts',
   'general',
   'signatures',
+  'autoreply',
   'filters',
   'notifications',
   'security',
@@ -168,6 +170,11 @@ export default function App() {
   const [defaultSignature, setDefaultSignature] = useState('')
   const [signatureMode, setSignatureMode] = useState<SignatureMode>('shared')
   const [allowRemoteImages, setAllowRemoteImages] = useState(false)
+  const [contactAutoAdd, setContactAutoAdd] = useState(true)
+  const [autoReplyMode, setAutoReplyMode] = useState<AutoReplyMode>('shared')
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false)
+  const [autoReplySubject, setAutoReplySubject] = useState('')
+  const [autoReplyBody, setAutoReplyBody] = useState('')
   const [metadataRetentionDays, setMetadataRetentionDays] = useState(0)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
@@ -205,6 +212,13 @@ export default function App() {
       return localStorage.getItem('mc_reading_pane') === '1'
     } catch {
       return false
+    }
+  })
+  const [composeRich, setComposeRich] = useState(() => {
+    try {
+      return localStorage.getItem('mc_compose_rich') !== '0'
+    } catch {
+      return true
     }
   })
   const [defaultSenderNew, setDefaultSenderNew] = useState<string>(() => {
@@ -293,6 +307,11 @@ export default function App() {
         setDefaultSignature(settingsResponse.defaultSignature)
         setSignatureMode(settingsResponse.signatureMode)
         setAllowRemoteImages(settingsResponse.allowRemoteImages)
+        setContactAutoAdd(settingsResponse.contactAutoAdd ?? true)
+        setAutoReplyMode(settingsResponse.autoReplyMode ?? 'shared')
+        setAutoReplyEnabled(settingsResponse.autoReplyEnabled ?? false)
+        setAutoReplySubject(settingsResponse.autoReplySubject ?? '')
+        setAutoReplyBody(settingsResponse.autoReplyBody ?? '')
         setMetadataRetentionDays(settingsResponse.metadataRetentionDays)
       }
       if (filtersResponse) {
@@ -1536,10 +1555,58 @@ export default function App() {
     }
   }
 
+  function changeComposeRich(value: boolean) {
+    setComposeRich(value)
+    try {
+      localStorage.setItem('mc_compose_rich', value ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
   async function changeAllowRemoteImages(value: boolean) {
     setAllowRemoteImages(value)
     try {
       await api.updateSettings({ allowRemoteImages: value })
+    } catch (error) {
+      setSettingsError(errorText(error, tRef.current))
+    }
+  }
+
+  async function changeContactAutoAdd(value: boolean) {
+    setContactAutoAdd(value)
+    try {
+      await api.updateSettings({ contactAutoAdd: value })
+    } catch (error) {
+      setSettingsError(errorText(error, tRef.current))
+    }
+  }
+
+  async function changeAutoReply(patch: {
+    mode?: AutoReplyMode
+    enabled?: boolean
+    subject?: string
+    body?: string
+  }) {
+    if (patch.mode !== undefined) {
+      setAutoReplyMode(patch.mode)
+    }
+    if (patch.enabled !== undefined) {
+      setAutoReplyEnabled(patch.enabled)
+    }
+    if (patch.subject !== undefined) {
+      setAutoReplySubject(patch.subject)
+    }
+    if (patch.body !== undefined) {
+      setAutoReplyBody(patch.body)
+    }
+    try {
+      await api.updateSettings({
+        autoReplyMode: patch.mode,
+        autoReplyEnabled: patch.enabled,
+        autoReplySubject: patch.subject,
+        autoReplyBody: patch.body,
+      })
     } catch (error) {
       setSettingsError(errorText(error, tRef.current))
     }
@@ -1773,8 +1840,17 @@ export default function App() {
             }}
             readingPane={readingPane}
             onReadingPaneChange={changeReadingPane}
+            composeRich={composeRich}
+            onComposeRichChange={changeComposeRich}
             allowRemoteImages={allowRemoteImages}
             onAllowRemoteImagesChange={(value) => void changeAllowRemoteImages(value)}
+            contactAutoAdd={contactAutoAdd}
+            onContactAutoAddChange={(value) => void changeContactAutoAdd(value)}
+            autoReplyMode={autoReplyMode}
+            autoReplyEnabled={autoReplyEnabled}
+            autoReplySubject={autoReplySubject}
+            autoReplyBody={autoReplyBody}
+            onAutoReplyChange={changeAutoReply}
             metadataRetentionDays={metadataRetentionDays}
             onMetadataRetentionChange={(value) => void changeMetadataRetention(value)}
             defaultSenderNew={defaultSenderNew}
@@ -2002,6 +2078,7 @@ export default function App() {
           defaultAccountId={composeAccountId}
           defaultSignature={defaultSignature}
           signatureMode={signatureMode}
+          composeRichDefault={composeRich}
           maxAttachmentBytes={health?.maxAttachmentBytes ?? 15 * 1024 * 1024}
           initialDraft={composeDraft}
           seed={composeSeed}
@@ -2020,6 +2097,12 @@ export default function App() {
             setQuery('')
             setSelectedMessageId(null)
             setRefreshKey((key) => key + 1)
+            // Sending may have added the recipients to Other contacts: refresh
+            // them so autocomplete sees the new addresses immediately.
+            api
+              .contacts()
+              .then((response) => setContacts(response.contacts))
+              .catch(() => undefined)
             // A relay can accept a message but drop some recipients (bounced or
             // suppressed). Show that alongside any other warning; otherwise
             // fall back to the usual "sent" notice.

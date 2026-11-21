@@ -46,7 +46,9 @@ async function updateContact(context: Parameters<PagesFunction<Env>>[0]): Promis
       return fail('A contact with this email already exists', 409, undefined, 'contact_exists')
     }
   }
-  await context.env.DB.prepare('UPDATE contacts SET name = ?, email = ?, note = ? WHERE id = ?')
+  await context.env.DB.prepare(
+    "UPDATE contacts SET name = ?, email = ?, note = ?, source = 'manual' WHERE id = ?",
+  )
     .bind(name, email, note, id)
     .run()
   const updated = await context.env.DB.prepare('SELECT * FROM contacts WHERE id = ?')

@@ -80,6 +80,9 @@ export const accountUpdateSchema = z.object({
     .int()
     .refine(isSyncIntervalMinutes, 'Unsupported sync interval')
     .optional(),
+  autoReplyEnabled: z.boolean().optional(),
+  autoReplySubject: z.string().trim().max(200).optional(),
+  autoReplyBody: z.string().max(5000).optional(),
   sentFolder: safeText(255).optional(),
   autoSavesSent: z.boolean().optional(),
   sentCopyAccountId: z.string().min(1).max(64).nullable().optional(),
@@ -227,5 +230,10 @@ export const appSettingsSchema = z.object({
   signatureMode: z.enum(['shared', 'per_account']).optional(),
   allowRemoteImages: z.boolean().optional(),
   metadataRetentionDays: z.number().int().min(0).max(3650).optional(),
+  contactAutoAdd: z.boolean().optional(),
+  autoReplyMode: z.enum(['shared', 'per_account']).optional(),
+  autoReplyEnabled: z.boolean().optional(),
+  autoReplySubject: z.string().trim().max(200).optional(),
+  autoReplyBody: z.string().max(5000).optional(),
 })
 

@@ -75,6 +75,41 @@ body {
   animation: thread-message-in 160ms ease-out;
 }
 
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.rich-editor p,
+.rich-editor div {
+  margin: 0 0 0.5em;
+}
+
+.rich-editor ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+  margin: 0 0 0.5em;
+}
+
+.rich-editor ol {
+  list-style: decimal;
+  padding-left: 1.4rem;
+  margin: 0 0 0.5em;
+}
+
+.rich-editor blockquote {
+  margin: 0 0 0.5em;
+  border-left: 3px solid var(--color-line);
+  padding-left: 0.75rem;
+  color: var(--color-muted);
+}
+
+.rich-editor a {
+  color: var(--color-brand);
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .thread-message-in {
     animation: none;

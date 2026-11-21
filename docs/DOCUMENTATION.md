@@ -125,6 +125,7 @@ Key constraints:
   - The mailbox copy is mirrored as an ordinary draft of the target account (`i_<account>.draft.<uid>`). The Drafts list and draft searches filter those ids out (`relayDraftMirrorIds` → `draftMirrorIdsFromPointers`), so the draft is listed once, under the relay account that owns it. Saving or deleting a draft queues a sync of the target Drafts folder, so the mirror follows the copy that was just appended or expunged. The exclusion runs inside SQL, before `LIMIT`, because filtering a page afterwards would shorten it and drop the next cursor. The ids are inlined as validated literals instead of bound parameters: D1 caps a statement at 100 parameters and a mailbox can hold many copies, so the list is filtered to `i_<account>.<folder>.<uid>` shapes and capped at 500 entries.
 - Autosave runs 5 seconds after the last change and every 30 seconds while changes remain. Closing the composer saves pending changes first; if the draft cannot be saved the user is asked whether to discard it.
 - An explicit **Save draft** closes the composer and opens the Drafts folder.
+- The composer has a rich-text mode (bold, italic, underline, strike, lists, blockquote, link) and a plain-text fallback. `html` is stored in the MIME/draft alongside `text`, and the default mode is a per-device preference (`localStorage: mc_compose_rich`), so the desktop and the phone can differ. Pasting keeps only a small allow-list of tags and sanitizes links.
 - The Drafts folder is **not grouped into conversations**: each draft is its own row, even when it carries the thread key of an existing conversation. The thread queries deliberately exclude `folder = 'draft'`, so the list has a dedicated draft query; otherwise the folder would always look empty. A relay draft stored in another mailbox is still listed once, under the relay account.
 
 ### Where a send-only account keeps its copies
@@ -212,7 +213,11 @@ Enabled filters are also evaluated when the inbox is listed and when the cron wo
 
 ### `contacts`
 
-Shared address book: `id`, `name`, `email`, `note`, `created_at`. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
+Shared address book: `id`, `name`, `email`, `note`, `source`, `created_at`. `source` is `manual` or `auto`: sending a message adds its recipients to the Gmail-style **Other contacts** for autocomplete unless `app_settings.contact_auto_add` is `0`; editing an automatic contact promotes it to `manual`. A unique index on `lower(email)` prevents duplicates; creating a contact with an existing email updates the name/note instead. Contacts are not account-scoped. The UI supports search, create/edit/delete, CSV import/export, and autocomplete in To/Cc/Bcc.
+
+### Auto-reply (vacation responder)
+
+`auto_reply_mode` (`shared` or `per_account`) picks where the configuration lives: the shared mode reads `auto_reply_enabled`, `auto_reply_subject` and `auto_reply_body` from `app_settings`; the per-account mode reads `accounts.auto_reply_enabled/subject/body`. The reply is sent from the notification cron after new inbox messages are mirrored: `auto_reply_log` has a unique `(account_id, message_id)` key and a sender index, so a message gets at most one reply and a sender at most one per 24 hours. Own account addresses, `no-reply`/`postmaster`/`mailer-daemon` senders, automated subjects and mail older than seven days are skipped; replies carry `Auto-Submitted: auto-replied` and `X-Auto-Response-Suppress: All` to prevent loops.
 
 ### `imap_sync` and `imap_messages`
 

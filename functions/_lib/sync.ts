@@ -11,6 +11,7 @@ import type { PageCursor } from '../../shared/paging'
 import type { ImapConnection, ImapHeader } from './imap/client'
 import { MISSING_FOLDER, withImap, resolveFolderName } from './mail/imap'
 import { applyFilters } from './filters'
+import { processAutoReply } from './auto-reply'
 import { archiveUpdateStatement } from './mail/archive-update'
 import {
   isReplySubject,
@@ -1070,6 +1071,7 @@ async function runSyncChunkLocked(
     }
 
     const now = new Date().toISOString()
+    const isInitialSync = maxUid === 0
 
     if (uidsToFetch.length > 0) {
       const headers = await connection.fetchHeaders(uidsToFetch)
@@ -1190,6 +1192,18 @@ async function runSyncChunkLocked(
         // Filters cover every folder, not just the inbox: the automatic account
         // label (a match-all account filter) must reach sent, drafts and trash too.
         await applyFilters(env, account.id, summaries)
+        // The cron only sees messages whose UID is still above the cursor: when a
+        // client syncs first, the vacation responder would never run. Handle new
+        // inbox mail here as well; the auto_reply_log unique key prevents doubles.
+        if (folder === 'inbox' && phase === 'new' && !isInitialSync) {
+          for (const item of parsed) {
+            try {
+              await processAutoReply(env, account, item.row)
+            } catch (error) {
+              console.error('[auto-reply] failed', error)
+            }
+          }
+        }
       }
 
       if (archiveStorage && parsed.length > 0) {

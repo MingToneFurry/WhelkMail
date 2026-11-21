@@ -19,11 +19,15 @@ export interface Label {
   createdAt: string
 }
 
+export type ContactSource = 'manual' | 'auto'
+
 export interface Contact {
   id: string
   name: string
   email: string
   note: string
+  /** `auto` entries are the Gmail-style "Other contacts" created when sending. */
+  source: ContactSource
   createdAt: string
 }
 
@@ -127,6 +131,7 @@ export interface FilterInput {
 }
 
 export type SignatureMode = 'shared' | 'per_account'
+export type AutoReplyMode = 'shared' | 'per_account'
 
 /** One conversation row in the message list (threads are per account). */
 export interface MailThread {
@@ -178,6 +183,7 @@ export type SettingsTab =
   | 'accounts'
   | 'general'
   | 'signatures'
+  | 'autoreply'
   | 'filters'
   | 'notifications'
   | 'security'
@@ -189,6 +195,12 @@ export interface AppSettings {
   allowRemoteImages: boolean
   /** Delete mirrored IMAP metadata older than this many days. 0 keeps everything. */
   metadataRetentionDays: number
+  /** Add recipients of a sent message to Other contacts for autocomplete. */
+  contactAutoAdd: boolean
+  autoReplyMode: AutoReplyMode
+  autoReplyEnabled: boolean
+  autoReplySubject: string
+  autoReplyBody: string
 }
 
 export interface Mailbox {
@@ -227,6 +239,10 @@ export interface Account {
   autoSync: boolean
   /** Minutes between automatic checks for this account (1, 2, 5, 10, 15 or 30). */
   syncIntervalMinutes: number
+  /** Per-account auto-responder, used when autoReplyMode is per_account. */
+  autoReplyEnabled: boolean
+  autoReplySubject: string
+  autoReplyBody: string
   sentFolder: string
   autoSavesSent: boolean
   /** IMAP account that receives a copy of the sent mail (relay accounts only). */
@@ -454,6 +470,9 @@ export interface AccountPatch {
   deleteAfterArchive?: boolean
   autoSync?: boolean
   syncIntervalMinutes?: number
+  autoReplyEnabled?: boolean
+  autoReplySubject?: string
+  autoReplyBody?: string
   sentFolder?: string
   autoSavesSent?: boolean
   sentCopyAccountId?: string | null

@@ -44,6 +44,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 - Inbox, Sent, Drafts and Spam with autosave and reopenable drafts.
 - Gmail-style conversations (RFC `References` when available, subject fallback otherwise): one list row per thread showing the senders and the message count (`Mario, Luca +2  5`), and a reading pane that stacks every message of the thread (your replies included) as a one-line header you can click to expand. Threads are per account and every standard view is grouped: inbox, sent, spam, label views and search results. Drafts are the exception: each draft is listed on its own.
 - HTML bodies in a sandboxed frame with optional remote images; attachment indicators from `BODYSTRUCTURE` without downloading the body up front.
+- Rich text composer with bold, lists, links and quotes; the default rich/plain format is saved per device, so desktop and phone can differ. Drafts keep their HTML.
 - Installable PWA, mobile drawer layout and Web Push notifications with per-account/folder preferences.
 - English by default, Italian available; the dictionary is extensible.
 
@@ -60,14 +61,16 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 
 - Gmail-style labels shared across all accounts, with a label view that collects messages from Inbox, Sent, Drafts and Spam.
 - Per-account incoming labels applied automatically.
-- Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc.
+- Contacts with search, edit, CSV import/export and recipient autocomplete in To/Cc/Bcc. Recipients of sent messages are added to **Other contacts** for autocomplete (on by default; Settings → General switches to manual only).
 - Signatures: one shared signature or a different signature per account.
+- Vacation responder (auto-reply): one shared message for all accounts or a different one per account.
 
 ### Automation
 
 - Gmail-style filters shared across accounts: match From/To/Subject/words/attachments and apply labels and/or forward the original EML.
 - Incremental, resumable IMAP metadata sync into D1, with per-account status and automatic resume.
 - Optional background sync through the cron worker: each IMAP account chooses its own interval (1, 2, 5, 10, 15 or 30 minutes, 5 by default).
+- Vacation responder runs from the same cron worker; it replies at most once per sender every 24 hours and marks the reply as automatic.
 - Anti-loop forwarding headers, per-filter forward logs and deletion logs.
 
 ## Security

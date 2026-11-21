@@ -248,7 +248,9 @@ export async function applyFilters(
       }
     }
     if (statements.length > 0) {
-      await env.DB.batch(statements)
+      for (let index = 0; index < statements.length; index += 100) {
+        await env.DB.batch(statements.slice(index, index + 100))
+      }
     }
     return forwards
   } catch (error) {

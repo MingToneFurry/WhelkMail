@@ -16,6 +16,7 @@ import { RELEASES_URL, UPGRADE_DOC_URL } from '../../shared/update-links'
 import type {
   Account,
   AccountPatch,
+  AutoReplyMode,
   FilterInput,
   HealthStatus,
   Label,
@@ -66,8 +67,22 @@ interface SettingsProps {
   onAddAccount: () => void
   readingPane: boolean
   onReadingPaneChange: (value: boolean) => void
+  composeRich: boolean
+  onComposeRichChange: (value: boolean) => void
   allowRemoteImages: boolean
   onAllowRemoteImagesChange: (value: boolean) => void
+  contactAutoAdd: boolean
+  onContactAutoAddChange: (value: boolean) => void
+  autoReplyMode: AutoReplyMode
+  autoReplyEnabled: boolean
+  autoReplySubject: string
+  autoReplyBody: string
+  onAutoReplyChange: (patch: {
+    mode?: AutoReplyMode
+    enabled?: boolean
+    subject?: string
+    body?: string
+  }) => Promise<void>
   metadataRetentionDays: number
   onMetadataRetentionChange: (value: number) => void
   defaultSenderNew: string
@@ -836,6 +851,219 @@ function AccountSignatureEditor({ account, busy, onUpdate }: AccountSignatureEdi
   )
 }
 
+interface AutoReplySettingsProps {
+  accounts: Account[]
+  mode: AutoReplyMode
+  enabled: boolean
+  subject: string
+  body: string
+  busyId: string | null
+  onChange: (patch: {
+    mode?: AutoReplyMode
+    enabled?: boolean
+    subject?: string
+    body?: string
+  }) => Promise<void>
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
+}
+
+function AutoReplySettings({
+  accounts,
+  mode,
+  enabled,
+  subject,
+  body,
+  busyId,
+  onChange,
+  onUpdate,
+}: AutoReplySettingsProps) {
+  const { t } = useI18n()
+  const [subjectDraft, setSubjectDraft] = useState(subject)
+  const [bodyDraft, setBodyDraft] = useState(body)
+  const [saving, setSaving] = useState(false)
+  const receiving = accounts.filter((account) => account.kind === 'imap')
+
+  async function saveShared() {
+    setSaving(true)
+    await onChange({ subject: subjectDraft.trim(), body: bodyDraft })
+    setSaving(false)
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-line bg-white p-5">
+        <p className="text-sm font-medium">{t('settings.autoReplyTitle')}</p>
+        <p className="mt-1 text-[11px] text-muted">{t('settings.autoReplyHint')}</p>
+        <div className="mt-3 space-y-2">
+          <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+            <input
+              type="radio"
+              name="auto-reply-mode"
+              checked={mode === 'shared'}
+              onChange={() => void onChange({ mode: 'shared' })}
+              className="mt-0.5 h-3.5 w-3.5"
+            />
+            <span>
+              <span className="block font-medium">{t('settings.autoReplyShared')}</span>
+              <span className="text-muted">{t('settings.autoReplySharedHint')}</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+            <input
+              type="radio"
+              name="auto-reply-mode"
+              checked={mode === 'per_account'}
+              onChange={() => void onChange({ mode: 'per_account' })}
+              className="mt-0.5 h-3.5 w-3.5"
+            />
+            <span>
+              <span className="block font-medium">{t('settings.autoReplyPerAccount')}</span>
+              <span className="text-muted">{t('settings.autoReplyPerAccountHint')}</span>
+            </span>
+          </label>
+        </div>
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-muted">
+          {t('settings.autoReplyRules')}
+        </p>
+      </div>
+
+      {mode === 'shared' ? (
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <label className="flex items-center gap-2 text-xs text-slate-700">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => void onChange({ enabled: event.target.checked })}
+              className="h-4 w-4"
+            />
+            {t('settings.autoReplyEnable')}
+          </label>
+          <label className="mt-4 block text-xs">
+            <span className="mb-1 block font-medium text-muted">
+              {t('settings.autoReplySubject')}
+            </span>
+            <input
+              value={subjectDraft}
+              onChange={(event) => setSubjectDraft(event.target.value)}
+              maxLength={200}
+              placeholder={t('settings.autoReplySubjectPlaceholder')}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+          </label>
+          <label className="mt-3 block text-xs">
+            <span className="mb-1 block font-medium text-muted">
+              {t('settings.autoReplyBody')}
+            </span>
+            <textarea
+              value={bodyDraft}
+              onChange={(event) => setBodyDraft(event.target.value)}
+              rows={5}
+              maxLength={5000}
+              placeholder={t('settings.autoReplyBodyPlaceholder')}
+              className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+          </label>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              disabled={saving || (subjectDraft.trim() === subject && bodyDraft === body)}
+              onClick={() => void saveShared()}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {saving ? t('common.loading') : t('common.save')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {receiving.length === 0 ? (
+            <p className="rounded-2xl border border-line bg-white p-5 text-xs text-muted">
+              {t('settings.autoReplyNoAccounts')}
+            </p>
+          ) : null}
+          {receiving.map((account) => (
+            <AccountAutoReplyEditor
+              key={account.id}
+              account={account}
+              busy={busyId === account.id}
+              onUpdate={onUpdate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AccountAutoReplyEditor({
+  account,
+  busy,
+  onUpdate,
+}: {
+  account: Account
+  busy: boolean
+  onUpdate: (id: string, patch: AccountPatch) => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [enabled, setEnabled] = useState(account.autoReplyEnabled)
+  const [subject, setSubject] = useState(account.autoReplySubject)
+  const [body, setBody] = useState(account.autoReplyBody)
+
+  async function save() {
+    await onUpdate(account.id, {
+      autoReplyEnabled: enabled,
+      autoReplySubject: subject.trim(),
+      autoReplyBody: body,
+    })
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5">
+      <p className="text-sm font-medium">{account.email}</p>
+      <label className="mt-3 flex items-center gap-2 text-xs text-slate-700">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => setEnabled(event.target.checked)}
+          className="h-4 w-4"
+        />
+        {t('settings.autoReplyEnable')}
+      </label>
+      <label className="mt-3 block text-xs">
+        <span className="mb-1 block font-medium text-muted">{t('settings.autoReplySubject')}</span>
+        <input
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+          maxLength={200}
+          placeholder={t('settings.autoReplySubjectPlaceholder')}
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+        />
+      </label>
+      <label className="mt-3 block text-xs">
+        <span className="mb-1 block font-medium text-muted">{t('settings.autoReplyBody')}</span>
+        <textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          rows={4}
+          maxLength={5000}
+          placeholder={t('settings.autoReplyBodyPlaceholder')}
+          className="w-full resize-y rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+        />
+      </label>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void save()}
+          className="rounded-lg border border-line px-3 py-1.5 text-xs hover:bg-slate-50 disabled:opacity-50"
+        >
+          {busy ? t('common.loading') : t('common.save')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Settings({
   accounts,
   labels,
@@ -861,8 +1089,17 @@ export function Settings({
   onAddAccount,
   readingPane,
   onReadingPaneChange,
+  composeRich,
+  onComposeRichChange,
   allowRemoteImages,
   onAllowRemoteImagesChange,
+  contactAutoAdd,
+  onContactAutoAddChange,
+  autoReplyMode,
+  autoReplyEnabled,
+  autoReplySubject,
+  autoReplyBody,
+  onAutoReplyChange,
   metadataRetentionDays,
   onMetadataRetentionChange,
   defaultSenderNew,
@@ -882,6 +1119,7 @@ export function Settings({
     { id: 'accounts' as const, label: t('settings.tabAccounts') },
     { id: 'general' as const, label: t('settings.tabGeneral') },
     { id: 'signatures' as const, label: t('settings.tabSignatures') },
+    { id: 'autoreply' as const, label: t('settings.tabAutoReply') },
     { id: 'filters' as const, label: t('settings.tabFilters') },
     { id: 'notifications' as const, label: t('settings.tabNotifications') },
     { id: 'security' as const, label: t('settings.tabSecurity') },
@@ -983,6 +1221,33 @@ export function Settings({
             </div>
 
             <div className="mt-3 rounded-2xl border border-line bg-white p-5">
+              <p className="text-sm font-medium">{t('settings.contactAutoAddTitle')}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('settings.contactAutoAddHint')}</p>
+              <div className="mt-3 space-y-2">
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="radio"
+                    name="contact-auto-add"
+                    checked={contactAutoAdd}
+                    onChange={() => onContactAutoAddChange(true)}
+                    className="mt-0.5 h-3.5 w-3.5"
+                  />
+                  <span>{t('settings.contactAutoAddOn')}</span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="radio"
+                    name="contact-auto-add"
+                    checked={!contactAutoAdd}
+                    onChange={() => onContactAutoAddChange(false)}
+                    className="mt-0.5 h-3.5 w-3.5"
+                  />
+                  <span>{t('settings.contactAutoAddOff')}</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-line bg-white p-5">
               <p className="mb-3 text-sm font-medium">{t('settings.layout')}</p>
               <label className="flex items-center gap-2 text-xs text-slate-700">
                 <input
@@ -1022,6 +1287,39 @@ export function Settings({
                 <p className="mt-1 text-[11px] text-muted">{t('settings.retentionHint')}</p>
               </label>
               <RetentionSettings days={metadataRetentionDays} />
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-line bg-white p-5">
+              <p className="text-sm font-medium">{t('settings.composeFormatTitle')}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('settings.composeFormatHint')}</p>
+              <div className="mt-3 space-y-2">
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="radio"
+                    name="compose-format"
+                    checked={composeRich}
+                    onChange={() => onComposeRichChange(true)}
+                    className="mt-0.5 h-3.5 w-3.5"
+                  />
+                  <span>
+                    <span className="block font-medium">{t('settings.composeFormatRich')}</span>
+                    <span className="text-muted">{t('settings.composeFormatRichHint')}</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="radio"
+                    name="compose-format"
+                    checked={!composeRich}
+                    onChange={() => onComposeRichChange(false)}
+                    className="mt-0.5 h-3.5 w-3.5"
+                  />
+                  <span>
+                    <span className="block font-medium">{t('settings.composeFormatPlain')}</span>
+                    <span className="text-muted">{t('settings.composeFormatPlainHint')}</span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="mt-3 rounded-2xl border border-line bg-white p-5">
@@ -1136,6 +1434,19 @@ export function Settings({
             </div>
           )}
           </div>
+        ) : null}
+
+        {tab === 'autoreply' ? (
+          <AutoReplySettings
+            accounts={accounts}
+            mode={autoReplyMode}
+            enabled={autoReplyEnabled}
+            subject={autoReplySubject}
+            body={autoReplyBody}
+            busyId={busyId}
+            onChange={onAutoReplyChange}
+            onUpdate={onUpdate}
+          />
         ) : null}
 
         {tab === 'filters' ? (

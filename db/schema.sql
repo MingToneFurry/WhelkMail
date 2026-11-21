@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   delete_after_archive INTEGER NOT NULL DEFAULT 0,
   auto_sync INTEGER NOT NULL DEFAULT 1,
   sync_interval_minutes INTEGER NOT NULL DEFAULT 5,
+  auto_reply_enabled INTEGER NOT NULL DEFAULT 0,
+  auto_reply_subject TEXT NOT NULL DEFAULT '',
+  auto_reply_body TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 
@@ -124,6 +127,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   note TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
   created_at TEXT NOT NULL
 );
 
@@ -245,6 +249,19 @@ CREATE TABLE IF NOT EXISTS deletion_log (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_deletion_log_unique ON deletion_log (message_id);
 CREATE INDEX IF NOT EXISTS idx_deletion_log_account ON deletion_log (account_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS auto_reply_log (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  sender_email TEXT NOT NULL,
+  status TEXT NOT NULL,
+  error TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auto_reply_log_message ON auto_reply_log (account_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_auto_reply_log_sender ON auto_reply_log (account_id, sender_email, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS storage_cleanup_log (
   id TEXT PRIMARY KEY,

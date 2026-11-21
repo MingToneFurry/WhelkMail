@@ -6,6 +6,7 @@ import type { Env } from '../../_lib/env'
 import { cleanupBodyCache } from '../../_lib/body-cache'
 import { pruneMirroredMetadata } from '../../_lib/retention'
 import { applyFilters } from '../../_lib/filters'
+import { processAutoReply } from '../../_lib/auto-reply'
 import { forwardFilteredMessage } from '../../_lib/forward'
 import { fail, json } from '../../_lib/http'
 import { pushConfigured, sendWebPush, type PushSubscriptionRecord } from '../../_lib/push'
@@ -161,6 +162,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             if (result === 'sent') {
               forwarded += 1
             }
+          }
+          try {
+            await processAutoReply(context.env, account, row)
+          } catch (error) {
+            console.error('[auto-reply] failed', error)
           }
         }
 

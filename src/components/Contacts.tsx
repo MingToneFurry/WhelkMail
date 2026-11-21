@@ -284,7 +284,14 @@ export function Contacts({ contacts, onCreate, onUpdate, onDelete }: ContactsPro
                   {initials(contact.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-800">{contact.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-medium text-slate-800">{contact.name}</p>
+                    {contact.source === 'auto' ? (
+                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                        {t('contacts.otherContacts')}
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="truncate text-xs text-muted">{contact.email}</p>
                   {contact.note ? (
                     <p className="truncate text-[11px] text-muted">{contact.note}</p>

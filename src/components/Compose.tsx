@@ -25,6 +25,8 @@ import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { cn, fileToBase64, formatBytes, isValidEmail, parseAddresses } from '../lib/utils'
+import { htmlToPlainText, plainTextToHtml, sanitizeComposeHtml } from '../lib/rich-text'
+import { RichTextEditor } from './RichTextEditor'
 import { RecipientField } from './RecipientField'
 
 interface PendingAttachment {
@@ -41,6 +43,7 @@ interface ComposeProps {
   maxAttachmentBytes: number
   defaultSignature: string
   signatureMode: SignatureMode
+  composeRichDefault: boolean
   initialDraft: DraftPayload | null
   seed: ComposeSeed | null
   onClose: () => void
@@ -74,6 +77,7 @@ export function Compose({
   maxAttachmentBytes,
   defaultSignature,
   signatureMode,
+  composeRichDefault,
   initialDraft,
   seed,
   onClose,
@@ -114,6 +118,8 @@ export function Compose({
   const [showBcc, setShowBcc] = useState(Boolean(initialBcc.length))
   const [subject, setSubject] = useState(initialDraft?.subject ?? seed?.subject ?? '')
   const [text, setText] = useState(initialText)
+  const [html, setHtml] = useState(initialDraft?.html || plainTextToHtml(initialText))
+  const [rich, setRich] = useState(composeRichDefault)
   const signatureRef = useRef(initialSignature)
   const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null)
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
@@ -198,6 +204,7 @@ export function Compose({
       bcc: bccAddresses,
       subject,
       text,
+      html: rich ? sanitizeComposeHtml(html) || undefined : undefined,
       attachments: attachments.map((item) => ({
         filename: item.filename,
         contentType: item.contentType,
@@ -274,14 +281,22 @@ export function Compose({
     if (next === signatureRef.current) {
       return
     }
+    const previous = signatureRef.current
+    signatureRef.current = next
     setText((current) => {
       const trimmed = current.trim()
-      if (!trimmed || trimmed === signatureRef.current.trim()) {
+      if (!trimmed || trimmed === previous.trim()) {
         return next
       }
       return current
     })
-    signatureRef.current = next
+    setHtml((current) => {
+      const currentText = htmlToPlainText(current).trim()
+      if (!currentText || currentText === previous.trim()) {
+        return plainTextToHtml(next)
+      }
+      return current
+    })
   }, [accountId, accounts, defaultSignature, signatureMode])
 
   async function saveDraftManually() {
@@ -318,7 +333,7 @@ export function Compose({
     }
     versionRef.current += 1
     setDirty(true)
-  }, [accountId, to, cc, bcc, subject, text, attachments])
+  }, [accountId, to, cc, bcc, subject, text, html, attachments])
 
   useEffect(() => {
     if (!dirty || busy || deleting) {
@@ -328,7 +343,7 @@ export function Compose({
       void persistRef.current(true)
     }, 5000)
     return () => window.clearTimeout(timer)
-  }, [dirty, busy, deleting, accountId, to, cc, bcc, subject, text, attachments, draftId])
+  }, [dirty, busy, deleting, accountId, to, cc, bcc, subject, text, html, attachments, draftId])
 
   useEffect(() => {
     if (!dirty || busy || deleting) {
@@ -354,6 +369,15 @@ export function Compose({
     } finally {
       setDeleting(false)
     }
+  }
+
+  function toggleRich() {
+    if (rich) {
+      setRich(false)
+      return
+    }
+    setHtml(plainTextToHtml(text))
+    setRich(true)
   }
 
   async function submit(event: FormEvent) {
@@ -529,12 +553,23 @@ export function Compose({
             />
           </div>
 
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder={t('compose.body')}
-            className="min-h-48 w-full resize-y px-5 py-4 text-sm leading-6 outline-none"
-          />
+          {rich ? (
+            <RichTextEditor
+              html={html}
+              placeholder={t('compose.body')}
+              onChange={(nextHtml, nextText) => {
+                setHtml(nextHtml)
+                setText(nextText)
+              }}
+            />
+          ) : (
+            <textarea
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder={t('compose.body')}
+              className="min-h-48 w-full resize-y px-5 py-4 text-sm leading-6 outline-none"
+            />
+          )}
 
           {attachments.length > 0 ? (
             <div className="flex flex-wrap gap-2 px-5 pb-4">
@@ -586,6 +621,13 @@ export function Compose({
             >
               <Paperclip size={16} />
               {t('compose.attach')}
+            </button>
+            <button
+              type="button"
+              onClick={toggleRich}
+              className="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-slate-100"
+            >
+              {rich ? t('compose.plainTextMode') : t('compose.richTextMode')}
             </button>
             {totalBytes > 0 ? (
               <span className="text-[10px] text-muted">

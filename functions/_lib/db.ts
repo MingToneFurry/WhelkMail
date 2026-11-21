@@ -53,6 +53,9 @@ export interface AccountRow {
   delete_after_archive: number
   auto_sync: number
   sync_interval_minutes: number
+  auto_reply_enabled: number
+  auto_reply_subject: string | null
+  auto_reply_body: string | null
   created_at: string
 }
 
@@ -117,6 +120,9 @@ export function publicAccount(row: AccountRow, r2Available: boolean): Account {
     deleteAfterArchive: Boolean(row.delete_after_archive),
     autoSync: Boolean(row.auto_sync),
     syncIntervalMinutes: row.sync_interval_minutes ?? DEFAULT_SYNC_INTERVAL_MINUTES,
+    autoReplyEnabled: Boolean(row.auto_reply_enabled),
+    autoReplySubject: row.auto_reply_subject ?? '',
+    autoReplyBody: row.auto_reply_body ?? '',
     sentFolder: row.sent_folder,
     autoSavesSent: Boolean(row.auto_saves_sent),
     sentCopyAccountId: row.sent_copy_account_id ?? null,

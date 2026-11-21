@@ -1,6 +1,7 @@
 import { canSendFrom } from '../../../shared/from-address'
 import { sendSchema } from '../../../shared/schemas'
 import type { AttachmentMeta, Mailbox } from '../../../shared/types'
+import { addAutoContacts } from '../../_lib/contacts'
 import { fromBase64 } from '../../_lib/crypto'
 import {
   getAccountRow,
@@ -215,6 +216,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         'smtp_failed',
       )
     }
+    await addAutoContacts(context.env, [...to, ...cc, ...bcc])
     let warning: string | undefined
     let sentFolder: string | undefined
     if (!account.auto_saves_sent) {
@@ -336,6 +338,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       attachments,
     })
     relayAccepted = true
+    await addAutoContacts(context.env, [...to, ...cc, ...bcc])
     let warning: string | undefined
     if (copyTarget) {
       try {
