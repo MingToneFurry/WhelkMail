@@ -12,6 +12,7 @@ import {
   Send,
   Server,
   Trash2,
+  Type,
   X,
 } from 'lucide-react'
 import type {
@@ -709,6 +710,7 @@ export function Compose({
               className="min-w-0 flex-1 flex-nowrap overflow-x-auto"
               onCommand={runEditorCommand}
               onLink={() => richEditorRef.current?.createLink()}
+              onTogglePlainText={toggleRich}
             />
             <button
               type="button"
@@ -749,13 +751,6 @@ export function Compose({
                 <Baseline size={16} />
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={toggleRich}
-              className="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-slate-100"
-            >
-              {rich ? t('compose.plainTextMode') : t('compose.richTextMode')}
-            </button>
             {rich ? (
               <>
                 <span className="hidden h-5 w-px bg-line sm:block" />
@@ -763,9 +758,20 @@ export function Compose({
                   className="hidden sm:flex"
                   onCommand={runEditorCommand}
                   onLink={() => richEditorRef.current?.createLink()}
+                  onTogglePlainText={toggleRich}
                 />
               </>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={toggleRich}
+                className="rounded-lg px-2 py-1.5 text-muted hover:bg-slate-100"
+                aria-label={t('compose.richTextMode')}
+                title={t('compose.richTextMode')}
+              >
+                <Type size={16} />
+              </button>
+            )}
             {totalBytes > 0 ? (
               <span className="text-[10px] text-muted">
                 {formatBytes(totalBytes)} / {limitMb} MB

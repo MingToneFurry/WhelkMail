@@ -2,6 +2,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
   type ClipboardEvent,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -17,6 +18,7 @@ import {
   Quote,
   RemoveFormatting,
   Strikethrough,
+  Type,
   Underline,
 } from 'lucide-react'
 import { useI18n } from '../i18n'
@@ -206,14 +208,112 @@ interface RichTextToolbarProps {
   className?: string
   onCommand: (name: string, value?: string) => void
   onLink: () => void
+  onTogglePlainText?: () => void
+}
+
+/**
+ * The formatting that applies at the caret. The toolbar uses it to highlight
+ * the active buttons, so bold text shows an active bold button instead of the
+ * toolbar looking identical whatever the cursor is doing.
+ */
+interface FormatState {
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  strike: boolean
+  bulletList: boolean
+  orderedList: boolean
+  quote: boolean
+  link: boolean
+}
+
+const EMPTY_FORMAT_STATE: FormatState = {
+  bold: false,
+  italic: false,
+  underline: false,
+  strike: false,
+  bulletList: false,
+  orderedList: false,
+  quote: false,
+  link: false,
+}
+
+function queryCommandState(name: string): boolean {
+  try {
+    return document.queryCommandState(name)
+  } catch {
+    return false
+  }
+}
+
+function readFormatState(): FormatState {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) {
+    return EMPTY_FORMAT_STATE
+  }
+  const anchor = selection.anchorNode
+  const element = anchor instanceof Element ? anchor : (anchor?.parentElement ?? null)
+  // Ignore selections outside an editable body (subject, recipients, inputs).
+  if (
+    !element ||
+    !element.closest(
+      '[contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]',
+    )
+  ) {
+    return EMPTY_FORMAT_STATE
+  }
+  let quote = false
+  let link = false
+  let node: Node | null = element
+  while (node) {
+    if (node instanceof HTMLElement) {
+      if (node.tagName === 'BLOCKQUOTE') {
+        quote = true
+      }
+      if (node.tagName === 'A') {
+        link = true
+      }
+    }
+    node = node.parentNode
+  }
+  try {
+    if (String(document.queryCommandValue('formatBlock')).toLowerCase().includes('blockquote')) {
+      quote = true
+    }
+  } catch {
+    // Older browsers may not support formatBlock values.
+  }
+  return {
+    bold: queryCommandState('bold'),
+    italic: queryCommandState('italic'),
+    underline: queryCommandState('underline'),
+    strike: queryCommandState('strikeThrough'),
+    bulletList: queryCommandState('insertUnorderedList'),
+    orderedList: queryCommandState('insertOrderedList'),
+    quote,
+    link,
+  }
+}
+
+function useFormatState() {
+  const [state, setState] = useState<FormatState>(EMPTY_FORMAT_STATE)
+  useEffect(() => {
+    const update = () => setState(readFormatState())
+    update()
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [])
+  return { state, refresh: () => setState(readFormatState()) }
 }
 
 function ToolButton({
   label,
+  active,
   onAction,
   children,
 }: {
   label: string
+  active?: boolean
   onAction: () => void
   children: ReactNode
 }) {
@@ -234,8 +334,13 @@ function ToolButton({
       type="button"
       onPointerDown={runPointer}
       onKeyDown={runKey}
-      className="rounded p-1.5 text-muted hover:bg-slate-100 hover:text-slate-800"
+      className={`rounded p-1.5 ${
+        active
+          ? 'bg-slate-200 text-slate-900'
+          : 'text-muted hover:bg-slate-100 hover:text-slate-800'
+      }`}
       aria-label={label}
+      aria-pressed={active ?? false}
       title={label}
     >
       {children}
@@ -243,52 +348,87 @@ function ToolButton({
   )
 }
 
-export function RichTextToolbar({ className, onCommand, onLink }: RichTextToolbarProps) {
+export function RichTextToolbar({
+  className,
+  onCommand,
+  onLink,
+  onTogglePlainText,
+}: RichTextToolbarProps) {
   const { t } = useI18n()
+  const { state, refresh } = useFormatState()
+
+  function run(name: string, value?: string) {
+    onCommand(name, value)
+    refresh()
+  }
+
+  function runLink() {
+    onLink()
+    refresh()
+  }
 
   return (
     <div className={`flex flex-wrap items-center gap-0.5 ${className ?? ''}`}>
-      <ToolButton label={t('compose.bold')} onAction={() => onCommand('bold')}>
+      <ToolButton label={t('compose.bold')} active={state.bold} onAction={() => run('bold')}>
         <Bold size={16} />
       </ToolButton>
-      <ToolButton label={t('compose.italic')} onAction={() => onCommand('italic')}>
+      <ToolButton label={t('compose.italic')} active={state.italic} onAction={() => run('italic')}>
         <Italic size={16} />
       </ToolButton>
-      <ToolButton label={t('compose.underline')} onAction={() => onCommand('underline')}>
+      <ToolButton
+        label={t('compose.underline')}
+        active={state.underline}
+        onAction={() => run('underline')}
+      >
         <Underline size={16} />
       </ToolButton>
-      <ToolButton label={t('compose.strike')} onAction={() => onCommand('strikeThrough')}>
+      <ToolButton
+        label={t('compose.strike')}
+        active={state.strike}
+        onAction={() => run('strikeThrough')}
+      >
         <Strikethrough size={16} />
       </ToolButton>
       <span className="mx-1 h-4 w-px bg-line" />
       <ToolButton
         label={t('compose.bulletList')}
-        onAction={() => onCommand('insertUnorderedList')}
+        active={state.bulletList}
+        onAction={() => run('insertUnorderedList')}
       >
         <List size={16} />
       </ToolButton>
       <ToolButton
         label={t('compose.numberedList')}
-        onAction={() => onCommand('insertOrderedList')}
+        active={state.orderedList}
+        onAction={() => run('insertOrderedList')}
       >
         <ListOrdered size={16} />
       </ToolButton>
       <ToolButton
         label={t('compose.quote')}
-        onAction={() => onCommand('formatBlock', 'blockquote')}
+        active={state.quote}
+        onAction={() => run('formatBlock', 'blockquote')}
       >
         <Quote size={16} />
       </ToolButton>
       <span className="mx-1 h-4 w-px bg-line" />
-      <ToolButton label={t('compose.link')} onAction={onLink}>
+      <ToolButton label={t('compose.link')} active={state.link} onAction={runLink}>
         <Link2 size={16} />
       </ToolButton>
       <ToolButton
         label={t('compose.clearFormatting')}
-        onAction={() => onCommand('removeFormat')}
+        onAction={() => run('removeFormat')}
       >
         <RemoveFormatting size={16} />
       </ToolButton>
+      {onTogglePlainText ? (
+        <>
+          <span className="mx-1 h-4 w-px bg-line" />
+          <ToolButton label={t('compose.plainTextMode')} onAction={onTogglePlainText}>
+            <Type size={16} />
+          </ToolButton>
+        </>
+      ) : null}
     </div>
   )
 }
