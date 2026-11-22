@@ -714,6 +714,7 @@ export function Compose({
             />
             <button
               type="button"
+              onPointerDown={(event) => event.preventDefault()}
               onClick={() => setMobileFormatting(false)}
               className="shrink-0 rounded-full p-2 text-muted hover:bg-slate-100"
               aria-label={t('common.close')}
@@ -734,16 +735,20 @@ export function Compose({
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-slate-100"
+              className="rounded-lg p-1.5 text-muted hover:bg-slate-100"
+              aria-label={t('compose.attach')}
+              title={t('compose.attach')}
             >
               <Paperclip size={16} />
-              {t('compose.attach')}
             </button>
             {rich ? (
               <button
                 type="button"
+                // Keep the editor focused: taking focus here blurred the body
+                // and closed the on-screen keyboard when opening formatting.
+                onPointerDown={(event) => event.preventDefault()}
                 onClick={() => setMobileFormatting((value) => !value)}
-                className="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-slate-100 sm:hidden"
+                className="rounded-lg p-1.5 text-muted hover:bg-slate-100 sm:hidden"
                 aria-label={t('compose.formatting')}
                 aria-expanded={mobileFormatting}
                 title={t('compose.formatting')}
@@ -755,7 +760,7 @@ export function Compose({
               <>
                 <span className="hidden h-5 w-px bg-line sm:block" />
                 <RichTextToolbar
-                  className="hidden sm:flex"
+                  className="hidden sm:flex sm:flex-nowrap"
                   onCommand={runEditorCommand}
                   onLink={() => richEditorRef.current?.createLink()}
                   onTogglePlainText={toggleRich}
@@ -792,10 +797,11 @@ export function Compose({
                 type="button"
                 disabled={deleting}
                 onClick={() => void removeDraft()}
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-red-50 hover:text-brand-strong disabled:opacity-50"
+                className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-brand-strong disabled:opacity-50"
+                aria-label={t('compose.deleteDraft')}
+                title={t('compose.deleteDraft')}
               >
                 <Trash2 size={14} />
-                {t('compose.deleteDraft')}
               </button>
             ) : null}
           </div>
