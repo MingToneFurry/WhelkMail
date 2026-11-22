@@ -93,6 +93,33 @@ function signatureOf(
   return { text, html: (account?.signatureHtml ?? '').trim() || plainTextToHtml(text) }
 }
 
+/**
+ * Tracks the visual viewport so the full-screen mobile composer sits exactly
+ * above the on-screen keyboard. `position: fixed` and `100%` height follow the
+ * layout viewport, not the visual one, which is what made the body editor slide
+ * behind the keyboard on mobile.
+ */
+function useVisualViewport() {
+  const [box, setBox] = useState<{ height: number; offsetTop: number } | null>(null)
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) {
+      return
+    }
+    const update = () => {
+      setBox({ height: viewport.height, offsetTop: viewport.offsetTop })
+    }
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+    }
+  }, [])
+  return box
+}
+
 export function Compose({
   accounts,
   contacts,
@@ -111,6 +138,7 @@ export function Compose({
   onDeleted,
 }: ComposeProps) {
   const { t } = useI18n()
+  const visualViewport = useVisualViewport()
   const initialTo = initialDraft?.to ?? seed?.to ?? []
   const initialCc = initialDraft?.cc ?? seed?.cc ?? []
   const initialBcc = initialDraft?.bcc ?? seed?.bcc ?? []
@@ -453,7 +481,14 @@ export function Compose({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-white sm:items-center sm:bg-black/30 sm:p-6"
+      className="fixed z-50 flex items-stretch justify-center bg-white sm:items-center sm:bg-black/30 sm:p-6"
+      style={{
+        left: 0,
+        right: 0,
+        bottom: 'auto',
+        top: visualViewport?.offsetTop ?? 0,
+        height: visualViewport?.height ?? '100dvh',
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           void handleClose()
@@ -493,7 +528,7 @@ export function Compose({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">{t('compose.from')}</span>
             {accounts.length > 1 || aliasEmail ? (
@@ -613,6 +648,7 @@ export function Compose({
               handleRef={richEditorRef}
               placeholder={t('compose.body')}
               autoFocus={!initialDraft && !seed}
+              className="rich-editor min-h-24 flex-1 overflow-y-auto px-5 py-3 text-sm leading-6 outline-none sm:min-h-48 sm:py-4"
               onChange={(nextHtml, nextText) => {
                 setHtml(nextHtml)
                 setText(nextText)
@@ -623,7 +659,7 @@ export function Compose({
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={t('compose.body')}
-              className="min-h-48 w-full resize-y px-5 py-4 text-sm leading-6 outline-none"
+              className="min-h-24 w-full flex-1 resize-none px-5 py-3 text-sm leading-6 outline-none sm:min-h-48 sm:resize-y sm:py-4"
             />
           )}
 
@@ -668,15 +704,29 @@ export function Compose({
         </div>
 
         {rich && mobileFormatting ? (
-          <div className="border-t border-line bg-slate-50 px-3 py-1 sm:hidden">
+          <div className="flex items-center gap-1 border-t border-line bg-white px-2 py-1 sm:hidden">
             <RichTextToolbar
+              className="min-w-0 flex-1 flex-nowrap overflow-x-auto"
               onCommand={runEditorCommand}
               onLink={() => richEditorRef.current?.createLink()}
             />
+            <button
+              type="button"
+              onClick={() => setMobileFormatting(false)}
+              className="shrink-0 rounded-full p-2 text-muted hover:bg-slate-100"
+              aria-label={t('common.close')}
+            >
+              <X size={18} />
+            </button>
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
+        <div
+          className={cn(
+            'flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3',
+            rich && mobileFormatting && 'hidden sm:flex',
+          )}
+        >
           <div className="flex items-center gap-3">
             <input ref={fileInput} type="file" multiple onChange={addFiles} className="hidden" />
             <button
