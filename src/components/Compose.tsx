@@ -7,6 +7,7 @@ import {
   Cloud,
   FileText,
   HardDrive,
+  Loader2,
   Paperclip,
   Save,
   Send,
@@ -810,10 +811,15 @@ export function Compose({
               type="button"
               disabled={saving || autoSaving || busy || deleting || !account}
               onClick={() => void saveDraftManually()}
-              className="flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              className="flex items-center justify-center rounded-full border border-line p-2.5 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              aria-label={saving ? t('compose.savingDraft') : t('compose.saveDraft')}
+              title={saving ? t('compose.savingDraft') : t('compose.saveDraft')}
             >
-              <Save size={16} />
-              {saving ? t('compose.savingDraft') : t('compose.saveDraft')}
+              {saving || autoSaving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
             </button>
             <button
               type="button"
@@ -828,12 +834,13 @@ export function Compose({
                 void sendMessage()
               }}
               className={cn(
-                'flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-medium text-white hover:bg-brand-strong',
+                'flex items-center justify-center rounded-full bg-brand p-2.5 text-white hover:bg-brand-strong',
                 (busy || saving || autoSaving || !account) && 'opacity-60',
               )}
+              aria-label={busy ? t('compose.sending') : t('compose.send')}
+              title={busy ? t('compose.sending') : t('compose.send')}
             >
-              <Send size={16} />
-              {busy ? t('compose.sending') : t('compose.send')}
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
           </div>
         </div>
