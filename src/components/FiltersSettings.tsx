@@ -195,131 +195,18 @@ export function FiltersSettings({
     }
   }
 
-  return (
-    <div className="mt-6 rounded-2xl border border-line bg-white p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <Filter size={16} className="text-muted" />
-        <p className="text-sm font-medium">{t('filters.title')}</p>
-      </div>
-      <p className="mb-4 text-[11px] text-muted">{t('filters.hint')}</p>
-
-      <div className="space-y-2">
-        {filters.length === 0 ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted">
-            {t('filters.empty')}
-          </p>
-        ) : null}
-        {filters.map((filter) => (
-          <div
-            key={filter.id}
-            className={cn(
-              'flex flex-wrap items-start justify-between gap-2 rounded-xl border border-line px-3 py-2',
-              !filter.enabled && 'opacity-60',
-            )}
-          >
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-slate-700">{filter.name}</p>
-              {filter.autoLabel || filter.accountId ? (
-                <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                  {filter.autoLabel ? (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                      {t('filters.automatic')}
-                    </span>
-                  ) : null}
-                  {filter.accountId ? (
-                    <span className="text-[10px] text-muted">
-                      {t('filters.account')}:{' '}
-                      {accounts.find((account) => account.id === filter.accountId)?.email ??
-                        filter.accountId}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-              <p className="text-[11px] text-muted">
-                {criteriaSummary(filter, t('filters.allMail'))}
-              </p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {filter.labelIds.map((id) => {
-                  const label = labels.find((item) => item.id === id)
-                  return label ? (
-                    <span
-                      key={id}
-                      className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-medium',
-                        labelStyle(label.color),
-                      )}
-                    >
-                      {label.name}
-                    </span>
-                  ) : null
-                })}
-              </div>
-              {filter.forwardTo.length > 0 ? (
-                <p className="mt-1 text-[11px] text-muted">
-                  {t('filters.forwardToLabel')}: {filter.forwardTo.join(', ')}
-                </p>
-              ) : null}
-              {filter.lastForwardStatus ? (
-                <p className="mt-1 text-[11px] text-muted">
-                  {t('filters.lastForward')}: {filter.lastForwardStatus}
-                  {filter.lastForwardError ? ` — ${filter.lastForwardError}` : ''}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                disabled={applyingAll || applyingId !== null}
-                onClick={() => void applyFilters(filter.id)}
-                title={t('filters.applyOne')}
-                aria-label={t('filters.applyOne')}
-                className="rounded-full p-1.5 text-muted hover:bg-slate-100 disabled:opacity-40"
-              >
-                {applyingId === filter.id ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Tag size={13} />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => startEdit(filter)}
-                className="rounded-full p-1.5 text-muted hover:bg-slate-100"
-                aria-label={t('filters.edit')}
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateFilter(filter.id, { enabled: !filter.enabled })}
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-[11px]',
-                  filter.enabled
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-slate-100 text-muted',
-                )}
-              >
-                {filter.enabled ? t('filters.enabled') : t('filters.disabled')}
-              </button>
-              <button
-                type="button"
-                onClick={() => onDeleteFilter(filter.id)}
-                className="rounded-full p-1.5 text-muted hover:bg-red-50 hover:text-brand-strong"
-                aria-label={t('filters.delete')}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 rounded-xl border border-line p-3">
+  /**
+   * The same form is used to create a filter and to edit the selected one. When
+   * editing it is rendered inline, right under the filter being changed.
+   */
+  function filterForm() {
+    return (
+      <>
         <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-700">
           <Plus size={13} /> {editingId ? t('filters.editTitle') : t('filters.new')}
         </p>
         {editingFilter?.autoLabel ? (
-          <div className="mb-3 rounded-lg border border-line bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+          <div className="mb-3 rounded-lg border border-line px-3 py-2 text-[11px] text-slate-600">
             <p className="font-medium text-slate-700">{t('filters.autoLabelTitle')}</p>
             <p className="mt-0.5">
               {t('filters.autoLabelHint', {
@@ -455,7 +342,143 @@ export function FiltersSettings({
             {busy ? t('common.loading') : editingId ? t('filters.save') : t('filters.create')}
           </button>
         </div>
+      </>
+    )
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Filter size={16} className="text-muted" />
+        <p className="text-sm font-medium">{t('filters.title')}</p>
       </div>
+      <p className="mb-4 text-[11px] text-muted">{t('filters.hint')}</p>
+
+      <div className="space-y-2">
+        {filters.length === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted">
+            {t('filters.empty')}
+          </p>
+        ) : null}
+        {filters.map((filter) => {
+          const editing = editingId === filter.id
+          return (
+            <div key={filter.id}>
+              <div
+                className={cn(
+                  'flex flex-wrap items-start justify-between gap-2 rounded-xl border border-line px-3 py-2',
+                  !filter.enabled && 'opacity-60',
+                  editing && 'rounded-b-none',
+                )}
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-700">{filter.name}</p>
+                  {filter.autoLabel || filter.accountId ? (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      {filter.autoLabel ? (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                          {t('filters.automatic')}
+                        </span>
+                      ) : null}
+                      {filter.accountId ? (
+                        <span className="text-[10px] text-muted">
+                          {t('filters.account')}:{' '}
+                          {accounts.find((account) => account.id === filter.accountId)?.email ??
+                            filter.accountId}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <p className="text-[11px] text-muted">
+                    {criteriaSummary(filter, t('filters.allMail'))}
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {filter.labelIds.map((id) => {
+                      const label = labels.find((item) => item.id === id)
+                      return label ? (
+                        <span
+                          key={id}
+                          className={cn(
+                            'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                            labelStyle(label.color),
+                          )}
+                        >
+                          {label.name}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
+                  {filter.forwardTo.length > 0 ? (
+                    <p className="mt-1 text-[11px] text-muted">
+                      {t('filters.forwardToLabel')}: {filter.forwardTo.join(', ')}
+                    </p>
+                  ) : null}
+                  {filter.lastForwardStatus ? (
+                    <p className="mt-1 text-[11px] text-muted">
+                      {t('filters.lastForward')}: {filter.lastForwardStatus}
+                      {filter.lastForwardError ? ` — ${filter.lastForwardError}` : ''}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={applyingAll || applyingId !== null}
+                    onClick={() => void applyFilters(filter.id)}
+                    title={t('filters.applyOne')}
+                    aria-label={t('filters.applyOne')}
+                    className="rounded-full p-1.5 text-muted hover:bg-slate-100 disabled:opacity-40"
+                  >
+                    {applyingId === filter.id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Tag size={13} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (editing ? resetForm() : startEdit(filter))}
+                    className="rounded-full p-1.5 text-muted hover:bg-slate-100"
+                    aria-label={t('filters.edit')}
+                    aria-expanded={editing}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateFilter(filter.id, { enabled: !filter.enabled })}
+                    className={cn(
+                      'rounded-full px-2.5 py-1 text-[11px]',
+                      filter.enabled
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-muted',
+                    )}
+                  >
+                    {filter.enabled ? t('filters.enabled') : t('filters.disabled')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteFilter(filter.id)}
+                    className="rounded-full p-1.5 text-muted hover:bg-red-50 hover:text-brand-strong"
+                    aria-label={t('filters.delete')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              {editing ? (
+                <div className="rounded-b-xl border-x border-b border-line bg-slate-50 p-3">
+                  {filterForm()}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      {!editingId ? (
+        <div className="mt-4 rounded-xl border border-line p-3">{filterForm()}</div>
+      ) : null}
 
       <div className="mt-3 rounded-2xl border border-line bg-white p-5">
         <p className="text-sm font-medium">{t('filters.applyAllTitle')}</p>
