@@ -122,8 +122,33 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://<host>:8787` or put Caddy/Traefik/nginx in front and set
-`PUBLIC_ORIGIN=https://mail.example.com`.
+The container listens on `127.0.0.1:8787`; put Caddy/Traefik/nginx in front and
+set `PUBLIC_ORIGIN=https://mail.example.com`. Nothing starts until that variable
+and a real `APP_PASSWORD` are set:
+
+- **`PUBLIC_ORIGIN`** is required with `NODE_ENV=production` (the image sets it).
+  Without it the origin would be rebuilt from `X-Forwarded-Proto`/`Host`, which a
+  client can write.
+- **`APP_PASSWORD`** must be at least 10 characters and must not be the example
+  value: the container refuses to start otherwise, so a forgotten `change-me`
+  cannot expose a public installation.
+
+### Reverse proxy requirements
+
+The rate limiter and the origin depend on headers, so the proxy has to be
+configured for it:
+
+- **Append** the client address to `X-Forwarded-For` (Caddy does this by default,
+  nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). WhelkMail
+  reads the **last** entry, the one the proxy wrote; a client-supplied list is
+  therefore ignored.
+- **Overwrite** `X-Forwarded-Proto` and `X-Forwarded-Host`, do not pass through what
+  the client sent.
+- **Do not expose the container directly**: the port is bound to loopback for this
+  reason. If the proxy runs in another container, drop the `ports:` block, use
+  `expose: ["8787"]` and a shared network.
+- With a reverse proxy that *strips* `X-Forwarded-For` instead of appending, every
+  request shares one rate-limit bucket; that is safe but useless, so append.
 
 The image uses Node 24, the built-in `node:sqlite` module and a bundled server
 (`dist-server/server.mjs`), so the runtime stage has no `node_modules` and no
