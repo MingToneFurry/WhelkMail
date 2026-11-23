@@ -262,6 +262,37 @@ describe('IMAP responses', () => {
   })
 })
 
+describe('IMAP buffering', () => {
+  it('handles a CRLF split across two network blocks', async () => {
+    // '* OK ready' is 10 bytes, so a chunk of 11 ends exactly on the CR and the
+    // next block starts with the LF.
+    const { socket } = fakeImap({
+      greeting: '* OK ready\r\n',
+      chunkSize: 11,
+      respond: (tag) => `${tag} OK\r\n`,
+    })
+
+    const connection = await ImapConnection.open(config, 200, connectorOf(socket))
+    await expect(connection.login('user@example.com', 'secret')).resolves.toBeUndefined()
+    connection.close()
+  })
+
+  it('rejects an absurd literal instead of buffering it', async () => {
+    const { socket } = fakeImap({
+      greeting,
+      respond: (tag, command) =>
+        command.startsWith('UID FETCH')
+          ? `* 1 FETCH (UID 7 BODY[] {999999999}\r\n`
+          : `${tag} OK\r\n`,
+    })
+
+    const connection = await ImapConnection.open(config, 200, connectorOf(socket))
+
+    await expect(connection.fetchFull(7)).rejects.toThrow(/exceeds/)
+    connection.close()
+  })
+})
+
 describe('IMAP STARTTLS', () => {
   const starttlsConfig = { host: 'imap.example', port: 143, security: 'starttls' as const }
 

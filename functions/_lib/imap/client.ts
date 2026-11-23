@@ -60,6 +60,8 @@ export class ImapError extends Error {}
 class ImapTimeoutError extends ImapError {}
 
 const COMMAND_TIMEOUT_MS = 20_000
+/** Largest IMAP literal this client buffers (a Worker has 128 MB of memory). */
+export const MAX_LITERAL_BYTES = 64 * 1024 * 1024
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -82,15 +84,6 @@ function quote(value: string): string {
   return `"${safe.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
-function indexOfCrlf(buffer: Uint8Array): number {
-  for (let i = 0; i + 1 < buffer.length; i += 1) {
-    if (buffer[i] === 13 && buffer[i + 1] === 10) {
-      return i
-    }
-  }
-  return -1
-}
-
 /** The socket surface this client relies on (swappable in tests). */
 export type ImapSocketLike = MailSocketLike
 
@@ -102,7 +95,15 @@ export class ImapConnection {
   private socket: ImapSocketLike
   private reader!: ReadableStreamDefaultReader<Uint8Array>
   private writer!: WritableStreamDefaultWriter<Uint8Array>
-  private buffer = new Uint8Array(0)
+  /**
+   * Bytes received but not consumed yet, as a queue of chunks with a read
+   * offset. The previous version concatenated every new block into one array,
+   * which is O(n^2) for a large IMAP literal: reading a 10 MB message copied
+   * the already-read part once per network block.
+   */
+  private chunks: Uint8Array[] = []
+  private head = 0
+  private buffered = 0
   private tagCounter = 0
   private commandTimeoutMs: number
 
@@ -145,7 +146,9 @@ export class ImapConnection {
   }
 
   private attach(): void {
-    this.buffer = new Uint8Array(0)
+    this.chunks = []
+    this.head = 0
+    this.buffered = 0
     this.reader = this.socket.readable.getReader()
     this.writer = this.socket.writable.getWriter()
   }
@@ -179,23 +182,81 @@ export class ImapConnection {
     }
   }
 
+  /** Pull one block from the socket into the queue. */
   private async fill(): Promise<void> {
     const { value, done } = await this.reader.read()
     if (done || !value) {
       throw new ImapError('IMAP connection closed')
     }
-    const merged = new Uint8Array(this.buffer.length + value.length)
-    merged.set(this.buffer)
-    merged.set(value, this.buffer.length)
-    this.buffer = merged
+    if (value.byteLength === 0) {
+      return
+    }
+    this.chunks.push(value)
+    this.buffered += value.byteLength
+  }
+
+  private async ensure(needed: number): Promise<void> {
+    while (this.buffered < needed) {
+      await this.fill()
+    }
+  }
+
+  /**
+   * Offset of the next CRLF, counting from the read head, or -1.
+   * Scans the queue without copying; a CR/LF pair split across two blocks is
+   * handled by peeking at the first byte of the following chunk.
+   */
+  private findCrlf(): number {
+    let consumed = 0
+    for (let index = 0; index < this.chunks.length; index += 1) {
+      const chunk = this.chunks[index]
+      const start = index === 0 ? this.head : 0
+      for (let position = start; position < chunk.length; position += 1) {
+        if (chunk[position] !== 13) {
+          continue
+        }
+        if (position + 1 < chunk.length) {
+          if (chunk[position + 1] === 10) {
+            return consumed + (position - start)
+          }
+          continue
+        }
+        const next = this.chunks[index + 1]
+        if (next && next.length > 0 && next[0] === 10) {
+          return consumed + (position - start)
+        }
+      }
+      consumed += chunk.length - start
+    }
+    return -1
+  }
+
+  /** Copy exactly `length` bytes out of the queue and drop them from it. */
+  private take(length: number): Uint8Array {
+    const out = new Uint8Array(length)
+    let written = 0
+    while (written < length) {
+      const chunk = this.chunks[0]
+      const available = chunk.length - this.head
+      const size = Math.min(available, length - written)
+      out.set(chunk.subarray(this.head, this.head + size), written)
+      written += size
+      this.head += size
+      this.buffered -= size
+      if (this.head >= chunk.length) {
+        this.chunks.shift()
+        this.head = 0
+      }
+    }
+    return out
   }
 
   private async readLine(): Promise<string> {
-    while (true) {
-      const index = indexOfCrlf(this.buffer)
-      if (index >= 0) {
-        const line = decoder.decode(this.buffer.subarray(0, index))
-        this.buffer = this.buffer.subarray(index + 2)
+    for (;;) {
+      const at = this.findCrlf()
+      if (at >= 0) {
+        const line = decoder.decode(this.take(at))
+        this.take(2)
         return line
       }
       await this.fill()
@@ -203,12 +264,8 @@ export class ImapConnection {
   }
 
   private async readBytes(length: number): Promise<Uint8Array> {
-    while (this.buffer.length < length) {
-      await this.fill()
-    }
-    const bytes = this.buffer.slice(0, length)
-    this.buffer = this.buffer.subarray(length)
-    return bytes
+    await this.ensure(length)
+    return this.take(length)
   }
 
   private async writeLine(line: string): Promise<void> {
@@ -257,7 +314,15 @@ export class ImapConnection {
       }
       const literal = line.match(/\{(\d+)\}$/)
       if (literal) {
-        const bytes = await this.readBytes(Number(literal[1]))
+        const size = Number(literal[1])
+        if (!Number.isFinite(size) || size > MAX_LITERAL_BYTES) {
+          // A Worker has 128 MB: buffering an endless literal must fail loudly
+          // instead of exhausting it.
+          throw new ImapError(
+            `IMAP literal of ${size} bytes exceeds the ${MAX_LITERAL_BYTES} byte limit`,
+          )
+        }
+        const bytes = await this.readBytes(size)
         parts.push({ line, literal: bytes })
         await this.readLine()
         continue
