@@ -37,6 +37,8 @@ describe('config bundle encryption', () => {
     const bundle = emptyBundle()
     const envelope = await encryptConfigBundle('correct horse battery', bundle)
     expect(envelope.format).toBe(CONFIG_FORMAT)
+    // Cloudflare Workers rejects PBKDF2 above 100,000 iterations.
+    expect(envelope.kdf.iterations).toBeLessThanOrEqual(100_000)
     expect(envelope.ciphertext).not.toContain('allow_remote_images')
     const restored = await decryptConfigBundle('correct horse battery', envelope)
     expect(restored.data.settings).toEqual(bundle.data.settings)

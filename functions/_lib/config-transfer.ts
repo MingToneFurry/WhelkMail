@@ -21,9 +21,15 @@ export const CONFIG_FORMAT = 'whelkmail-config'
 export const CONFIG_VERSION = 1
 
 const KDF_NAME = 'PBKDF2-SHA256'
-const PBKDF2_ITERATIONS = 210_000
+/**
+ * Cloudflare Workers implements PBKDF2 with a hard cap of 100,000 iterations
+ * ("Pbkdf2 failed: iteration counts above 100000 are not supported"). Node
+ * itself accepts more, but the bundle must be produced and opened on every
+ * target, so both generation and validation stay at that ceiling.
+ */
+const PBKDF2_ITERATIONS = 100_000
 const MIN_PBKDF2_ITERATIONS = 10_000
-const MAX_PBKDF2_ITERATIONS = 1_000_000
+const MAX_PBKDF2_ITERATIONS = 100_000
 const SALT_BYTES = 16
 const IV_BYTES = 12
 
