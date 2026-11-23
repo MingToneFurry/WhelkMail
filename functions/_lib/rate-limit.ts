@@ -10,13 +10,30 @@ interface AttemptRow {
   blocked_until: number | null
 }
 
+/**
+ * The client address used for rate limiting.
+ *
+ * On Cloudflare `CF-Connecting-IP` is set by the platform and cannot be forged.
+ * Behind a self-hosted proxy (the Node/Docker entry) `X-Forwarded-For` is built
+ * by the client and by each proxy in turn, so the **last** entry is the address
+ * the closest proxy saw. Taking the first one, as this used to, let anyone bypass
+ * the login rate limit by sending their own header.
+ */
 export function clientIp(request: Request): string {
   const direct = request.headers.get('CF-Connecting-IP')
   if (direct) {
     return direct.slice(0, 64)
   }
-  const forwarded = request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
-  return forwarded ? forwarded.slice(0, 64) : 'unknown'
+  const chain = request.headers.get('X-Forwarded-For')
+  if (!chain) {
+    return 'unknown'
+  }
+  const entries = chain
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+  const closest = entries[entries.length - 1]
+  return closest ? closest.slice(0, 64) : 'unknown'
 }
 
 export async function checkLoginRate(
