@@ -92,7 +92,20 @@ export class SqliteStatement {
   }
 
   executeSync<T = Record<string, unknown>>(): D1Result<T> {
-    if (/^\s*(select|pragma|with)\b/i.test(this.sql)) {
+    const sql = this.sql
+    if (/^\s*(select|pragma)\b/i.test(sql)) {
+      const results = this.statement.all(...this.values) as T[]
+      return { results, success: true, meta: { changes: 0, last_row_id: 0 } }
+    }
+    // `WITH` can be either: a read CTE returns rows, a data-modifying CTE returns
+    // none. Sending the second kind through all() executes it but reports
+    // `changes: 0`, which silently breaks anything that checks the count, so the
+    // statement text decides which call is used.
+    if (/^\s*with\b/i.test(sql)) {
+      if (MODIFIES_DATA.test(sql)) {
+        const info = this.statement.run(...this.values)
+        return { results: [], success: true, meta: metaOf(info) }
+      }
       const results = this.statement.all(...this.values) as T[]
       return { results, success: true, meta: { changes: 0, last_row_id: 0 } }
     }
@@ -101,9 +114,22 @@ export class SqliteStatement {
   }
 }
 
+/**
+ * A `WITH` query that writes returns no rows; run() gives the right change count.
+ */
+const MODIFIES_DATA = /\b(?:insert|update|delete|replace)\b/i
+
+/** Prepared statements are kept, but not forever: long-running installs would grow without a limit. */
+const MAX_CACHED_STATEMENTS = 200
+
 export class SqliteDatabase {
   private readonly db: DatabaseSync
   private readonly statements = new Map<string, Statement>()
+
+  /** Exposed for the tests that check the cache stays bounded. */
+  get statementCacheSize(): number {
+    return this.statements.size
+  }
 
   constructor(path: string) {
     this.db = new DatabaseSync(path)
@@ -115,6 +141,14 @@ export class SqliteDatabase {
   prepare(sql: string): SqliteStatement {
     let statement = this.statements.get(sql)
     if (!statement) {
+      if (this.statements.size >= MAX_CACHED_STATEMENTS) {
+        // Oldest first: Map keeps insertion order, so the first key is the one
+        // prepared longest ago.
+        const oldest = this.statements.keys().next().value
+        if (oldest !== undefined) {
+          this.statements.delete(oldest)
+        }
+      }
       statement = this.db.prepare(sql)
       this.statements.set(sql, statement)
     }
