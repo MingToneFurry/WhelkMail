@@ -4,6 +4,7 @@ import type { Env } from '../functions/_lib/env'
 import { migrateSqlite } from './adapters/db/migrate'
 import { openSqlite, type SqliteDatabase } from './adapters/db/sqlite'
 import { createS3Bucket } from './adapters/storage/s3'
+import { appPasswordProblem, MIN_APP_PASSWORD_LENGTH } from '../shared/app-password'
 
 export interface NodeEnvironment {
   env: Env
@@ -96,10 +97,22 @@ export function loadNodeEnvironment(root = process.cwd()): NodeEnvironment {
   }
   const cronSecret = value('CRON_SECRET') ?? `local-${crypto.randomUUID()}`
 
+  const appPassword = required('APP_PASSWORD')
+  const passwordProblem = appPasswordProblem(appPassword)
+  if (passwordProblem) {
+    // A container that starts with the example password is a public installation
+    // with a password printed in the repository.
+    const message = `${passwordProblem} Choose a password of at least ${MIN_APP_PASSWORD_LENGTH} characters and set it in deploy/docker/.env.`
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(message)
+    }
+    console.warn(`[env] ${message}`)
+  }
+
   const env: Env = {
     DB: database as unknown as Env['DB'],
     BUCKET: bucket as Env['BUCKET'],
-    APP_PASSWORD: required('APP_PASSWORD'),
+    APP_PASSWORD: appPassword,
     TOKEN_ENC_KEY: required('TOKEN_ENC_KEY'),
     GOOGLE_CLIENT_ID: '',
     GOOGLE_CLIENT_SECRET: '',
