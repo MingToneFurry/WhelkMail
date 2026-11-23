@@ -244,13 +244,34 @@ async function main(): Promise<void> {
     }
     stopping = true
     console.log(`[whelkmail] ${signal}: shutting down`)
+    // Stop the scheduler first: no new background work while draining.
     for (const stop of cleanup) {
       stop()
     }
-    server.close()
-    server.closeAllConnections?.()
-    await runtime.drain()
+
+    // Graceful, in this order: stop accepting, let in-flight requests finish,
+    // wait for background work, then close the database. Only a shutdown that
+    // does not finish in time cuts the connections.
+    const FORCE_CLOSE_MS = 10_000
+    const force = setTimeout(() => {
+      console.warn('[whelkmail] shutdown timed out: cutting the remaining connections')
+      server.closeAllConnections?.()
+    }, FORCE_CLOSE_MS)
+    force.unref?.()
+
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve())
+      // Keep-alive sockets would otherwise hold close() open until they expire.
+      server.closeIdleConnections?.()
+    })
+    try {
+      await runtime.drain()
+    } catch (error) {
+      console.error('[whelkmail] background tasks did not finish:', error)
+    }
     environment.database.close()
+    clearTimeout(force)
+    console.log('[whelkmail] stopped')
     process.exitCode = 0
   }
   process.once('SIGINT', () => void shutdown('SIGINT'))
