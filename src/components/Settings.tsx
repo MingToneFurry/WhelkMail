@@ -39,6 +39,7 @@ import {
 import { DeletionPanel } from './DeletionPanel'
 import { FiltersSettings } from './FiltersSettings'
 import { PushSettings } from './PushSettings'
+import { ConfigTransfer } from './ConfigTransfer'
 import { RetentionSettings } from './RetentionSettings'
 import { StorageCleanupPanel } from './StorageCleanupPanel'
 import { ThreadsPanel } from './ThreadsPanel'
@@ -1597,6 +1598,7 @@ export function Settings({
               </div>
             </div>
 
+            <ConfigTransfer />
             <StorageCleanupPanel />
             <ThreadsPanel />
             <p className="mt-3 text-[11px] text-muted">

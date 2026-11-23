@@ -241,6 +241,17 @@ export const pushPrefsSchema = z.object({
   folders: z.array(z.enum(['inbox', 'sent', 'draft'])).max(3).optional(),
 })
 
+const configPassphrase = z.string().min(8).max(1024)
+
+export const configExportSchema = z.object({
+  passphrase: configPassphrase,
+})
+
+export const configImportSchema = z.object({
+  passphrase: configPassphrase,
+  payload: z.unknown(),
+})
+
 export const appSettingsSchema = z.object({
   defaultSignature: z.string().max(5000).optional(),
   defaultSignatureHtml: z.string().max(50000).optional(),

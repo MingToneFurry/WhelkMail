@@ -14,6 +14,8 @@ import * as totp from '../functions/api/auth/totp'
 import * as contacts from '../functions/api/contacts/index'
 import * as contactsImport from '../functions/api/contacts/import'
 import * as contact from '../functions/api/contacts/[id]'
+import * as configExport from '../functions/api/config/export'
+import * as configImport from '../functions/api/config/import'
 import * as cronNotifications from '../functions/api/cron/notifications'
 import * as drafts from '../functions/api/drafts/index'
 import * as draft from '../functions/api/drafts/[id]'
@@ -81,6 +83,9 @@ export const routes: RouteEntry[] = [
   route('/api/contacts', contacts),
   route('/api/contacts/import', contactsImport),
   route('/api/contacts/:id', contact),
+
+  route('/api/config/export', configExport),
+  route('/api/config/import', configImport),
 
   route('/api/cron/notifications', cronNotifications),
 

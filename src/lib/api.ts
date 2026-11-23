@@ -3,6 +3,8 @@ import type {
   AccountCreateInput,
   AccountPatch,
   AppSettings,
+  ConfigEnvelope,
+  ConfigImportResult,
   Contact,
   ContactInput,
   DeletionLog,
@@ -209,6 +211,18 @@ export const api = {
   },
   settings(): Promise<AppSettings> {
     return request('/api/settings')
+  },
+  exportConfig(passphrase: string): Promise<ConfigEnvelope> {
+    return request('/api/config/export', {
+      method: 'POST',
+      body: JSON.stringify({ passphrase }),
+    })
+  },
+  importConfig(passphrase: string, payload: unknown): Promise<ConfigImportResult> {
+    return request('/api/config/import', {
+      method: 'POST',
+      body: JSON.stringify({ passphrase, payload }),
+    })
   },
   updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
     return request('/api/settings', { method: 'PATCH', body: JSON.stringify(input) })

@@ -539,3 +539,27 @@ export interface TotpSetup {
 export interface TotpEnableResult {
   recoveryCodes: string[]
 }
+
+/** Passphrase-encrypted configuration file downloaded from /api/config/export. */
+export interface ConfigEnvelope {
+  format: 'whelkmail-config'
+  version: number
+  createdAt: string
+  kdf: { name: 'PBKDF2-SHA256'; iterations: number; salt: string }
+  iv: string
+  ciphertext: string
+}
+
+export interface ConfigImportCounts {
+  accounts: number
+  labels: number
+  filters: number
+  contacts: number
+  pushPrefs: number
+  settings: number
+}
+
+export interface ConfigImportResult {
+  ok: true
+  counts: ConfigImportCounts
+}

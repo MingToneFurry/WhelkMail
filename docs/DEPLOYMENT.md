@@ -187,6 +187,25 @@ curl -s https://mail.example.com/api/health
 Then sign in, add an account under Settings → Accounts, and use **Test
 connection**. The first mailbox open starts the initial metadata sync.
 
+### Moving a configuration to another installation
+
+**Settings → System → Configuration export and import** writes a single JSON
+file with accounts, filters, labels, contacts, notification preferences and app
+settings. Account secrets (IMAP/SMTP passwords, OAuth tokens, relay and Drive
+keys) are decrypted on export and the whole file is encrypted with a passphrase
+you choose (PBKDF2-SHA256 + AES-256-GCM), so it can be restored on a deployment
+that uses a different `TOKEN_ENC_KEY`.
+
+The import replaces the target installation's configuration, re-encrypts the
+secrets with its own `TOKEN_ENC_KEY` and clears the local mail mirror (mail stays
+on the providers and is rebuilt by the next sync). Sessions, two-factor settings
+and the R2/Drive archive are left untouched. The passphrase cannot be recovered:
+without it the file cannot be opened.
+
+The key derivation runs inside the Worker, so on a Workers Free plan its CPU
+budget can be too small for the export/import request; use Docker or a Workers
+Paid plan when the file is large.
+
 ## Updating
 
 - **Workers:** pull the release, update `wrangler.jsonc` if the release note
