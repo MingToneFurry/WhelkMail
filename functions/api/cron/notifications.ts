@@ -38,25 +38,29 @@ function parseFolders(value: string): Folder[] {
   }
 }
 
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const secret = context.env.CRON_SECRET
-  const authorization = context.request.headers.get('Authorization') ?? ''
-  if (!secret || authorization !== `Bearer ${secret}`) {
-    return fail('Unauthorized', 401, undefined, 'unauthorized')
-  }
-
-  const canNotify = pushConfigured(context.env)
+/**
+ * The scheduled work itself, callable without an HTTP round trip.
+ *
+ * The Workers entry runs it directly from `scheduled()`, so a deployment that
+ * never configured CRON_SECRET still gets sync, notifications, filters,
+ * forwarding and cleanup. The HTTP endpoint below keeps the secret check for
+ * external triggers (the separate `worker/` cron used by Pages deployments).
+ */
+export async function runScheduledTasks(
+  env: Env,
+): Promise<{ sent: number; forwarded: number; deleted: number }> {
+  const canNotify = pushConfigured(env)
   const subscriptions = canNotify
-    ? await context.env.DB.prepare(
+    ? await env.DB.prepare(
         'SELECT id, endpoint, p256dh, auth FROM push_subscriptions',
       ).all<PushSubscriptionRecord>()
     : { results: [] as PushSubscriptionRecord[] }
   const notify = canNotify && subscriptions.results.length > 0
 
-  const prefRows = await context.env.DB.prepare('SELECT * FROM push_prefs').all<PushPrefsRow>()
+  const prefRows = await env.DB.prepare('SELECT * FROM push_prefs').all<PushPrefsRow>()
   const prefs = new Map(prefRows.results.map((row) => [row.account_id, row]))
-  const accounts = await listAccountRows(context.env)
-  const forwardingFilters = await context.env.DB.prepare(
+  const accounts = await listAccountRows(env)
+  const forwardingFilters = await env.DB.prepare(
     "SELECT id FROM filters WHERE enabled = 1 AND forward_to_json <> '[]'",
   ).all<{ id: string }>()
   const hasForwarding = forwardingFilters.results.length > 0
@@ -96,7 +100,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
     let autoDue = false
     if (autoFolders.size > 0) {
-      const lastAuto = await context.env.DB.prepare(
+      const lastAuto = await env.DB.prepare(
         'SELECT MAX(last_synced_at) AS last FROM imap_sync WHERE account_id = ?',
       )
         .bind(account.id)
@@ -108,7 +112,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       if (!requiredFolders.has(folder) && !autoDue) {
         continue
       }
-      const previous = await context.env.DB.prepare(
+      const previous = await env.DB.prepare(
         'SELECT max_uid FROM imap_sync WHERE account_id = ? AND folder = ?',
       )
         .bind(account.id, folder)
@@ -116,10 +120,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       const previousMax = previous?.max_uid ?? 0
 
       try {
-        await runSyncChunk(context.env, account, folder)
+        await runSyncChunk(env, account, folder)
       } catch (error) {
         await markSyncError(
-          context.env,
+          env,
           account.id,
           folder,
           error instanceof Error ? error.message : String(error),
@@ -131,7 +135,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         continue
       }
 
-      const fresh = await context.env.DB.prepare(
+      const fresh = await env.DB.prepare(
         'SELECT * FROM imap_messages WHERE account_id = ? AND folder = ? AND uid > ? ORDER BY uid ASC LIMIT 20',
       )
         .bind(account.id, folder, previousMax)
@@ -139,7 +143,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
       for (const row of fresh.results) {
         const summary = imapMessageSummary(row, account)
-        const existingLabels = await context.env.DB.prepare(
+        const existingLabels = await env.DB.prepare(
           'SELECT label_id FROM message_labels WHERE message_id = ?',
         )
           .bind(row.id)
@@ -147,13 +151,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         summary.labelIds = existingLabels.results.map((item) => item.label_id)
         // Filters run on every folder: the automatic account label is a filter
         // too, so sent, drafts and trash are labelled like the inbox.
-        const forwards = await applyFilters(context.env, account.id, [summary])
+        const forwards = await applyFilters(env, account.id, [summary])
 
         // Labelling runs everywhere, forwarding only on incoming mail.
         if (folder === 'inbox') {
           for (const match of forwards) {
             const result = await forwardFilteredMessage(
-              context.env,
+              env,
               account,
               match.filterId,
               match.forwardTo,
@@ -164,14 +168,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             }
           }
           try {
-            await processAutoReply(context.env, account, row)
+            await processAutoReply(env, account, row)
           } catch (error) {
             console.error('[auto-reply] failed', error)
           }
         }
 
         if (folder === 'inbox' && account.delete_after_archive) {
-          const result = await deleteArchivedMessage(context.env, account, row)
+          const result = await deleteArchivedMessage(env, account, row)
           if (result === 'done') {
             deleted += 1
           }
@@ -190,7 +194,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
               continue
             }
             try {
-              const result = await sendWebPush(context.env, subscription, payload, {
+              const result = await sendWebPush(env, subscription, payload, {
                 urgency: 'high',
               })
               if (result.ok) {
@@ -208,7 +212,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
 
     if (account.delete_after_archive) {
-      const pending = await context.env.DB.prepare(
+      const pending = await env.DB.prepare(
         `SELECT m.* FROM imap_messages m
          LEFT JOIN deletion_log d ON d.message_id = m.id AND d.status = 'done'
          WHERE m.account_id = ? AND m.folder = 'inbox' AND m.archived = 1 AND m.archive_key IS NOT NULL AND d.id IS NULL
@@ -217,7 +221,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         .bind(account.id)
         .all<ImapMessageRow>()
       for (const row of pending.results) {
-        const result = await deleteArchivedMessage(context.env, account, row)
+        const result = await deleteArchivedMessage(env, account, row)
         if (result === 'done') {
           deleted += 1
         }
@@ -225,17 +229,27 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
   }
 
-  await cleanupBodyCache(context.env).catch(() => undefined)
-  await cleanupExpiredSyncLocks(context.env).catch(() => undefined)
-  await pruneMirroredMetadata(context.env).catch(() => undefined)
+  await cleanupBodyCache(env).catch(() => undefined)
+  await cleanupExpiredSyncLocks(env).catch(() => undefined)
+  await pruneMirroredMetadata(env).catch(() => undefined)
 
   if (gone.size > 0) {
-    await context.env.DB.batch(
+    await env.DB.batch(
       [...gone].map((endpoint) =>
-        context.env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint),
+        env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint),
       ),
     )
   }
 
-  return json({ ok: true, sent, forwarded, deleted })
+  return { sent, forwarded, deleted }
+}
+
+export const onRequestPost: PagesFunction<Env> = async (context) => {
+  const secret = context.env.CRON_SECRET
+  const authorization = context.request.headers.get('Authorization') ?? ''
+  if (!secret || authorization !== `Bearer ${secret}`) {
+    return fail('Unauthorized', 401, undefined, 'unauthorized')
+  }
+  const result = await runScheduledTasks(context.env)
+  return json({ ok: true, ...result })
 }

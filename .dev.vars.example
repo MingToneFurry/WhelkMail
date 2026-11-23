@@ -7,6 +7,10 @@ TOKEN_ENC_KEY=
 # Everything below is optional. Commented entries are not requested by the
 # Deploy to Cloudflare setup; add them later in the dashboard or with
 # `wrangler secret put`.
+# CRON_SECRET is only needed when an external scheduler calls
+# POST /api/cron/notifications (the separate worker/ cron used by Pages
+# deployments). The Workers entry runs the same work in-process and does not
+# read this secret.
 # CRON_SECRET=
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
