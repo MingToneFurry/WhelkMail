@@ -36,6 +36,11 @@ coverage/
 wrangler.toml
 worker/wrangler.toml
 
+# Local Docker deployment overrides stay personal; the Dockerfile, compose.yml
+# and .env.example are part of the distributed software and remain tracked.
+deploy/docker/compose.override.yml
+deploy/docker/docker-compose.override.yml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
