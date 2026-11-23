@@ -400,54 +400,120 @@ async function runInChunks(env: Env, statements: D1PreparedStatement[], size = 5
   }
 }
 
+interface ConfigSnapshot {
+  tables: { table: ConfigTable; rows: ConfigRow[] }[]
+  settings: { key: string; value: string }[]
+}
+
+function settingsStatements(env: Env, settings: { key: string; value: string }[]): D1PreparedStatement[] {
+  return settings.map((setting) =>
+    env.DB.prepare(
+      'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    ).bind(setting.key, setting.value),
+  )
+}
+
+async function replaceSettings(env: Env, settings: { key: string; value: string }[]): Promise<void> {
+  const placeholders = CONFIG_SETTING_KEYS.map(() => '?').join(', ')
+  await env.DB.prepare(`DELETE FROM app_settings WHERE key IN (${placeholders})`)
+    .bind(...CONFIG_SETTING_KEYS)
+    .run()
+  await runInChunks(env, settingsStatements(env, settings))
+}
+
+/** Read what is there now, so a failed import can put it back. */
+async function snapshotConfig(env: Env): Promise<ConfigSnapshot> {
+  const tables: ConfigSnapshot['tables'] = []
+  for (const table of CONFIG_TABLES) {
+    try {
+      const result = await env.DB.prepare(`SELECT * FROM ${table}`).all<ConfigRow>()
+      tables.push({ table, rows: result.results })
+    } catch {
+      // An older schema may lack the table: nothing to keep for it.
+      tables.push({ table, rows: [] })
+    }
+  }
+  let settings: { key: string; value: string }[] = []
+  try {
+    const placeholders = CONFIG_SETTING_KEYS.map(() => '?').join(', ')
+    const result = await env.DB.prepare(
+      `SELECT key, value FROM app_settings WHERE key IN (${placeholders})`,
+    )
+      .bind(...CONFIG_SETTING_KEYS)
+      .all<{ key: string; value: string }>()
+    settings = result.results
+  } catch {
+    settings = []
+  }
+  return { tables, settings }
+}
+
+/**
+ * Put a snapshot back after a failed import. Best effort: the caller reports the
+ * original error, and this must not mask it with a second failure.
+ */
+async function restoreConfig(env: Env, snapshot: ConfigSnapshot): Promise<void> {
+  await env.DB.batch(CLEAR_STATEMENTS.map((sql) => env.DB.prepare(sql)))
+  for (const { table, rows } of snapshot.tables) {
+    try {
+      await runInChunks(env, insertStatements(env, table, rows))
+    } catch {
+      // Skip a table that cannot be rebuilt rather than aborting the restore.
+    }
+  }
+  await replaceSettings(env, snapshot.settings)
+}
+
+/**
+ * Replace the whole configuration with the bundle.
+ *
+ * Order matters for safety, because D1 makes a transaction atomic per batch and
+ * not across batches:
+ *
+ * 1. every row is validated and every statement is built **before** anything is
+ *    deleted, so a malformed bundle cannot empty the installation;
+ * 2. the current configuration is snapshotted;
+ * 3. the replacement runs, and if any step fails the snapshot is restored.
+ */
 export async function applyConfigBundle(env: Env, bundle: ConfigBundle): Promise<ConfigImportResult> {
   const accounts: ConfigRow[] = []
   for (const row of bundle.data.accounts) {
     accounts.push(await accountRowForImport(env, row))
   }
-
-  await env.DB.batch(CLEAR_STATEMENTS.map((sql) => env.DB.prepare(sql)))
-
-  const labels = bundle.data.labels.map((row) => sanitizeRow(row, 'labels'))
-  const filters = bundle.data.filters.map((row) => sanitizeRow(row, 'filters'))
-  const contacts = bundle.data.contacts.map((row) => sanitizeRow(row, 'contacts'))
-  const pushPrefs = bundle.data.pushPrefs.map((row) => sanitizeRow(row, 'push_prefs'))
-
-  await runInChunks(env, insertStatements(env, 'accounts', accounts))
-  await runInChunks(env, insertStatements(env, 'labels', labels))
-  await runInChunks(env, insertStatements(env, 'filters', filters))
-  await runInChunks(env, insertStatements(env, 'contacts', contacts))
-  await runInChunks(env, insertStatements(env, 'push_prefs', pushPrefs))
-
-  const known = new Set(CONFIG_SETTING_KEYS)
-  const settingPlaceholders = CONFIG_SETTING_KEYS.map(() => '?').join(', ')
-  await env.DB.prepare(`DELETE FROM app_settings WHERE key IN (${settingPlaceholders})`)
-    .bind(...CONFIG_SETTING_KEYS)
-    .run()
-  const settingsStatements: D1PreparedStatement[] = []
-  let settingsCount = 0
-  for (const setting of bundle.data.settings) {
-    if (!known.has(setting.key)) {
-      continue
-    }
-    settingsStatements.push(
-      env.DB.prepare(
-        'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ).bind(setting.key, setting.value),
-    )
-    settingsCount += 1
+  // Built now: sanitizeRow() throws on an invalid column or value, and that must
+  // happen while the current configuration is still in place.
+  const prepared: Record<ConfigTable, D1PreparedStatement[]> = {
+    accounts: insertStatements(env, 'accounts', accounts),
+    labels: insertStatements(env, 'labels', bundle.data.labels),
+    filters: insertStatements(env, 'filters', bundle.data.filters),
+    contacts: insertStatements(env, 'contacts', bundle.data.contacts),
+    push_prefs: insertStatements(env, 'push_prefs', bundle.data.pushPrefs),
   }
-  await runInChunks(env, settingsStatements)
+  const known = new Set(CONFIG_SETTING_KEYS)
+  const settings = bundle.data.settings.filter((setting) => known.has(setting.key))
+
+  const snapshot = await snapshotConfig(env)
+
+  try {
+    await env.DB.batch(CLEAR_STATEMENTS.map((sql) => env.DB.prepare(sql)))
+    for (const table of CONFIG_TABLES) {
+      await runInChunks(env, prepared[table])
+    }
+    await replaceSettings(env, settings)
+  } catch (error) {
+    await restoreConfig(env, snapshot).catch(() => undefined)
+    throw error
+  }
 
   return {
     ok: true,
     counts: {
       accounts: accounts.length,
-      labels: labels.length,
-      filters: filters.length,
-      contacts: contacts.length,
-      pushPrefs: pushPrefs.length,
-      settings: settingsCount,
+      labels: bundle.data.labels.length,
+      filters: bundle.data.filters.length,
+      contacts: bundle.data.contacts.length,
+      pushPrefs: bundle.data.pushPrefs.length,
+      settings: settings.length,
     },
   }
 }
