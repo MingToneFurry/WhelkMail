@@ -83,6 +83,17 @@ export function loadNodeEnvironment(root = process.cwd()): NodeEnvironment {
   }
 
   const publicOrigin = value('PUBLIC_ORIGIN') ?? value('APP_URL')
+  if (!publicOrigin) {
+    // Without it the origin comes from X-Forwarded-Proto/Host, which a client
+    // can write unless a proxy overwrites them: cookies and OAuth redirects
+    // would then follow an attacker-chosen host.
+    const message =
+      'PUBLIC_ORIGIN is required: set it to the public URL of this deployment (for example https://mail.example.com).'
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(message)
+    }
+    console.warn(`[env] ${message}`)
+  }
   const cronSecret = value('CRON_SECRET') ?? `local-${crypto.randomUUID()}`
 
   const env: Env = {

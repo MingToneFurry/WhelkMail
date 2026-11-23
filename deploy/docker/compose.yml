@@ -11,8 +11,12 @@ services:
       - .env
     environment:
       DB_PATH: /data/whelkmail.sqlite
+    # Bound to the loopback interface: put Caddy/nginx on the host in front of it.
+    # Publishing 8787 on 0.0.0.0 would expose the app over plain HTTP next to the
+    # reverse proxy. If the proxy is another container, drop this block, join a
+    # shared network and use `expose: ["8787"]` instead.
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
     volumes:
       - whelkmail-data:/data
     # Add MinIO with: docker compose --profile s3 up -d --build
@@ -28,9 +32,11 @@ services:
       MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-change-me-please}
     volumes:
       - whelkmail-minio:/data
+    # Development only: the console and the S3 endpoint stay on loopback so a
+    # public host does not expose MinIO with the default credentials above.
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
 
 volumes:
   whelkmail-data:
