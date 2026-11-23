@@ -736,6 +736,8 @@ const en: Record<string, string> = {
   'errors.oauth_invalid_provider': 'Invalid OAuth provider',
   'errors.config_invalid': 'Invalid configuration file',
   'errors.config_passphrase': 'Wrong passphrase or corrupted file',
+  'errors.config_secret_undecryptable':
+    'A stored account secret cannot be decrypted with this deployment key',
   'errors.imap_not_connected': 'Account is not connected',
   'errors.imap_failed': 'IMAP connection failed',
   'errors.smtp_failed': 'SMTP connection failed',
@@ -1496,6 +1498,8 @@ const it: Record<string, string> = {
   'errors.oauth_invalid_provider': 'Provider OAuth non valido',
   'errors.config_invalid': 'File di configurazione non valido',
   'errors.config_passphrase': 'Passphrase errata o file danneggiato',
+  'errors.config_secret_undecryptable':
+    'Un segreto account salvato non è decifrabile con la chiave di questo deployment',
   'errors.imap_not_connected': 'Account non collegato',
   'errors.imap_failed': 'Connessione IMAP fallita',
   'errors.smtp_failed': 'Connessione SMTP fallita',

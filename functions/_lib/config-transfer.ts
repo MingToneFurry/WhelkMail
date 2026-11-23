@@ -280,7 +280,15 @@ export async function accountRowForExport(env: Env, row: ConfigRow): Promise<Con
     const value = copy[column]
     delete copy[column]
     if (typeof value === 'string' && value.length > 0) {
-      secrets[name] = await decryptString(env, value)
+      try {
+        secrets[name] = await decryptString(env, value)
+      } catch {
+        const label = String(row.email ?? row.id ?? 'unknown')
+        throw new ConfigTransferError(
+          'config_secret_undecryptable',
+          `The stored ${name.replace(/_/g, ' ')} for ${label} cannot be decrypted with this deployment's TOKEN_ENC_KEY. Re-enter the account credentials, then export again.`,
+        )
+      }
     }
   }
   copy.secrets = secrets

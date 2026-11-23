@@ -1,5 +1,9 @@
 import { configExportSchema } from '../../../shared/schemas'
-import { buildConfigBundle, encryptConfigBundle } from '../../_lib/config-transfer'
+import {
+  buildConfigBundle,
+  ConfigTransferError,
+  encryptConfigBundle,
+} from '../../_lib/config-transfer'
 import type { Env } from '../../_lib/env'
 import { fail, json, readJson } from '../../_lib/http'
 import { isSchemaError, schemaOutdated } from '../../_lib/schema'
@@ -30,6 +34,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (isSchemaError(error)) {
       return schemaOutdated(error)
     }
-    throw error
+    if (error instanceof ConfigTransferError) {
+      return fail(error.message, 400, undefined, error.code)
+    }
+    console.error('[config export] failed:', error)
+    return fail(
+      'Internal error',
+      500,
+      error instanceof Error ? error.message : undefined,
+      'internal',
+    )
   }
 }

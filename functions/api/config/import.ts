@@ -41,6 +41,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (isSchemaError(error)) {
       return schemaOutdated(error)
     }
-    throw error
+    console.error('[config import] failed:', error)
+    return fail(
+      'Internal error',
+      500,
+      error instanceof Error ? error.message : undefined,
+      'internal',
+    )
   }
 }
