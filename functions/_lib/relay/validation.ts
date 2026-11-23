@@ -4,7 +4,7 @@ import { findCloudflareAccount } from './cloudflare'
 import type { RelayAdapter } from './types'
 
 // Kept out of ./index so it can be imported (and tested) without pulling in
-// the SMTP client, which depends on the Workers-only cloudflare:sockets.
+// the SMTP client and its runtime-provided socket transport.
 
 /**
  * The 400 for a relay account saved without its relayDomain value, worded

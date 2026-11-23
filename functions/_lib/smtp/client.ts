@@ -1,11 +1,13 @@
-import { connect } from 'cloudflare:sockets'
 import { toBase64 } from '../crypto'
+import {
+  mailSocketConnector,
+  type MailSocketConfig,
+  type MailSocketLike,
+} from '../mail/socket'
 
 export type SmtpSecurity = 'tls' | 'starttls'
 
-export interface SmtpConfig {
-  host: string
-  port: number
+export interface SmtpConfig extends MailSocketConfig {
   security: SmtpSecurity
 }
 
@@ -21,14 +23,8 @@ interface SmtpResponse {
   lines: string[]
 }
 
-/** The slice of `cloudflare:sockets` this client relies on (swappable in tests). */
-export interface SmtpSocketLike {
-  opened: Promise<unknown>
-  readable: ReadableStream<Uint8Array>
-  writable: WritableStream<Uint8Array>
-  startTls(): SmtpSocketLike
-  close(): void
-}
+/** The socket surface this client relies on (swappable in tests). */
+export type SmtpSocketLike = MailSocketLike
 
 export type SmtpConnector = (config: SmtpConfig) => SmtpSocketLike
 
@@ -87,11 +83,7 @@ function indexOfCrlf(buffer: Uint8Array): number {
   return -1
 }
 
-const defaultConnector: SmtpConnector = (config) =>
-  connect(
-    { hostname: config.host, port: config.port },
-    { secureTransport: config.security === 'tls' ? 'on' : 'starttls', allowHalfOpen: false },
-  )
+const defaultConnector: SmtpConnector = (config) => mailSocketConnector()(config)
 
 export class SmtpConnection {
   private socket: SmtpSocketLike

@@ -3,10 +3,13 @@
 **Your mailboxes. Your domain. One calm inbox.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white)](https://pages.cloudflare.com)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-success.svg)](#using-this-repository)
 
-WhelkMail is a self-hosted webmail client for the IMAP and SMTP accounts you already own. It runs entirely on Cloudflare Pages and Workers, so there is no mail server to operate and no infrastructure to babysit.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
+
+WhelkMail is a self-hosted webmail client for the IMAP and SMTP accounts you already own. One repository deploys to **Cloudflare Workers** (default), **Cloudflare Pages** (for existing installations) or **Docker on any VPS**, so there is no mail server to operate and no infrastructure to babysit.
 
 Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a familiar, Gmail-style interface on top of the mailboxes you already use. Messages, sent copies, drafts and attachments stay on your provider; only a short-lived D1 cache and the strictly opt-in long-term archive copy them.
 
@@ -14,7 +17,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 
 **Try it:** [demo.whelkmail.eu](https://demo.whelkmail.eu) is a live public demo of the app. **Install it:** the [WhelkMail Installer](https://github.com/WhelkMail/installer) (beta) provisions and deploys a WhelkMail instance inside your own Cloudflare account, from the browser or the terminal.
 
-[Quick start](#quick-start) · [Installer](#installer-beta) · [Deploy on Cloudflare](#deploy-on-cloudflare) · [Security](#security) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Installer](#installer-beta) · [Deploy on Cloudflare](#deploy-on-cloudflare) Â· [Deploy on Docker](#deploy-on-docker) · [Security](#security) · [Documentation](#documentation)
 
 ## Screenshots
 
@@ -31,7 +34,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 ## Why WhelkMail
 
 - **One inbox, many accounts.** Gmail, Outlook, iCloud, Yahoo and custom domains side by side, with colored account labels and a shared address book.
-- **Cloudflare-native.** Pages Functions, D1, R2 and `cloudflare:sockets`: no VPS, no container, no mail server to patch.
+- **Cloudflare-first, not Cloudflare-only.** Workers with D1, R2 and `cloudflare:sockets` by default; the same code runs on Pages or in a single Docker container with SQLite and any S3-compatible bucket.
 - **Your data stays put.** By default the client reads from the provider. A short-lived D1 cache keeps recently listed or opened bodies for fast opens; the long-term archive on R2 or Google Drive remains strictly opt-in.
 - **Privacy by default.** HTML email is rendered in a sandboxed frame, remote images and tracking pixels stay blocked unless you enable them for a message, and credentials are encrypted at rest.
 - **Actually yours.** Self-hosted, MIT licensed, no telemetry, no vendor account required beyond your Cloudflare project.
@@ -88,47 +91,69 @@ See [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) for the full threat model and
 ## Stack
 
 - React 19 + Vite 8 + TypeScript + Tailwind CSS
-- Cloudflare Pages Functions (Workers runtime)
-- Cloudflare D1 for accounts and metadata
-- `cloudflare:sockets` for IMAP/SMTP
-- Optional Cloudflare R2 or Google Drive for archive
+- One runtime-agnostic API core (`server/`) with three thin entrypoints
+- Cloudflare Workers (default) or Pages Functions, sharing D1 and R2
+- Docker / Node 24 entrypoint with built-in SQLite (`node:sqlite`)
+- `cloudflare:sockets` on Cloudflare, `node:net`/`node:tls` on Node, for IMAP/SMTP
+- Optional R2, S3/MinIO or Google Drive for archive
 - `postal-mime` for MIME parsing
 
 ## Quick start
 
-Requirements: Node.js 22+ and npm.
+Requirements: Node.js 24+ and npm (the Docker image also uses Node 24).
+
+**Cloudflare Workers (default)**
 
 ```bash
 npm install
-cp wrangler.toml.example wrangler.toml
+# create a D1 database and replace the placeholder database_id in wrangler.jsonc
+npm run db:init:workers:remote
+npx wrangler secret put APP_PASSWORD
+npx wrangler secret put TOKEN_ENC_KEY
+npm run deploy
+```
+
+**Cloudflare Pages (existing installations)**
+
+```bash
+npm install
 npm run db:init:local
+npm run dev:pages
 ```
 
-The example uses a placeholder D1 ID; for local development that is fine. For a real deployment, create your own database and replace it (or configure the `DB` binding in the Pages dashboard).
+Pages uses the tracked `wrangler.jsonc` for local bindings. If you have an old
+local `wrangler.toml`, remove it: Pages does not support custom configuration
+paths, and the dashboard remains the source of truth for deployed bindings.
 
-If you already have a local database created before labels/signatures, run `npm run db:migrate:local`. If you only need the security tables (sessions, rate limiting, OAuth state), start from that migration with `node scripts/migrate.mjs local --from=012`; existing sessions are invalidated.
+**Docker**
 
-Create `.dev.vars` in the project root:
-
-```env
-APP_PASSWORD=change-me
-TOKEN_ENC_KEY=<32-byte base64 key>
+```bash
+cd deploy/docker
+cp .env.example .env
+# set APP_PASSWORD, TOKEN_ENC_KEY and PUBLIC_ORIGIN
+docker compose up -d --build
 ```
 
-Generate the key with:
+All targets need `APP_PASSWORD` and `TOKEN_ENC_KEY`. Generate the key with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-Start the app in two terminals:
+For local Cloudflare development, put the same two values in a gitignored
+`.dev.vars` file at the repository root.
+
+The local development loop:
 
 ```bash
-npm run dev       # Vite on http://localhost:5173
-npm run dev:api   # Pages Functions on http://localhost:8788
+npm install
+npm run dev            # Vite on http://localhost:5173
+npm run dev:workers    # Worker + local D1 on http://localhost:8787
+npm run dev:pages      # Pages Functions on http://localhost:8788
 ```
 
-Open `http://localhost:8788` and sign in with `APP_PASSWORD`.
+The complete matrix (secrets, migrations, S3, cron, reverse proxy) is in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Installer (beta)
 
@@ -148,49 +173,65 @@ This project is meant to be self-hosted. Do not point your deployment at someone
 - use **Use this template** (or a fork) to create your own copy;
 - create your own D1 database and run the migrations;
 - set your own secrets in the Cloudflare dashboard;
-- keep `wrangler.toml` local (it is gitignored) or configure the `DB` binding in the dashboard. Start from `wrangler.toml.example`.
+- `wrangler.jsonc` is tracked with placeholder values so the Deploy to Cloudflare button works. Replace `database_id` only in your local deployment and keep it out of commits. A legacy `wrangler.toml` stays gitignored.
 
 ## Deploy on Cloudflare
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
+
+The button deploys the Worker from this repository and asks you to bind a D1
+database and add the required secrets. For a fully provisioned Cloudflare
+install (D1, secrets, Pages) use the [WhelkMail Installer](#installer-beta)
+instead.
+
 The complete guide — dashboard clicks, exact commands, bindings, secrets, OAuth apps and troubleshooting — is in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
 
-Short version:
+**Cloudflare Workers (default)**
 
-1. Create the database and configure the D1 binding. For local/CLI work, copy the example and paste your own ID:
-   ```bash
-   cp wrangler.toml.example wrangler.toml
-   npx wrangler d1 create mail-client
-   ```
-   The D1 database keeps the legacy `mail-client` name so existing data keeps working; the Pages project is named `whelkmail`. Do not commit `wrangler.toml`: for GitHub deployments, set the `DB` binding in the Pages dashboard instead.
-2. Create a Pages project from GitHub. Build settings:
-   - Build command: `npm run build`
-   - Output directory: `dist`
-   - Root directory: `/`
-   - Environment variable: `NODE_VERSION=22`
-3. Add the D1 binding `DB` and the secrets `APP_PASSWORD` and `TOKEN_ENC_KEY`.
-4. Apply the schema:
-   ```bash
-   npm run db:init:remote
-   ```
-   If the database already existed before labels and signatures were added, run the additive migrations too:
-   ```bash
-   npm run db:migrate:remote
-   ```
-   If you only need the security tables, run `node scripts/migrate.mjs remote --from=012`.
-5. Optional Web Push:
-   ```bash
-   npm run vapid
-   ```
-   Add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` and a random `CRON_SECRET` to the Pages project, then copy the cron worker template, set your Pages URL in it and deploy:
-   ```bash
-   cp worker/wrangler.toml.example worker/wrangler.toml
-   # set APP_URL in worker/wrangler.toml
-   npm run cron:deploy
-   ```
-   `worker/wrangler.toml` is gitignored and `npm run cron:deploy` refuses to deploy while `APP_URL` is still a placeholder.
-6. Deploy and open the Pages URL.
+```bash
+npx wrangler d1 create mail-client   # paste the returned id into wrangler.jsonc
+npm run db:init:workers:remote
+npx wrangler secret put APP_PASSWORD
+npx wrangler secret put TOKEN_ENC_KEY
+npx wrangler secret put CRON_SECRET
+npm run deploy
+```
+
+Workers Assets serve the build and `/api/*` goes to the Worker; the Worker's
+`[triggers] crons` block handles background sync, notifications, filters and the
+vacation responder. No separate cron deployment is needed on this target.
+
+**Cloudflare Pages (existing installations)**
+
+Existing projects keep their D1/R2 bindings and secrets; deploying the new
+release is enough. For a new Pages project:
+
+1. Create the database with `npx wrangler d1 create mail-client` and paste the id into `wrangler.jsonc` for local CLI work, or set the `DB` binding in the Pages dashboard. Remove any old local `wrangler.toml`.
+2. Create a Pages project from GitHub: build `npm run build`, output `dist`, `NODE_VERSION=22`.
+3. Add the D1 binding `DB` and the secrets `APP_PASSWORD`, `TOKEN_ENC_KEY`.
+4. Run `npm run db:init:remote` (existing databases: `npm run db:migrate:remote`).
+5. Optional Web Push: `npm run vapid`, add VAPID keys and `CRON_SECRET`, then `cp worker/wrangler.toml.example worker/wrangler.toml`, set `APP_URL` and `npm run cron:deploy`.
+6. Run `npm run deploy:pages` and open the Pages URL.
 
 A Workers Paid plan is recommended: IMAP/SMTP TLS handshakes could exceed the free plan CPU budget.
+
+## Deploy on Docker
+
+```bash
+cd deploy/docker
+cp .env.example .env
+# set APP_PASSWORD, TOKEN_ENC_KEY and PUBLIC_ORIGIN
+docker compose up -d --build
+```
+
+Put Caddy, Traefik or nginx in front for TLS and set `PUBLIC_ORIGIN` to the
+public URL. The SQLite database lives in the `whelkmail-data` volume mounted at
+`/data`; migrations run automatically on startup. S3/MinIO storage is optional
+(`docker compose --profile s3 up -d --build` and the `S3_*` variables in
+`.env`). The container runs the sync/notification scheduler itself.
+
+Details, backups, S3 configuration and updates are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Configuration
 
@@ -215,6 +256,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 
 - [Live demo](https://demo.whelkmail.eu) — static, backend-free preview with mocked API calls and fake data
 - [WhelkMail Installer](https://github.com/WhelkMail/installer) — beta one-command provisioning and deployment on Cloudflare
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Workers, Pages and Docker, side by side
 - [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md) — complete Cloudflare deployment and usage guide
 - [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) — architecture, security, mailbox behavior and limitations
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local workflow, database migrations, tests and publishing to the public repository
@@ -223,7 +265,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 ## Limitations
 
 - No IMAP IDLE: folder lists are served from the D1 mirror and a background sync refreshes new mail and flags. While a sync is in progress, the client polls the lightweight sync status with backoff and refreshes the list when new UIDs, backfill progress or the folder state change, including a final refresh when the sync finishes. Sync can also be started manually from Settings; accounts with automatic sync enabled are refreshed by the cron worker at their own interval (Settings → account → **Check for mail**, 5 minutes by default), while notifications, filters and cleanup run every minute.
-- Web Push requires VAPID keys, the separate cron worker under `worker/`, and the `CRON_SECRET` secret shared by Pages and the worker.
+- Web Push requires VAPID keys and a scheduler: the Worker cron trigger on Workers, the separate `worker/` deployment on Pages, or the built-in Node scheduler on Docker. All share `CRON_SECRET`.
 - HTML bodies are rendered in a sandboxed frame. Remote images are blocked by default and can be enabled per message. Links open in a new tab; scripts and forms are disabled.
 - The first open of an account bootstraps the newest messages from the provider; afterwards the folder list comes from D1. Sync uses UIDNEXT and bounded backfill windows instead of scanning every UID on each run. Search runs against the D1 mirror across Inbox, Sent, Drafts and Spam, with an optional per-folder scope, and also matches contacts. Matching is a case-insensitive substring test (`LIKE`), not a full-text index: no stemming and no fuzzy matching. IMAP bodies are indexed progressively (a few per sync chunk, plus every message you open), so a search matches body text only for messages that have been indexed so far; the rest still match sender, recipients and subject.
 - Lists and search results are paginated with a keyset cursor (`Load more messages` at the bottom of the list) instead of one fixed 100-message cap.
@@ -232,7 +274,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - A label view uses the D1 mirror when available and falls back to fetching the labeled UIDs from the provider.
 - Mirrored IMAP metadata is kept indefinitely by default. Settings → Appearance can limit it to a retention window: older messages are removed from the D1 mirror (never from the provider, and never drafts), together with their label assignments. Pruned messages disappear from lists, search and label views and are not re-listed by the incremental sync; only a direct message link still opens one, because the body is fetched from the provider on demand. Settings → Appearance shows the last cleanup (time and count) and **Download metadata again** clears the sync cursors so the mirror is rebuilt from the provider in the background — the messages come back, their labels do not. The archive copy in R2/Drive is left untouched.
 - Filters run when the inbox is loaded and when a sync ingests new inbox messages. Matching uses From/To/Subject/snippet, not the full message body; word criteria are re-evaluated after the body is indexed, so new header-only mail is not judged on an empty snippet. A filter on **To:** also matches the addresses a message was forwarded from (`Delivered-To`, `X-Original-To`, `Received … for`), so a domain that only forwards (`info@domain` → `you@provider`) matches without an account per address.
-- Forwarding and provider deletion run from the cron worker, so they require the same setup as Web Push. They act on new incoming messages detected after the initial sync; to apply a filter to mail that is already in the mailbox use the tag button on a filter (that filter only) or **Settings → Filters → Apply every filter** (all enabled filters); forwarding matching old messages is an option of the second one only, and each message is forwarded once per filter.
+- Forwarding and provider deletion run from the same scheduler, so they require the same setup as Web Push. They act on new incoming messages detected after the initial sync; to apply a filter to mail that is already in the mailbox use the tag button on a filter (that filter only) or **Settings → Filters → Apply every filter** (all enabled filters); forwarding matching old messages is an option of the second one only, and each message is forwarded once per filter.
 - The sender is the account address: there is no free-form "send as". Replies pick the account whose address received the message (see above), and **Reply as** in Settings → Accounts overrides that choice per mailbox. A relay account with **Send from any address on this domain** replies from the address on its domain that the message was sent to (`shop@DOMAIN.IT`), without an account per address. The alias is read from headers that aren't signed, so a forwarding header only counts when the receiving server's topmost `Authentication-Results` reports a passing DKIM signature for that domain; a server that adds none, or a signed message replayed straight to the inbox with a forwarding header added, can still mislead it. The address is always limited to the relay's exact domain and is shown in the From field before sending, and two relays allowed to send as the same domain make the alias ambiguous, so none is offered.
 - Switching the IMAP body archive between R2 and Drive keeps the previously archived messages readable: each row records the backend that wrote it (legacy rows fall back to trying both).
 - A relay account needs a **working sent-copy destination** (Google Drive, R2 or an IMAP mailbox). If the copy cannot be saved the send is aborted before the relay is called and returns `storage_failed`, so the message is never handed to the provider.
@@ -243,7 +285,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 - Provider error details are returned to the authenticated admin to help with IMAP/SMTP setup.
 - New releases are announced inside the app by comparing the installed version with the latest GitHub release. The check runs from the Worker (cached for a day, no user data sent) and is informational only: it cannot update a deployment. Set `UPDATE_CHECK=off` to disable it.
 - **Cloudflare Email Service is experimental.** The maintainer has not run it against a real Cloudflare account, so actual delivery, suppression handling (error `10205`), rate limits and the per-recipient failures the app reports are unverified. Use SMTP2GO or another listed relay when you need a path that has been tested in practice.
-- Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget. The cron worker now wakes every minute so each account can follow its own check interval, which on Free costs about 3% of the daily request quota while nothing is due; a 1 or 2 minute interval, however, means an IMAP connection every minute and is only realistic with Paid. On Free, set `crons = ["*/5 * * * *"]` in `worker/wrangler.toml` to cut the wake-ups fivefold with nothing lost.
+- Workers Paid is recommended because IMAP/SMTP TLS handshakes could exceed the free plan CPU budget. The scheduler wakes every minute so each account can follow its own check interval, which on Free costs about 3% of the daily request quota while nothing is due; a 1 or 2 minute interval, however, means an IMAP connection every minute and is only realistic with Paid. On Free, set `crons = ["*/5 * * * *"]` in `wrangler.jsonc` (or in `worker/wrangler.toml` on Pages) to cut the wake-ups fivefold with nothing lost. Docker has no such CPU limit.
 - Google OAuth uses the restricted `https://mail.google.com/` scope. A public production app needs Google verification (CASA); personal/testing apps can use OAuth in Testing mode, where refresh tokens expire after 7 days. App passwords remain available as an alternative.
 
 ## License

@@ -2,7 +2,9 @@
 
 This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
 
-> **Important:** this is not a static site. Deploy it as a **Pages project with Functions**. The `functions/` directory is the API (IMAP/SMTP over `cloudflare:sockets`). Uploading only `dist` without Functions will break every API call.
+> **Workers is the default target.** This guide focuses on Pages, which remains fully supported for existing installations. For the Workers deployment see [DEPLOYMENT.md](DEPLOYMENT.md); the backend is the same and both use D1, R2 and `cloudflare:sockets`.
+
+> **Important:** this is not a static site. Deploy it as a **Pages project with Functions**, or as a **Worker with static assets**. The `functions/` directory is the Pages API (IMAP/SMTP over `cloudflare:sockets`); the Workers entrypoint lives in `server/entries/workers.ts`. Uploading only `dist` without a backend will break every API call.
 
 ## What you will create
 
@@ -18,7 +20,7 @@ This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do 
 
 - A Cloudflare account.
 - A GitHub repository containing this project.
-- Node.js 22 or newer and npm.
+- Node.js 24 or newer and npm (the Pages/Workers build itself also runs on Node 22).
 - Wrangler authenticated:
   ```bash
   npx wrangler login
@@ -35,17 +37,23 @@ npx wrangler d1 create mail-client
 
 The command prints a `database_id`. Use it in one of two ways:
 
-- **GitHub deployment:** set the `DB` binding in the Pages dashboard; `wrangler.toml` can stay local and untracked.
-- **CLI/local:** copy `wrangler.toml.example` to `wrangler.toml` and paste the ID:
+- **GitHub deployment:** set the `DB` binding in the Pages dashboard; the tracked `wrangler.jsonc` only supplies local bindings.
+- **CLI/local:** replace the placeholder in `wrangler.jsonc`:
 
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "mail-client"
-database_id = "<paste-the-database-id-here>"
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "mail-client",
+    "database_id": "<paste-the-database-id-here>"
+  }
+]
 ```
 
-The zero UUID in the example is fine for local development. For remote CLI commands and for deployments that read `wrangler.toml`, replace it with the real D1 ID or the Functions will fail.
+Keep the change out of commits when you publish a fork. Remove any legacy local
+`wrangler.toml`: Pages does not support custom configuration paths. The zero UUID
+in the public repository is fine for local development; remote CLI commands need
+the real D1 ID.
 
 > The D1 database intentionally keeps the legacy name `mail-client` so existing deployments and data continue to work after the whelkmail rebrand. Only the Pages project is named `whelkmail`.
 
@@ -275,12 +283,12 @@ npx wrangler pages deploy dist --project-name whelkmail
 Or simply:
 
 ```bash
-npm run deploy
+npm run deploy:pages
 ```
 
-`npm run deploy` runs `npm run build` and then `wrangler pages deploy dist`.
+`npm run deploy:pages` runs `npm run build` and then `wrangler pages deploy dist`.
 
-With CLI deployments, bindings and secrets come from the project configuration and your local `wrangler.toml`. With GitHub deployments, configure the D1 binding and secrets in the Pages dashboard instead; keep `wrangler.toml` local and untracked.
+With CLI deployments, bindings and secrets come from `wrangler.jsonc` (replace its placeholder D1 id locally) and from `wrangler secret put`. With GitHub deployments, configure the D1 binding and secrets in the Pages dashboard instead; the public `wrangler.jsonc` keeps the placeholder.
 
 ## 3. OAuth setup
 
@@ -418,7 +426,7 @@ Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT 
 
 | Symptom | Cause / fix |
 |---|---|
-| `database_id` placeholder error | Replace the placeholder in the local `wrangler.toml`, or set the `DB` binding in the Pages dashboard |
+| `database_id` placeholder error | Replace the placeholder in `wrangler.jsonc` for local CLI use, or set the `DB` binding in the Pages dashboard |
 | `D1_ERROR: no such table: accounts` | Apply the schema and record the baseline: `npm run db:init:remote` |
 | `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` / `sessions` / `login_attempts` / `oauth_states` / `imap_body_cache` / `imap_sync_locks` / `schema_migrations` | Run `npm run db:migrate:remote`: migrations already recorded are skipped |
 | `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` / `auto_sync` / `delete_after_archive` / `forward_to_json` / `drafts_folder` / `spam_folder` | Run `npm run db:migrate:remote`, or apply the missing `006`–`016` migrations in order |

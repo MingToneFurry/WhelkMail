@@ -12,6 +12,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-server
+data
 *.local
 coverage/
 .vitest/
@@ -29,7 +31,8 @@ coverage/
 .wrangler
 
 # Personal deployment config; start from the .example templates.
-# Both the Pages config and the cron worker config contain account-scoped values.
+# `wrangler.jsonc` is tracked with placeholder values for the shared config.
+# A legacy local `wrangler.toml` and the cron worker config stay personal.
 wrangler.toml
 worker/wrangler.toml
 

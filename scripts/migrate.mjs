@@ -37,9 +37,12 @@ const onlyArg = args.find((arg) => arg.startsWith('--only='))
 const only = onlyArg ? onlyArg.slice('--only='.length).padStart(3, '0') : null
 const markApplied = args.includes('--mark-applied')
 const dryRun = args.includes('--dry-run')
+const configArg = args.find((arg) => arg.startsWith('--config='))
+const config = configArg ? configArg.slice('--config='.length) : null
 
 const database = process.env.WHELKMAIL_D1_NAME ?? 'mail-client'
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+const configArgs = config ? [`--config=${config}`] : []
 
 function command(sql) {
   return [
@@ -49,6 +52,7 @@ function command(sql) {
     database,
     `--${target}`,
     `--command=${sql}`,
+    ...configArgs,
   ]
 }
 
@@ -256,6 +260,7 @@ for (const file of pending) {
     database,
     `--${target}`,
     `--file=${relative}`,
+    ...configArgs,
   ])
   if (result.status !== 0) {
     console.error(

@@ -1,6 +1,11 @@
 import { readCookie, verifySession } from '../_lib/crypto'
 import type { Env } from '../_lib/env'
 import { fail, HttpError } from '../_lib/http'
+import { registerWorkersSockets } from '../../server/adapters/sockets/workers'
+
+// Pages keeps its native file routing, so this middleware is the place where
+// the Cloudflare socket implementation is installed for the IMAP/SMTP clients.
+registerWorkersSockets()
 
 const PUBLIC_PATHS = new Set([
   '/api/auth/login',

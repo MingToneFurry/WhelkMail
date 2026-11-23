@@ -18,13 +18,16 @@ would create a duplicate commit for content that already exists.
 
 ## Local setup
 
-Requirements: Node.js 22+ and npm.
+Requirements: Node.js 24+ and npm (the Node entrypoint uses `node:sqlite`; the Docker image is Node 24).
 
 ```bash
 npm install
-cp wrangler.toml.example wrangler.toml   # gitignored
-npm run db:init:local                     # fresh database: schema + migration baseline
+npm run db:init:local   # fresh local database: schema + migration baseline
 ```
+
+The tracked `wrangler.jsonc` carries the local bindings with a placeholder D1
+id. Remove any legacy local `wrangler.toml`: Pages does not support custom
+configuration paths, and the public repository must keep the placeholder.
 
 Create `.dev.vars` (gitignored) with at least:
 
@@ -47,6 +50,24 @@ npm run dev:api   # Pages Functions on http://localhost:8788
 ```
 
 Open `http://localhost:8788` (the Functions proxy the Vite dev server).
+
+Other targets:
+
+```bash
+npm run db:init:workers:local
+npm run dev            # Vite
+npm run dev:workers    # Worker + local D1 on http://localhost:8787
+
+npm run build:all
+APP_PASSWORD=... TOKEN_ENC_KEY=... DB_PATH=./data/dev.sqlite \
+  PUBLIC_ORIGIN=http://localhost:8787 node dist-server/server.mjs
+```
+
+The Node entrypoint uses the built-in `node:sqlite` module (Node 24; the Docker
+image uses Node 24) and creates/migrates the database on startup. All
+three targets share `server/`, `functions/api` and `functions/_lib`: the API
+route table in `server/routes.ts` must have one row per file under
+`functions/api` (a test enforces it).
 
 ### Working from the Acode terminal on Android
 
@@ -168,8 +189,9 @@ npm ci && npm run typecheck && npm run test && npm run build
 
 The public repository must not contain:
 
-- `wrangler.toml` or `worker/wrangler.toml` (they carry the Pages URL and
-  account-scoped resource identifiers);
+- `wrangler.toml` or `worker/wrangler.toml` (they carry URLs and account-scoped
+  resource identifiers). The tracked `wrangler.jsonc` must keep the placeholder
+  `database_id`, so the Deploy to Cloudflare button and forks stay generic;
 - `.dev.vars`, `.env*` or any secret;
 - `node_modules/`, `dist/`, `.wrangler/` (local D1 state) or `coverage/`;
 - seed data: `db/schema.sql` must stay `CREATE` statements only, with no
@@ -198,10 +220,13 @@ logo: at status bar size they only add noise. After changing the files, bump
 | Path | Contents |
 | --- | --- |
 | `src/` | React app (`App.tsx` holds the state machine, `components/` the UI) |
-| `functions/api/` | Pages Functions endpoints |
-| `functions/_lib/` | IMAP/SMTP, D1 access, sync, cache, filters, crypto |
+| `functions/api/` | API endpoint handlers (native Pages routing; Workers/Node import them through `server/routes.ts`) |
+| `functions/_lib/` | IMAP/SMTP, database access, sync, cache, filters, crypto |
+| `server/` | runtime-agnostic API dispatcher, route table and Workers/Node/SQLite/S3 adapters |
+| `server/entries/` | Workers and Node entrypoints (Pages needs none) |
+| `deploy/docker/` | Dockerfile, compose file and environment example |
 | `shared/` | types, schemas, presets and paging helpers shared by both sides |
-| `worker/` | notification cron worker (`index.ts` + example config) |
+| `worker/` | cron worker for the Pages target (`index.ts` + example config) |
 | `db/` | schema and migrations |
 | `scripts/` | helper scripts (VAPID keys, migrations, worker config, publishing) |
 | `tests/` | Vitest suites |

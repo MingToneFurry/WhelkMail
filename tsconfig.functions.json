@@ -16,5 +16,13 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["functions", "shared"]
+  "include": ["functions", "shared", "server"],
+  "exclude": [
+    "server/adapters/db/sqlite.ts",
+    "server/adapters/db/migrate.ts",
+    "server/adapters/sockets/node.ts",
+    "server/env.node.ts",
+    "server/entries/node.ts",
+    "server/static.ts"
+  ]
 }

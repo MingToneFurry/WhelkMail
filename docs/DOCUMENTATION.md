@@ -2,7 +2,7 @@
 
 This document covers the architecture, security model, mailbox behavior and storage.
 
-> **Deploying or using it on Cloudflare?** Start with the dedicated step-by-step guide: [CLOUDFLARE.md](CLOUDFLARE.md). It covers dashboard clicks, exact commands, bindings, secrets, OAuth setup, verification and troubleshooting.
+> **Deploying?** [DEPLOYMENT.md](DEPLOYMENT.md) compares Workers, Pages and Docker. **Using Cloudflare?** Start with [CLOUDFLARE.md](CLOUDFLARE.md). It covers dashboard clicks, exact commands, bindings, secrets, OAuth setup, verification and troubleshooting.
 
 ## 1. Scope
 
@@ -20,20 +20,28 @@ Browser (React/Vite)
         |
         | HTTPS, same-origin /api
         v
-Cloudflare Pages Functions (Workers runtime)
+API core (server/app.ts + functions/api handlers)
         |
-        +-- D1 (accounts, message metadata, relay archive, drafts)
-        +-- IMAP over cloudflare:sockets (TLS / STARTTLS)
-        +-- SMTP over cloudflare:sockets (TLS / STARTTLS)
+        +-- Cloudflare Workers (default): D1, R2, cloudflare:sockets, cron triggers
+        +-- Cloudflare Pages (legacy):   D1, R2, cloudflare:sockets, worker/ cron
+        +-- Docker / Node 24:            SQLite (node:sqlite), S3, node:net/tls, built-in cron
+        |
         +-- OAuth: Google and Microsoft (XOAUTH2), Google Drive (archive)
         +-- HTTP relay APIs (send-only accounts)
-        +-- R2 binding (optional, relay/IMAP archive)
 ```
+
+The endpoints under `functions/api` are shared by all three targets. `server/app.ts`
+provides the same authentication, origin and security-header middleware as the
+Pages `_middleware.ts`; `server/routes.ts` maps every handler for the Workers and
+Node dispatchers, while Pages keeps its native file routing. Runtime differences
+are isolated in small adapters: D1 vs `node:sqlite`, R2 vs an S3 bucket exposed
+through the same `put/get/delete` surface, and `cloudflare:sockets` vs
+`node:net`/`node:tls`.
 
 Key constraints:
 
-- Browsers cannot speak IMAP/SMTP, so all mailbox traffic goes through Pages Functions.
-- Cloudflare Workers can open **outbound** TCP sockets with `cloudflare:sockets`. They cannot accept inbound TCP connections.
+- Browsers cannot speak IMAP/SMTP, so all mailbox traffic goes through the API backend.
+- Cloudflare Workers can open **outbound** TCP sockets with `cloudflare:sockets`. They cannot accept inbound TCP connections. Node/Docker opens the same outbound connections with `node:net`/`node:tls`.
 - Port 25 is blocked by Cloudflare and is not used.
 - IMAP `IDLE` is not supported across requests. The UI refreshes on navigation, after sending, or on reload.
 
@@ -154,13 +162,15 @@ functions/                 Cloudflare Pages Functions
     storage/               Drive and R2 adapters
     relay/                 HTTP relay adapters
     microsoft/oauth.ts     Microsoft OAuth2 / XOAUTH2 token flow
-  api/                     HTTP endpoints
+  api/                     HTTP endpoints (Pages native routing; shared route table)
+server/                    Runtime-agnostic dispatcher, Workers/Node entries and adapters
+deploy/docker/             Dockerfile, compose file and environment example
 shared/                    Types, Zod schemas, provider presets, paging helpers
 src/                       React application
-db/schema.sql              D1 schema for a fresh install
+db/schema.sql              D1/SQLite schema for a fresh install
 db/migrations/             Additive upgrades for existing databases
-wrangler.toml.example      local Pages/D1 configuration template
-worker/wrangler.toml.example  cron worker template (the real file is gitignored)
+wrangler.jsonc             Shared Workers/Pages configuration (placeholder D1 id)
+worker/wrangler.toml.example  Pages cron worker template (the real file is gitignored)
 ```
 
 ## 5. Data model
@@ -418,14 +428,19 @@ npm run lint
 npx wrangler d1 create mail-client
 ```
 
-Copy the returned `database_id` into your local `wrangler.toml` (gitignored; start from `wrangler.toml.example`), or configure the `DB` binding in the Pages dashboard:
+Copy the returned `database_id` into `wrangler.jsonc` for local CLI work, or configure the `DB` binding in the Pages dashboard:
 
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "mail-client"
-database_id = "<your-database-id>"
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "mail-client",
+    "database_id": "<your-database-id>"
+  }
+]
 ```
+
+The repository tracks `wrangler.jsonc` with a zero-UUID placeholder so the Deploy to Cloudflare button and forks remain generic; keep your real id out of commits.
 
 The D1 database keeps the legacy `mail-client` name to preserve existing data; the Pages project is `whelkmail`.
 

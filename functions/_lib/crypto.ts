@@ -148,7 +148,13 @@ export async function createSession(env: Env, request?: Request): Promise<string
   const tokenHash = await sha256Hex(token)
   const now = Math.floor(Date.now() / 1000)
   const nowIso = new Date().toISOString()
-  const ip = request?.headers.get('CF-Connecting-IP')?.slice(0, 64) ?? null
+  const ip =
+    (
+      request?.headers.get('CF-Connecting-IP') ??
+      request?.headers.get('X-Forwarded-For')?.split(',')[0]
+    )
+      ?.trim()
+      .slice(0, 64) ?? null
   const userAgent = request?.headers.get('User-Agent')?.slice(0, 300) ?? null
   await env.DB.prepare(
     'INSERT INTO sessions (id, token_hash, created_at, expires_at, last_seen_at, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',

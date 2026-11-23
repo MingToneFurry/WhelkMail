@@ -20,6 +20,8 @@ export interface Env {
   VAPID_PRIVATE_KEY?: string
   VAPID_SUBJECT?: string
   CRON_SECRET?: string
+  /** Public origin used by the cron worker / Node scheduler. */
+  APP_URL?: string
   /** Set to `off` to stop the outbound check for new releases. */
   UPDATE_CHECK?: string
   /** Optional GitHub token, only used to raise the release-check rate limit. */

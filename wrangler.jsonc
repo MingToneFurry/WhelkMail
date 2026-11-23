@@ -1,0 +1,61 @@
+// Shared Wrangler configuration for the two Cloudflare targets.
+//
+//   Workers (default):  npm run deploy
+//   Pages (existing):   npm run deploy:pages  (functions/ keeps native routing)
+//
+// The `main`, `assets` and `triggers` keys are used by Workers. Pages uses the
+// `functions/` directory and the bindings below. This file is the standard
+// `wrangler.jsonc` that the "Deploy to Cloudflare" button expects in the root.
+//
+// `database_id` is intentionally the placeholder used by the public repository.
+// For a CLI deployment replace it with your own D1 id. If you publish a fork,
+// keep the placeholder in the commit: the Deploy to Cloudflare flow and the
+// Pages dashboard bind your own resources.
+//
+// Secrets are NOT stored here. Set them with:
+//   npx wrangler secret put APP_PASSWORD
+//   npx wrangler secret put TOKEN_ENC_KEY
+//   npx wrangler secret put CRON_SECRET
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "whelkmail",
+  "main": "server/entries/workers.ts",
+  "compatibility_date": "2026-11-01",
+
+  // Workers: static frontend from Vite. /api/* goes to the Worker first; every
+  // other path is served from the assets with SPA fallback. Pages ignores these
+  // keys and serves `dist` through its own build output directory.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Workers runs the notification/sync pass itself; no separate cron deployment
+  // is needed. Pages still uses the `worker/` cron.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  "vars": {
+    "RELAY_PROVIDER": "smtp2go"
+    // Optional: "APP_URL": "https://mail.example.com"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mail-client",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ]
+
+  // Optional archive on R2. Uncomment after creating the bucket.
+  // "r2_buckets": [
+  //   { "binding": "BUCKET", "bucket_name": "<your-r2-bucket>" }
+  // ]
+}

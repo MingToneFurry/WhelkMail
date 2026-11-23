@@ -1,6 +1,10 @@
-import { connect } from 'cloudflare:sockets'
 import { toBase64 } from '../crypto'
 import { ALIAS_HEADERS } from '../mail/parse'
+import {
+  mailSocketConnector,
+  type MailSocketConfig,
+  type MailSocketLike,
+} from '../mail/socket'
 import { bodyStructureHasAttachment, extractBodyStructure } from './bodystructure'
 
 /**
@@ -26,9 +30,7 @@ export const IMAP_HEADER_FIELDS = [
 
 export type ImapSecurity = 'tls' | 'starttls'
 
-export interface ImapConfig {
-  host: string
-  port: number
+export interface ImapConfig extends MailSocketConfig {
   security: ImapSecurity
 }
 
@@ -89,22 +91,12 @@ function indexOfCrlf(buffer: Uint8Array): number {
   return -1
 }
 
-/** The slice of `cloudflare:sockets` this client relies on (swappable in tests). */
-export interface ImapSocketLike {
-  opened: Promise<unknown>
-  readable: ReadableStream<Uint8Array>
-  writable: WritableStream<Uint8Array>
-  startTls(): ImapSocketLike
-  close(): void
-}
+/** The socket surface this client relies on (swappable in tests). */
+export type ImapSocketLike = MailSocketLike
 
 export type ImapConnector = (config: ImapConfig) => ImapSocketLike
 
-const defaultConnector: ImapConnector = (config) =>
-  connect(
-    { hostname: config.host, port: config.port },
-    { secureTransport: config.security === 'tls' ? 'on' : 'starttls', allowHalfOpen: false },
-  )
+const defaultConnector: ImapConnector = (config) => mailSocketConnector()(config)
 
 export class ImapConnection {
   private socket: ImapSocketLike
