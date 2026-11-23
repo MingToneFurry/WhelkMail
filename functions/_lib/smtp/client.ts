@@ -295,7 +295,9 @@ export class SmtpConnection {
     await this.expect([250], 'MAIL FROM')
     for (const recipient of recipients) {
       await this.write(`RCPT TO:<${recipient}>`)
-      await this.expect([250, 251], 'RCPT TO')
+      // 252: accepted but the recipient could not be verified, which is a
+      // success (some relays answer exactly that).
+      await this.expect([250, 251, 252], 'RCPT TO')
     }
     await this.write('DATA')
     await this.expect([354], 'DATA')

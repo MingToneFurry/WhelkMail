@@ -312,6 +312,40 @@ describe('SMTP authentication', () => {
   })
 })
 
+describe('SMTP recipient replies', () => {
+  it('accepts 252 (cannot verify the recipient)', async () => {
+    const { socket } = fakeSocket({
+      ...ehloOnly(),
+      respond: (line) => {
+        if (line.startsWith('EHLO')) {
+          return '250-mail.example\r\n250 AUTH PLAIN\r\n'
+        }
+        if (line.startsWith('MAIL FROM')) {
+          return '250 ok\r\n'
+        }
+        if (line.startsWith('RCPT TO')) {
+          return '252 cannot verify user, will accept\r\n'
+        }
+        if (line === 'DATA') {
+          return '354 go ahead\r\n'
+        }
+        if (line === '.') {
+          return '250 queued\r\n'
+        }
+        return null
+      },
+    })
+
+    const connection = await SmtpConnection.open(config, 200, connectorOf(socket))
+    await expect(
+      connection.sendRaw(encoder.encode('Subject: hi\r\n\r\nbody'), 'a@example.com', [
+        'b@example.com',
+      ]),
+    ).resolves.toBeUndefined()
+    connection.close()
+  })
+})
+
 describe('SMTP edge cases', () => {
   it('times out when a command cannot be written', async () => {
     const { socket, state } = fakeSocket({
