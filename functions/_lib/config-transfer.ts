@@ -449,19 +449,38 @@ async function snapshotConfig(env: Env): Promise<ConfigSnapshot> {
 }
 
 /**
- * Put a snapshot back after a failed import. Best effort: the caller reports the
- * original error, and this must not mask it with a second failure.
+ * Put a snapshot back after a failed import and report what did not come back.
+ *
+ * Each table is restored independently so one failure cannot stop the others, and
+ * the row counts are compared with the snapshot: a restore that silently drops
+ * rows would otherwise look successful.
  */
-async function restoreConfig(env: Env, snapshot: ConfigSnapshot): Promise<void> {
-  await env.DB.batch(CLEAR_STATEMENTS.map((sql) => env.DB.prepare(sql)))
+async function restoreConfig(env: Env, snapshot: ConfigSnapshot): Promise<string[]> {
+  const failures: string[] = []
+  try {
+    await env.DB.batch(CLEAR_STATEMENTS.map((sql) => env.DB.prepare(sql)))
+  } catch (error) {
+    failures.push(`clearing before the restore: ${error instanceof Error ? error.message : error}`)
+  }
   for (const { table, rows } of snapshot.tables) {
     try {
       await runInChunks(env, insertStatements(env, table, rows))
-    } catch {
-      // Skip a table that cannot be rebuilt rather than aborting the restore.
+      const restored = await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first<{
+        count: number
+      }>()
+      if ((restored?.count ?? 0) !== rows.length) {
+        failures.push(`${table}: ${restored?.count ?? 0} of ${rows.length} rows restored`)
+      }
+    } catch (error) {
+      failures.push(`${table}: ${error instanceof Error ? error.message : error}`)
     }
   }
-  await replaceSettings(env, snapshot.settings)
+  try {
+    await replaceSettings(env, snapshot.settings)
+  } catch (error) {
+    failures.push(`app_settings: ${error instanceof Error ? error.message : error}`)
+  }
+  return failures
 }
 
 /**
@@ -501,7 +520,24 @@ export async function applyConfigBundle(env: Env, bundle: ConfigBundle): Promise
     }
     await replaceSettings(env, settings)
   } catch (error) {
-    await restoreConfig(env, snapshot).catch(() => undefined)
+    const failures = await restoreConfig(env, snapshot).catch((restoreError) => [
+      restoreError instanceof Error ? restoreError.message : String(restoreError),
+    ])
+    if (failures.length > 0) {
+      // Never hide the original failure, and say the rollback is partial: the
+      // only remaining recovery is importing a bundle exported beforehand.
+      console.error(
+        `[config] import failed and the restore is incomplete. Re-import a bundle exported before this attempt.\n  original: ${
+          error instanceof Error ? error.message : error
+        }\n  restore: ${failures.join('; ')}`,
+      )
+    } else {
+      console.warn(
+        `[config] import failed, previous configuration restored: ${
+          error instanceof Error ? error.message : error
+        }`,
+      )
+    }
     throw error
   }
 

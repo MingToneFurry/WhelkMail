@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   applyConfigBundle,
   CONFIG_FORMAT,
@@ -27,6 +27,8 @@ class FakeDb {
   cleared = false
   /** Table whose INSERT throws once, to fail in the middle of the import. */
   failOnInsert: string | null = null
+  /** Table whose INSERT always throws, so the restore fails too. */
+  failEveryInsertInto: string | null = null
   statements = 0
 
   rows(table: string): Row[] {
@@ -78,7 +80,12 @@ class FakeDb {
     if (!/^\s*SELECT/i.test(sql)) {
       return []
     }
-    return this.rows(this.tableOf(sql))
+    const table = this.tableOf(sql)
+    if (/COUNT\(\*\)/i.test(sql)) {
+      // Used by the restore to verify that every row came back.
+      return [{ count: this.rows(table).length }]
+    }
+    return this.rows(table)
   }
 
   private execute(sql: string, params: unknown[]): number {
@@ -99,6 +106,9 @@ class FakeDb {
       return keys.length
     }
     if (/^\s*INSERT\s+INTO/i.test(sql)) {
+      if (this.failEveryInsertInto === table) {
+        throw new Error(`INSERT into ${table} failed`)
+      }
       if (this.failOnInsert === table) {
         this.failOnInsert = null
         throw new Error(`INSERT into ${table} failed`)
@@ -185,5 +195,23 @@ describe('configuration import', () => {
     expect(result.counts.labels).toBe(1)
     expect(db.rows('labels').map((row) => row.id)).toEqual(['new-label'])
     expect(db.rows('app_settings')).toContainEqual({ key: 'signature_mode', value: 'per_account' })
+  })
+})
+
+describe('configuration import with a failing restore', () => {
+  it('keeps the original error and says the restore is incomplete', async () => {
+    const db = new FakeDb()
+    // The labels insert fails during the import, and again during the restore.
+    db.failEveryInsertInto = 'labels'
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await expect(
+      applyConfigBundle(envWith(db), bundle({ labels: [{ id: 'new', name: 'New', color: 'rose' }] })),
+    ).rejects.toThrow(/INSERT into labels failed/)
+
+    // The original failure is not replaced by the restore one, and the operator
+    // is told that the rollback did not complete.
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('restore is incomplete'))
+    logged.mockRestore()
   })
 })
