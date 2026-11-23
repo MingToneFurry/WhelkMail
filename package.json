@@ -13,9 +13,6 @@
       },
       "TOKEN_ENC_KEY": {
         "description": "32 random bytes encoded in base64. Generate with `node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"`."
-      },
-      "CRON_SECRET": {
-        "description": "Random secret shared with the background scheduler. Required for notifications and automatic sync after the deploy."
       }
     }
   },

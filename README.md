@@ -115,10 +115,12 @@ npm run deploy
 ```
 
 The Deploy to Cloudflare button needs no manual D1 step: it provisions the
-database from the binding and writes its id into the new repository. It also
-asks for `APP_PASSWORD`, `TOKEN_ENC_KEY` and `CRON_SECRET` from
-`.dev.vars.example`. A custom Worker name is passed to `wrangler deploy` through
-`WRANGLER_CI_OVERRIDE_NAME`; for CLI use `WORKER_NAME=my-worker npm run deploy`.
+database from the binding and writes its id into the new repository. It asks
+only for `APP_PASSWORD` and `TOKEN_ENC_KEY`; `CRON_SECRET` and the OAuth/relay/
+VAPID values are optional and commented in `.dev.vars.example`, so the setup
+does not block on them. A custom Worker name is passed to `wrangler deploy`
+through `WRANGLER_CI_OVERRIDE_NAME`; for CLI use
+`WORKER_NAME=my-worker npm run deploy`.
 
 **Cloudflare Pages (existing installations)**
 
@@ -200,7 +202,7 @@ npx wrangler d1 create mail-client --binding DB --update-config
 npm run db:init:workers:remote
 npx wrangler secret put APP_PASSWORD
 npx wrangler secret put TOKEN_ENC_KEY
-npx wrangler secret put CRON_SECRET
+npx wrangler secret put CRON_SECRET   # optional: notifications/background sync
 npm run deploy
 ```
 
