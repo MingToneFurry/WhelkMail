@@ -166,7 +166,7 @@ The complete matrix (secrets, migrations, S3, cron, reverse proxy) is in
 
 ## Installer (beta)
 
-The [WhelkMail Installer](https://github.com/WhelkMail/installer) is a small tool that creates a ready-to-use WhelkMail deployment inside **your** Cloudflare account. It is not a hosted service and it does not touch your credentials: it takes the WhelkMail source from a GitHub release, creates the D1 database and the Pages project, stores `APP_PASSWORD` and `TOKEN_ENC_KEY`, deploys the app and verifies `GET /api/health`.
+The [WhelkMail Installer](https://github.com/WhelkMail/installer) is a small tool that creates a ready-to-use WhelkMail deployment inside **your** Cloudflare account. It provisions the **Pages** target, which stays supported for existing installations: for the default **Workers** target use the Deploy to Cloudflare button above, and for Docker follow [`deploy/docker`](deploy/docker). It is not a hosted service and it does not touch your credentials: it takes the WhelkMail source from a GitHub release, creates the D1 database and the Pages project, stores `APP_PASSWORD` and `TOKEN_ENC_KEY`, deploys the app and verifies `GET /api/health`.
 
 There are two paths:
 

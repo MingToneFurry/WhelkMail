@@ -21,7 +21,7 @@ The frontend (`npm run build`) is the same for all three.
 | --- | --- | --- |
 | `APP_PASSWORD` | yes | login password |
 | `TOKEN_ENC_KEY` | yes | 32 random bytes, base64 |
-| `CRON_SECRET` | recommended | shared by the app and its scheduler |
+| `CRON_SECRET` | Pages only | authenticates the separate `worker/` cron that calls `/api/cron/notifications`. The Workers entry runs the same work in-process and the Docker scheduler generates one when it is missing, so neither needs it |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | Drive archive + Google OAuth mail |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | optional | Microsoft OAuth mail |
 | `RELAY_PROVIDER`, `RELAY_API_KEY`, `RELAY_API_SECRET` | optional | send-only relay accounts |
@@ -39,8 +39,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
 button deploys the Worker directly, provisions the D1 database from the binding
 and asks only for the two required secrets declared in `.dev.vars.example`
-(`APP_PASSWORD`, `TOKEN_ENC_KEY`). The OAuth/relay/VAPID values and
-`CRON_SECRET` are commented out and can be added later. For a CLI deploy:
+(`APP_PASSWORD`, `TOKEN_ENC_KEY`). The OAuth/relay/VAPID values are commented out
+and can be added later. The scheduled work needs no secret here: `scheduled()`
+runs it in-process. For a CLI deploy:
 
 ```bash
 npm install
@@ -49,7 +50,6 @@ npm run db:init:workers:remote
 
 npx wrangler secret put APP_PASSWORD
 npx wrangler secret put TOKEN_ENC_KEY
-npx wrangler secret put CRON_SECRET   # optional: notifications/background sync
 
 npm run deploy
 ```

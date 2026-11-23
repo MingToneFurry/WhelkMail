@@ -22,16 +22,26 @@ guide is what the in-app notice links to when a newer release exists.
    - GitHub fork: open your fork and use **Sync fork → Update branch**, then
      check that your fork's `main` matches the upstream tag.
    - Command line: `git fetch --tags && git checkout v1.2.3`.
-2. **Deploy.** Either let Cloudflare Pages redeploy (it builds from the branch
-   you pushed) or run it yourself:
+2. **Deploy.** It depends on the target:
+   - **Workers (default):** `npm run deploy` publishes the Worker built from this
+     checkout; the Deploy to Cloudflare button updates it from a repository push.
+   - **Pages (existing installations):** let the Pages project rebuild from the
+     branch, or upload the build yourself with `npm run deploy:pages`.
+   - **Docker:** rebuild the image and recreate the container, keeping the data
+     volume:
+     ```bash
+     cd deploy/docker && docker compose up -d --build
+     ```
+   For all three, install the exact dependencies first:
    ```bash
    npm ci
-   npm run deploy
    ```
 3. **Migrate, if the release notes ask for it.**
    ```bash
-   npm run db:migrate:remote
+   npm run db:migrate:remote      # Workers or Pages: D1
    ```
+   Docker keeps its own SQLite file and migrates it when the container starts,
+   so there is nothing to run there unless the release notes say otherwise.
    Migrations are additive, so a release written against the previous schema
    keeps working while you run them; still, run them before using new features.
 4. **Reload the app.** A tab left open on the old bundle shows a "reload"
