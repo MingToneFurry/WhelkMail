@@ -37,12 +37,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ## 1. Cloudflare Workers (default)
 
 The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
-button deploys the Worker directly and binds a D1 database. For a CLI deploy:
+button deploys the Worker directly, provisions the D1 database from the binding
+and asks for the secrets declared in `.dev.vars.example`. For a CLI deploy:
 
 ```bash
 npm install
-npx wrangler d1 create mail-client
-# replace the placeholder database_id in wrangler.jsonc
+npx wrangler d1 create mail-client --binding DB --update-config
 npm run db:init:workers:remote
 
 npx wrangler secret put APP_PASSWORD
@@ -52,13 +52,16 @@ npx wrangler secret put CRON_SECRET
 npm run deploy
 ```
 
-`wrangler.jsonc` is tracked with a placeholder `database_id` so the Deploy to
-Cloudflare button and the public repository stay generic. Replace it only in
-your local/CLI deployment and keep the change out of commits. `npm run deploy`
-builds the frontend and runs `wrangler deploy`. Static assets are served by
-Workers Assets;
-`assets.run_worker_first` sends `/api/*` to the Worker, and
-`not_found_handling` keeps SPA deep links working.
+`wrangler.jsonc` intentionally has no `database_id`: the Deploy to Cloudflare
+flow provisions D1 and writes its id into the new repository, and `wrangler
+deploy` can auto-provision it for CLI use. If you create the database first, use
+`--update-config` as above and keep the id out of commits. For a custom Worker
+name, the Deploy flow sets `WRANGLER_CI_OVERRIDE_NAME`; for CLI use
+`WORKER_NAME=my-worker npm run deploy`.
+
+`npm run deploy` builds the frontend and runs `wrangler deploy`. Static assets
+are served by Workers Assets; `assets.run_worker_first` sends `/api/*` to the
+Worker, and `not_found_handling` keeps SPA deep links working.
 
 The Worker's `[triggers] crons` block runs the notification/sync pass directly,
 so the separate `worker/` deployment is **not** needed on this target.

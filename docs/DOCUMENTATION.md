@@ -169,7 +169,7 @@ shared/                    Types, Zod schemas, provider presets, paging helpers
 src/                       React application
 db/schema.sql              D1/SQLite schema for a fresh install
 db/migrations/             Additive upgrades for existing databases
-wrangler.jsonc             Shared Workers/Pages configuration (placeholder D1 id)
+wrangler.jsonc             Shared Workers/Pages configuration (D1 auto-provisioned)
 worker/wrangler.toml.example  Pages cron worker template (the real file is gitignored)
 ```
 
@@ -440,7 +440,7 @@ Copy the returned `database_id` into `wrangler.jsonc` for local CLI work, or con
 ]
 ```
 
-The repository tracks `wrangler.jsonc` with a zero-UUID placeholder so the Deploy to Cloudflare button and forks remain generic; keep your real id out of commits.
+The repository tracks `wrangler.jsonc` without a `database_id` so the Deploy to Cloudflare flow and `wrangler deploy` can provision D1; if you add a real id locally, keep it out of commits.
 
 The D1 database keeps the legacy `mail-client` name to preserve existing data; the Pages project is `whelkmail`.
 

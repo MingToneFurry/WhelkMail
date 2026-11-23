@@ -106,12 +106,19 @@ Requirements: Node.js 24+ and npm (the Docker image also uses Node 24).
 
 ```bash
 npm install
-# create a D1 database and replace the placeholder database_id in wrangler.jsonc
+# CLI: create D1 and add its id to the local wrangler.jsonc
+npx wrangler d1 create mail-client --binding DB --update-config
 npm run db:init:workers:remote
 npx wrangler secret put APP_PASSWORD
 npx wrangler secret put TOKEN_ENC_KEY
 npm run deploy
 ```
+
+The Deploy to Cloudflare button needs no manual D1 step: it provisions the
+database from the binding and writes its id into the new repository. It also
+asks for `APP_PASSWORD`, `TOKEN_ENC_KEY` and `CRON_SECRET` from
+`.dev.vars.example`. A custom Worker name is passed to `wrangler deploy` through
+`WRANGLER_CI_OVERRIDE_NAME`; for CLI use `WORKER_NAME=my-worker npm run deploy`.
 
 **Cloudflare Pages (existing installations)**
 
@@ -173,7 +180,7 @@ This project is meant to be self-hosted. Do not point your deployment at someone
 - use **Use this template** (or a fork) to create your own copy;
 - create your own D1 database and run the migrations;
 - set your own secrets in the Cloudflare dashboard;
-- `wrangler.jsonc` is tracked with placeholder values so the Deploy to Cloudflare button works. Replace `database_id` only in your local deployment and keep it out of commits. A legacy `wrangler.toml` stays gitignored.
+- `wrangler.jsonc` is tracked without a `database_id` so the Deploy to Cloudflare flow can provision D1 and write the id into your new repository. CLI users can add their own id locally and keep it out of commits. A legacy `wrangler.toml` stays gitignored.
 
 ## Deploy on Cloudflare
 
@@ -189,13 +196,18 @@ The complete guide — dashboard clicks, exact commands, bindings, secrets, OAut
 **Cloudflare Workers (default)**
 
 ```bash
-npx wrangler d1 create mail-client   # paste the returned id into wrangler.jsonc
+npx wrangler d1 create mail-client --binding DB --update-config
 npm run db:init:workers:remote
 npx wrangler secret put APP_PASSWORD
 npx wrangler secret put TOKEN_ENC_KEY
 npx wrangler secret put CRON_SECRET
 npm run deploy
 ```
+
+The Deploy to Cloudflare button skips the first command: it provisions D1 from
+the binding, writes the id into the new repository and asks for the secrets.
+Names are passed through `WRANGLER_CI_OVERRIDE_NAME`; CLI users can set
+`WORKER_NAME`.
 
 Workers Assets serve the build and `/api/*` goes to the Worker; the Worker's
 `[triggers] crons` block handles background sync, notifications, filters and the
@@ -206,7 +218,7 @@ vacation responder. No separate cron deployment is needed on this target.
 Existing projects keep their D1/R2 bindings and secrets; deploying the new
 release is enough. For a new Pages project:
 
-1. Create the database with `npx wrangler d1 create mail-client` and paste the id into `wrangler.jsonc` for local CLI work, or set the `DB` binding in the Pages dashboard. Remove any old local `wrangler.toml`.
+1. Create the database with `npx wrangler d1 create mail-client --binding DB --update-config` for local CLI work, or set the `DB` binding in the Pages dashboard. Remove any old local `wrangler.toml`.
 2. Create a Pages project from GitHub: build `npm run build`, output `dist`, `NODE_VERSION=22`.
 3. Add the D1 binding `DB` and the secrets `APP_PASSWORD`, `TOKEN_ENC_KEY`.
 4. Run `npm run db:init:remote` (existing databases: `npm run db:migrate:remote`).

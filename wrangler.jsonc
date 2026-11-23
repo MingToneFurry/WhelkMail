@@ -7,12 +7,18 @@
 // `functions/` directory and the bindings below. This file is the standard
 // `wrangler.jsonc` that the "Deploy to Cloudflare" button expects in the root.
 //
-// `database_id` is intentionally the placeholder used by the public repository.
-// For a CLI deployment replace it with your own D1 id. If you publish a fork,
-// keep the placeholder in the commit: the Deploy to Cloudflare flow and the
-// Pages dashboard bind your own resources.
+// The D1 binding intentionally has NO `database_id`. The Deploy to Cloudflare
+// flow provisions the database named below and writes its ID into your new
+// repository. `wrangler deploy` also auto-provisions it for CLI deployments.
+// If you prefer an existing database, add its `database_id` locally and keep
+// that change out of commits when you publish a fork.
 //
-// Secrets are NOT stored here. Set them with:
+// The Worker name comes from `name` here, or from the Deploy to Cloudflare
+// project/`WRANGLER_CI_OVERRIDE_NAME`. CLI users can also run:
+//   WORKER_NAME=my-worker npm run deploy
+//
+// Secrets are NOT stored here. The Deploy to Cloudflare flow reads
+// `.dev.vars.example` and asks for them; CLI users set them with:
 //   npx wrangler secret put APP_PASSWORD
 //   npx wrangler secret put TOKEN_ENC_KEY
 //   npx wrangler secret put CRON_SECRET
@@ -43,14 +49,15 @@
 
   "vars": {
     "RELAY_PROVIDER": "smtp2go"
-    // Optional: "APP_URL": "https://mail.example.com"
   },
 
+  // No database_id on purpose: the Deploy to Cloudflare flow and `wrangler
+  // deploy` provision it and write the ID back. Add an existing ID only for a
+  // personal CLI deployment.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "mail-client",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_name": "mail-client"
     }
   ]
 

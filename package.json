@@ -6,6 +6,19 @@
   "private": true,
   "version": "1.4.0",
   "type": "module",
+  "cloudflare": {
+    "bindings": {
+      "APP_PASSWORD": {
+        "description": "Password for the app login. Use a long random value."
+      },
+      "TOKEN_ENC_KEY": {
+        "description": "32 random bytes encoded in base64. Generate with `node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"`."
+      },
+      "CRON_SECRET": {
+        "description": "Random secret shared with the background scheduler. Required for notifications and automatic sync after the deploy."
+      }
+    }
+  },
   "scripts": {
     "dev": "vite",
     "dev:api": "wrangler pages dev --proxy 5173 --port 8788",
@@ -31,7 +44,7 @@
     "db:workers:remote": "wrangler d1 execute mail-client --remote --file=./db/schema.sql",
     "db:init:workers:remote": "npm run db:workers:remote && node scripts/migrate.mjs remote --mark-applied",
     "db:migrate:workers:remote": "node scripts/migrate.mjs remote",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && node scripts/deploy.mjs",
     "deploy:pages": "npm run build && wrangler pages deploy dist",
     "cron:deploy": "node scripts/ensure-worker-config.mjs && wrangler deploy -c worker/wrangler.toml",
     "vapid": "node scripts/generate-vapid.mjs",

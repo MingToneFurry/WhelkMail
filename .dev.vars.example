@@ -1,0 +1,22 @@
+# Required. The Deploy to Cloudflare flow presents these as inputs.
+APP_PASSWORD=
+# 32 random bytes, base64:
+# node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+TOKEN_ENC_KEY=
+# Shared with the background scheduler (notifications and automatic sync).
+CRON_SECRET=
+
+# Optional OAuth, relay and push values.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_MAIL_CLIENT_ID=
+GOOGLE_MAIL_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT=common
+RELAY_PROVIDER=smtp2go
+RELAY_API_KEY=
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+UPDATE_CHECK=
