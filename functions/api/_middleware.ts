@@ -2,6 +2,7 @@ import { readCookie, verifySession } from '../_lib/crypto'
 import type { Env } from '../_lib/env'
 import { fail, HttpError } from '../_lib/http'
 import { registerWorkersSockets } from '../../server/adapters/sockets/workers'
+import { passwordGuard } from '../_lib/password-guard'
 
 // Pages keeps its native file routing, so this middleware is the place where
 // the Cloudflare socket implementation is installed for the IMAP/SMTP clients.
@@ -41,6 +42,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   try {
     const request = context.request
     const url = new URL(request.url)
+
+    // Pages has no startup hook either: the policy is applied per request, as on
+    // Workers.
+    const blocked = passwordGuard(context.env, url.pathname)
+    if (blocked) {
+      return withSecurityHeaders(blocked)
+    }
 
     if (!PUBLIC_PATHS.has(url.pathname)) {
       const session = readCookie(request, 'mc_session')

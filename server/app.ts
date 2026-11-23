@@ -1,6 +1,7 @@
 import { readCookie, verifySession } from '../functions/_lib/crypto'
 import type { Env } from '../functions/_lib/env'
 import { fail, HttpError } from '../functions/_lib/http'
+import { passwordGuard } from '../functions/_lib/password-guard'
 import { allowedMethods, handlerFor, matchRoute } from './router'
 import type { ApiContext, AppRuntime, ApiHandler } from './types'
 
@@ -47,6 +48,13 @@ export async function handleRequest(
 ): Promise<Response> {
   try {
     const url = new URL(request.url)
+
+    // An insecure APP_PASSWORD must not serve the application at all: the Node
+    // entry refuses to start, this is the same policy for Workers.
+    const blocked = passwordGuard(env, url.pathname)
+    if (blocked) {
+      return withSecurityHeaders(blocked)
+    }
 
     if (!PUBLIC_PATHS.has(url.pathname)) {
       const session = readCookie(request, 'mc_session')

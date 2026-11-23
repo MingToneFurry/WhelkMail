@@ -79,6 +79,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 ## Security
 
 - Single deployment password plus optional **TOTP two-factor authentication** (RFC 6238) from Settings → Security, disabled by default and compatible with any authenticator app. Recovery codes are shown once and stored hashed.
+- The deployment password must be at least 10 characters and must not be an example value (`change-me`, `password`, …): the Docker container refuses to start, and a Worker or Pages deployment answers `503` on everything except `/api/health` until it is fixed.
 - Random server-side sessions stored as SHA-256 hashes in D1, 7-day TTL, real revocation on logout.
 - Login and 2FA rate limiting per IP.
 - AES-256-GCM encryption for IMAP/SMTP passwords, OAuth refresh tokens and relay keys; HKDF-derived keys for session and challenge signatures.
@@ -116,9 +117,9 @@ npm run deploy
 
 The Deploy to Cloudflare button needs no manual D1 step: it provisions the
 database from the binding and writes its id into the new repository. It asks
-only for `APP_PASSWORD` and `TOKEN_ENC_KEY`; `CRON_SECRET` and the OAuth/relay/
-VAPID values are optional and commented in `.dev.vars.example`, so the setup
-does not block on them. A custom Worker name is passed to `wrangler deploy`
+only for `APP_PASSWORD` and `TOKEN_ENC_KEY`; the OAuth/relay/VAPID values are
+optional and commented in `.dev.vars.example`, so the setup does not block on
+them. `CRON_SECRET` is not needed here at all: the scheduled work runs in-process. A custom Worker name is passed to `wrangler deploy`
 through `WRANGLER_CI_OVERRIDE_NAME`; for CLI use
 `WORKER_NAME=my-worker npm run deploy`.
 
@@ -202,7 +203,6 @@ npx wrangler d1 create mail-client --binding DB --update-config
 npm run db:init:workers:remote
 npx wrangler secret put APP_PASSWORD
 npx wrangler secret put TOKEN_ENC_KEY
-npx wrangler secret put CRON_SECRET   # optional: notifications/background sync
 npm run deploy
 ```
 
@@ -279,7 +279,7 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 ## Limitations
 
 - No IMAP IDLE: folder lists are served from the D1 mirror and a background sync refreshes new mail and flags. While a sync is in progress, the client polls the lightweight sync status with backoff and refreshes the list when new UIDs, backfill progress or the folder state change, including a final refresh when the sync finishes. Sync can also be started manually from Settings; accounts with automatic sync enabled are refreshed by the cron worker at their own interval (Settings → account → **Check for mail**, 5 minutes by default), while notifications, filters and cleanup run every minute.
-- Web Push requires VAPID keys and a scheduler: the Worker cron trigger on Workers, the separate `worker/` deployment on Pages, or the built-in Node scheduler on Docker. All share `CRON_SECRET`.
+- Web Push requires VAPID keys and a scheduler: the Worker cron trigger on Workers, the separate `worker/` deployment on Pages, or the built-in Node scheduler on Docker. `CRON_SECRET` is needed only by the Pages one, which calls `POST /api/cron/notifications` from outside: the Workers entry runs the same work in-process, and Docker generates a local secret when the variable is missing.
 - HTML bodies are rendered in a sandboxed frame. Remote images are blocked by default and can be enabled per message. Links open in a new tab; scripts and forms are disabled.
 - The first open of an account bootstraps the newest messages from the provider; afterwards the folder list comes from D1. Sync uses UIDNEXT and bounded backfill windows instead of scanning every UID on each run. Search runs against the D1 mirror across Inbox, Sent, Drafts and Spam, with an optional per-folder scope, and also matches contacts. Matching is a case-insensitive substring test (`LIKE`), not a full-text index: no stemming and no fuzzy matching. IMAP bodies are indexed progressively (a few per sync chunk, plus every message you open), so a search matches body text only for messages that have been indexed so far; the rest still match sender, recipients and subject.
 - Lists and search results are paginated with a keyset cursor (`Load more messages` at the bottom of the list) instead of one fixed 100-message cap.
