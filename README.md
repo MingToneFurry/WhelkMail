@@ -9,15 +9,15 @@
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
 
-WhelkMail is a self-hosted webmail client for the IMAP and SMTP accounts you already own. One repository deploys to **Cloudflare Workers** (default), **Cloudflare Pages** (for existing installations) or **Docker on any VPS**, so there is no mail server to operate and no infrastructure to babysit.
+WhelkMail is a self-hosted webmail client for the IMAP and SMTP accounts you already own. One repository deploys to **Cloudflare Workers** (default), **Cloudflare Pages** or **Docker on any VPS**, so there is no mail server to operate and no infrastructure to babysit.
 
 Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a familiar, Gmail-style interface on top of the mailboxes you already use. Messages, sent copies, drafts and attachments stay on your provider; only a short-lived D1 cache and the strictly opt-in long-term archive copy them.
 
 > **WhelkMail is not a mail server.** It talks IMAP and SMTP to the providers you already trust.
 
-**Try it:** [demo.whelkmail.eu](https://demo.whelkmail.eu) is a live public demo of the app. **Install it:** the [WhelkMail Installer](https://github.com/WhelkMail/installer) (beta) provisions and deploys a WhelkMail instance inside your own Cloudflare account, from the browser or the terminal.
+**Try it:** [demo.whelkmail.eu](https://demo.whelkmail.eu) is a live public demo of the app. **Install it:** follow the deployment instructions below to deploy WhelkMail to your own Cloudflare account or VPS.
 
-[Quick start](#quick-start) · [Installer](#installer-beta) · [Deploy on Cloudflare](#deploy-on-cloudflare) Â· [Deploy on Docker](#deploy-on-docker) · [Security](#security) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Deploy on Cloudflare](#deploy-on-cloudflare) · [Deploy on Docker](#deploy-on-docker) · [Security](#security) · [Documentation](#documentation)
 
 ## Screenshots
 
@@ -34,7 +34,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 ## Why WhelkMail
 
 - **One inbox, many accounts.** Gmail, Outlook, iCloud, Yahoo and custom domains side by side, with colored account labels and a shared address book.
-- **Cloudflare-first, not Cloudflare-only.** Workers with D1, R2 and `cloudflare:sockets` by default; the same code runs on Pages or in a single Docker container with SQLite and any S3-compatible bucket.
+- **Cloudflare-first, not Cloudflare-only.** Workers with D1, R2 and `cloudflare:sockets` by default; the same code runs on  or in a single Docker container with SQLite and any S3-compatible bucket.
 - **Your data stays put.** By default the client reads from the provider. A short-lived D1 cache keeps recently listed or opened bodies for fast opens; the long-term archive on R2 or Google Drive remains strictly opt-in.
 - **Privacy by default.** HTML email is rendered in a sandboxed frame, remote images and tracking pixels stay blocked unless you enable them for a message, and credentials are encrypted at rest.
 - **Actually yours.** Self-hosted, MIT licensed, no telemetry, no vendor account required beyond your Cloudflare project.
@@ -79,7 +79,7 @@ Connect Gmail, Outlook, iCloud, Fastmail, Yahoo or a custom domain and get a fam
 ## Security
 
 - Single deployment password plus optional **TOTP two-factor authentication** (RFC 6238) from Settings → Security, disabled by default and compatible with any authenticator app. Recovery codes are shown once and stored hashed.
-- The deployment password must be at least 10 characters and must not be an example value (`change-me`, `password`, …): the Docker container refuses to start, and a Worker or Pages deployment answers `503` on everything except `/api/health` until it is fixed.
+- The deployment password must be at least 10 characters and must not be an example value (`change-me`, `password`, …): the Docker container refuses to start, and a Worker or  deployment answers `503` on everything except `/api/health` until it is fixed.
 - Random server-side sessions stored as SHA-256 hashes in D1, 7-day TTL, real revocation on logout.
 - Login and 2FA rate limiting per IP.
 - AES-256-GCM encryption for IMAP/SMTP passwords, OAuth refresh tokens and relay keys; HKDF-derived keys for session and challenge signatures.
@@ -123,7 +123,7 @@ them. `CRON_SECRET` is not needed here at all: the scheduled work runs in-proces
 through `WRANGLER_CI_OVERRIDE_NAME`; for CLI use
 `WORKER_NAME=my-worker npm run deploy`.
 
-**Cloudflare Pages (existing installations)**
+**Cloudflare Pages**
 
 ```bash
 npm install
@@ -165,17 +165,6 @@ npm run dev:pages      # Pages Functions on http://localhost:8788
 The complete matrix (secrets, migrations, S3, cron, reverse proxy) is in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-## Installer (beta)
-
-The [WhelkMail Installer](https://github.com/WhelkMail/installer) is a small tool that creates a ready-to-use WhelkMail deployment inside **your** Cloudflare account. It provisions the **Pages** target, which stays supported for existing installations: for the default **Workers** target use the Deploy to Cloudflare button above, and for Docker follow [`deploy/docker`](deploy/docker). It is not a hosted service and it does not touch your credentials: it takes the WhelkMail source from a GitHub release, creates the D1 database and the Pages project, stores `APP_PASSWORD` and `TOKEN_ENC_KEY`, deploys the app and verifies `GET /api/health`.
-
-There are two paths:
-
-- **Browser (recommended):** copy the [installer template](https://github.com/WhelkMail/installer), add the four required secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `APP_PASSWORD`, `TOKEN_ENC_KEY`) to your copy and run the **Install WhelkMail** workflow from the Actions tab. Nothing is installed locally.
-- **Terminal:** with Node.js 22+ run `npx github:WhelkMail/installer` (or `npx whelkmail-installer` once published) and follow the prompts. Useful flags: `--dry-run`, `--r2`, `--cron`, `--push`, `--ref <tag>`, `--project-name <name>`.
-
-The installer is **beta**: it provisions a working deployment end to end, but review the run log and the [installer README](https://github.com/WhelkMail/installer#readme) before relying on it for production. Manual deployment remains the fully documented path in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md). Re-running the installer is safe: resources and the database are reused, secrets are overwritten and migrations are idempotent.
-
 ## Using this repository
 
 This project is meant to be self-hosted. Do not point your deployment at someone else's database or secrets:
@@ -189,10 +178,7 @@ This project is meant to be self-hosted. Do not point your deployment at someone
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/WhelkMail/WhelkMail)
 
-The button deploys the Worker from this repository and asks you to bind a D1
-database and add the required secrets. For a fully provisioned Cloudflare
-install (D1, secrets, Pages) use the [WhelkMail Installer](#installer-beta)
-instead.
+The button deploys the Worker from this repository and asks you to bind a D1 database and add the required secrets. For Cloudflare Pages, follow the manual deployment instructions in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
 
 The complete guide — dashboard clicks, exact commands, bindings, secrets, OAuth apps and troubleshooting — is in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
 
@@ -215,7 +201,7 @@ Workers Assets serve the build and `/api/*` goes to the Worker; the Worker's
 `[triggers] crons` block handles background sync, notifications, filters and the
 vacation responder. No separate cron deployment is needed on this target.
 
-**Cloudflare Pages (existing installations)**
+**Cloudflare Pages**
 
 Existing projects keep their D1/R2 bindings and secrets; deploying the new
 release is enough. For a new Pages project:
@@ -269,7 +255,6 @@ Relay credentials can also be entered per account in the UI and are encrypted at
 ## Documentation
 
 - [Live demo](https://demo.whelkmail.eu) — static, backend-free preview with mocked API calls and fake data
-- [WhelkMail Installer](https://github.com/WhelkMail/installer) — beta one-command provisioning and deployment on Cloudflare
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Workers, Pages and Docker, side by side
 - [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md) — complete Cloudflare deployment and usage guide
 - [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) — architecture, security, mailbox behavior and limitations
