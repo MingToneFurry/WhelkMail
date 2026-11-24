@@ -25,7 +25,7 @@ guide is what the in-app notice links to when a newer release exists.
 2. **Deploy.** It depends on the target:
    - **Workers (default):** `npm run deploy` publishes the Worker built from this
      checkout; the Deploy to Cloudflare button updates it from a repository push.
-   - **Pages (existing installations):** let the Pages project rebuild from the
+   - **Pages:** let the Pages project rebuild from the
      branch, or upload the build yourself with `npm run deploy:pages`.
    - **Docker:** rebuild the image and recreate the container, keeping the data
      volume:
