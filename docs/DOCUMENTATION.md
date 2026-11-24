@@ -23,7 +23,7 @@ Browser (React/Vite)
 API core (server/app.ts + functions/api handlers)
         |
         +-- Cloudflare Workers (default): D1, R2, cloudflare:sockets, cron triggers
-        +-- Cloudflare Pages (legacy):   D1, R2, cloudflare:sockets, worker/ cron
+        +-- Cloudflare Pages:   D1, R2, cloudflare:sockets, worker/ cron
         +-- Docker / Node 24:            SQLite (node:sqlite), S3, node:net/tls, built-in cron
         |
         +-- OAuth: Google and Microsoft (XOAUTH2), Google Drive (archive)
