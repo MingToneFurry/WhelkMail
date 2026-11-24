@@ -80,7 +80,7 @@ R2 is optional: uncomment the `r2_buckets` block in `wrangler.jsonc`
 after creating the bucket. Without it, accounts can still use Google Drive, an
 IMAP mailbox, or the provider itself for sent copies.
 
-## 2. Cloudflare Pages (existing installations)
+## 2. Cloudflare Pages
 
 Pages deployments keep using native file routing under `functions/api`; the
 only runtime change is that `functions/api/_middleware.ts` registers the
