@@ -661,6 +661,7 @@ export const zhCN: Record<string, string> = {
   'errors.message_invalid': "邮件数据无效",
   'errors.from_address_not_allowed': "此账户无法使用该地址发信",
   'errors.privacy_sender_required': "请选择获准的域名别名及发信中继",
+  'errors.privacy_visible_recipient': "收件人或抄送中包含你的私人邮箱。请移除该地址，或改用密送给自己留一份副本。",
   'errors.relay_any_address_relay_only': "仅中继账户支持使用本域名下的任意地址发信",
   'errors.message_not_found': "找不到邮件",
   'errors.message_send_failed': "邮件发送失败",

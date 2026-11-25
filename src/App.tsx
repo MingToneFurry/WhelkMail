@@ -36,8 +36,8 @@ import { syncSignature } from './lib/sync-signature'
 import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
 import { privacyAccountAllowed } from '../shared/privacy-sender'
 import { mergePage } from '../shared/paging'
-import { pickReplySender, privateReplyAlias, privateSenderAccount } from './lib/sender'
-import { displayAddress, isValidEmail, nameFromEmail } from './lib/utils'
+import { pickReplySender, privateReplyAlias, privateSenderAccount, replyParticipants } from './lib/sender'
+import { isValidEmail, nameFromEmail } from './lib/utils'
 import { Compose } from './components/Compose'
 import { Contacts } from './components/Contacts'
 import { Login } from './components/Login'
@@ -1137,48 +1137,20 @@ export default function App() {
     const sendingAccount = accounts.find((item) => item.id === sendingAccountId)
     const privateAddresses = privacyDomain
       ? accounts.filter(item => item.kind === 'imap').flatMap(item => [item.email, item.username])
-      : []
-    const ownAddresses = new Set(
-      [message.accountEmail, sendingAccount?.email ?? '', fromEmail ?? '', ...privateAddresses]
-        .filter(Boolean)
-        .map((email) => email.toLowerCase()),
+      : undefined
+    const { to, cc, quotedSender } = replyParticipants(
+      message, all, [message.accountEmail, sendingAccount?.email ?? '', fromEmail ?? ''], privateAddresses,
     )
-    const normalize = (values: string[]): string[] => {
-      const seen = new Set<string>()
-      const result: string[] = []
-      for (const value of values) {
-        const email = value.trim()
-        const key = email.toLowerCase()
-        if (!email || ownAddresses.has(key) || seen.has(key)) {
-          continue
-        }
-        seen.add(key)
-        result.push(email)
-      }
-      return result
-    }
-    const baseTargets =
-      message.folder === 'sent'
-        ? message.to.map((item) => item.email)
-        : [message.from.email]
-    const to = normalize(
-      all ? [...baseTargets, ...message.to.map((item) => item.email)] : baseTargets,
-    )
-    const cc = all
-      ? normalize(message.cc.map((item) => item.email)).filter(
-          (email) => !to.some((item) => item.toLowerCase() === email.toLowerCase()),
-        )
-      : []
     const subject = /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`
     const quoted = message.text
       .split(/\r?\n/)
       .map((line) => `> ${line}`)
       .join('\n')
-    const attribution = t('compose.quotedReply', {
+    const attribution = quotedSender && t('compose.quotedReply', {
       date: new Date(message.date).toLocaleString(locale),
-      sender: displayAddress(message.from),
+      sender: quotedSender,
     })
-    const text = `\n\n${attribution}\n${quoted}`
+    const text = attribution ? `\n\n${attribution}\n${quoted}` : `\n\n${quoted}`
     // Gmail quietly keeps people you reply to in Other contacts. Doing it when
     // the reply opens means an interrupted reply still remembers the address.
     if (contactAutoAdd) {

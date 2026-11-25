@@ -1,5 +1,6 @@
 import { canSendFrom, domainOf } from '../../../shared/from-address'
 import { privacyAccountAllowed } from '../../../shared/privacy-sender'
+import { mailboxIdentity } from '../../../shared/private-recipient'
 import { sendSchema } from '../../../shared/schemas'
 import type { AttachmentMeta, Mailbox, WarningMessage } from '../../../shared/types'
 import { addAutoContacts } from '../../_lib/contacts'
@@ -140,6 +141,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       `${fromEmail} (account ${account.email})`,
       'from_address_not_allowed',
     )
+  }
+
+  if (privacyDomain) {
+    // An explicitly entered recipient, an old client or a reopened draft may
+    // still contain the private mailbox, even when Reply All filtered it.
+    const visible = new Set([...input.to, ...input.cc].map(mailboxIdentity))
+    const mailboxes = await context.env.DB.prepare(
+      "SELECT email, username FROM accounts WHERE kind = 'imap'",
+    ).all<{ email: string; username: string | null }>()
+    const exposed = mailboxes.results.some(({ email, username }) =>
+      [email, username].some(address => address && domainOf(address) !== privacyDomain && visible.has(mailboxIdentity(address))),
+    )
+    if (exposed) {
+      return fail('Remove the private mailbox from To and Cc, or move it to Bcc', 400, undefined, 'privacy_visible_recipient')
+    }
   }
 
   const estimatedBytes = input.attachments.reduce(

@@ -1,5 +1,40 @@
 import { canSendFrom, domainOf, SENDABLE_ADDRESS, type FromAccount } from '../../shared/from-address'
+import { mailboxIdentity } from '../../shared/private-recipient'
 import type { MessageDetail } from '../../shared/types'
+import { displayAddress } from './utils'
+
+/** Build the visible To, Cc and quote attribution for a reply. */
+export function replyParticipants(
+  message: Pick<MessageDetail, 'folder' | 'from' | 'to' | 'cc'>,
+  all: boolean,
+  ownAddresses: string[],
+  privateAddresses?: string[],
+) {
+  const seen = new Set(ownAddresses.map(address => address.trim().toLowerCase()))
+  const privateMailboxes = privateAddresses && new Set(privateAddresses.map(mailboxIdentity))
+  const visible = (addresses: string[]): string[] => {
+    const result: string[] = []
+    for (const value of addresses) {
+      const email = value.trim()
+      const key = email.toLowerCase()
+      if (!email || seen.has(key) || privateMailboxes?.has(mailboxIdentity(email))) continue
+      seen.add(key)
+      result.push(email)
+    }
+    return result
+  }
+  const originalTo = message.to.map(item => item.email)
+  const targets = message.folder === 'sent' ? originalTo : [message.from.email]
+  const to = visible(all ? [...targets, ...originalTo] : targets)
+  const cc = all ? visible(message.cc.map(item => item.email)) : []
+  let quotedSender = displayAddress(message.from)
+  if (privateMailboxes) {
+    // A sender's display name can itself contain the private delivery address.
+    const email = message.from.email.trim()
+    quotedSender = SENDABLE_ADDRESS.test(email) && !privateMailboxes.has(mailboxIdentity(email)) ? email : ''
+  }
+  return { to, cc, quotedSender }
+}
 
 /** Strict mode only suggests addresses from the verified forwarding path.
  * To and Cc are authored by the sender and cannot prove which alias received the mail. */

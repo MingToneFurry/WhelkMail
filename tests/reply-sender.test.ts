@@ -1,8 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import { pickReplyAccount } from '../shared/from-address'
-import { pickReplySender, privateReplyAlias, privateSenderAccount } from '../src/lib/sender'
+import { pickReplySender, privateReplyAlias, privateSenderAccount, replyParticipants } from '../src/lib/sender'
 
 const ids = ['provider', 'domain-relay', 'other']
+
+describe('reply participants', () => {
+  const message = {
+    folder: 'inbox' as const,
+    from: { name: 'owner@gmail.com', email: 'sender@example.org' },
+    to: [{ name: null, email: 'o.wn.er+list@GoogleMail.com' }, { name: null, email: 'member+team@gmail.com' }],
+    cc: [{ name: null, email: 'OWNER+copy@gmail.com' }, { name: null, email: 'Member+other@gmail.com' }],
+  }
+
+  it('omits equivalent private addresses from To and Cc, and omits the original display name from the quote', () => {
+    expect(replyParticipants(message, true, [], ['owner@gmail.com'])).toEqual({
+      to: ['sender@example.org', 'member+team@gmail.com'], cc: ['Member+other@gmail.com'], quotedSender: 'sender@example.org',
+    })
+    expect(replyParticipants({ ...message, from: message.to[0] }, false, [], ['owner@gmail.com'])).toEqual({
+      to: [], cc: [], quotedSender: '',
+    })
+  })
+
+  it('preserves standard reply-all recipients and display names outside privacy mode', () => {
+    expect(replyParticipants(message, true, [])).toEqual({
+      to: ['sender@example.org', 'o.wn.er+list@GoogleMail.com', 'member+team@gmail.com'],
+      cc: ['OWNER+copy@gmail.com', 'Member+other@gmail.com'],
+      quotedSender: 'owner@gmail.com <sender@example.org>',
+    })
+  })
+})
 
 describe('private reply identity', () => {
   const domain = 'example.org'

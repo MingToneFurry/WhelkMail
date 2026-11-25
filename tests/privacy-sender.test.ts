@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { privacyAccountAllowed } from '../shared/privacy-sender'
+import { mailboxIdentity } from '../shared/private-recipient'
 import { onRequestPost } from '../functions/api/messages/send'
 import { sendWithAccount } from '../functions/_lib/mail/smtp'
 import { processAutoReply } from '../functions/_lib/auto-reply'
@@ -13,6 +14,11 @@ const relay = { kind: 'relay', email: 'hub@aliases.example', relayProvider: 'res
 const smtpRelay = { ...relay, relayProvider: 'custom', smtpSecurity: 'tls', smtpHost: 'mail.smtp2go.com' }
 
 describe('protected sender domain', () => {
+  it('recognizes equivalent consumer Gmail identities without conflating other providers', () => {
+    expect(mailboxIdentity('Own.Er+tag@GoogleMail.com')).toBe('owner@gmail.com')
+    expect(mailboxIdentity('Own.Er+tag@Company.example')).toBe('own.er+tag@company.example')
+  })
+
   it('allows a relay for the exact domain', () => {
     expect(privacyAccountAllowed(domain, relay)).toBe(true)
     expect(privacyAccountAllowed(domain, { ...relay, email: 'hub@sub.aliases.example' })).toBe(false)
@@ -55,7 +61,7 @@ describe('protected sender domain', () => {
     await expect(sendWithAccount(env, mailbox, new Uint8Array(), ['alice@example.com'])).rejects.toThrow('domain sending relay')
   })
 
-  it('delivers via the selected domain alias and keeps the original display name out of the submission and sent copy', async () => {
+  it('blocks a private To or Cc on send, permits a private Bcc, and omits the original display name', async () => {
     const db = openSqlite(':memory:')
     const transport = vi.fn(async (_url: string, _init: RequestInit) => Response.json({ id: 'accepted' }))
     vi.stubGlobal('fetch', transport)
@@ -63,16 +69,27 @@ describe('protected sender domain', () => {
       migrateSqlite(db, process.cwd())
       db.exec(`INSERT INTO accounts (id,email,display_name,kind,storage_driver,relay_provider,relay_any_address,created_at)
                VALUES ('relay','hub@aliases.example','owner@gmail.com','relay','r2','resend',1,'2026-01-01')`)
-      const request = new Request('https://web.example/api/messages/send', {
+      db.exec(`INSERT INTO accounts (id,email,username,display_name,kind,created_at)
+               VALUES ('inbox','own.er@gmail.com','login@example.net','Personal','imap','2026-01-01')`)
+      const request = (recipients: Record<string, string[]>, draftId?: string) => new Request('https://web.example/api/messages/send', {
         method: 'POST',
-        body: JSON.stringify({ accountId: 'relay', fromEmail: 'bank@aliases.example', to: ['a@example.com'], bcc: ['b@example.com'] }),
+        body: JSON.stringify({ accountId: 'relay', fromEmail: 'bank@aliases.example', to: ['a@example.com'], draftId, ...recipients }),
       })
       const env = { DB: db, PRIVACY_SENDER_DOMAIN: domain, RELAY_API_KEY: 'mock', BUCKET: { put: vi.fn() } }
-      const response = await onRequestPost({ request, env } as unknown as Parameters<typeof onRequestPost>[0])
+      const submit = (request: Request) => onRequestPost({ request, env } as unknown as Parameters<typeof onRequestPost>[0])
+      for (const visible of [{ to: ['owner+test@googlemail.com'] }, { cc: ['o.w.n.e.r@gmail.com'] }, { cc: ['LOGIN@example.net'] }]) {
+        const blocked = await submit(request(visible as Record<string, string[]>, 'existing-draft'))
+        expect(blocked.status).toBe(400)
+        expect((await blocked.json()).code).toBe('privacy_visible_recipient')
+      }
+      expect(transport).not.toHaveBeenCalled()
+      expect(env.BUCKET.put).not.toHaveBeenCalled()
+      const response = await submit(request({ bcc: ['owner+copy@googlemail.com'] }))
       expect(response.status).toBe(201)
       expect(transport).toHaveBeenCalledTimes(1)
       const payload = JSON.parse(String(transport.mock.calls[0][1].body))
-      expect(payload).toMatchObject({ from: 'bank@aliases.example', to: ['a@example.com'], bcc: ['b@example.com'] })
+      expect(payload).toMatchObject({ from: 'bank@aliases.example', to: ['a@example.com'], bcc: ['owner+copy@googlemail.com'] })
+      expect(payload.cc).toBeUndefined()
       expect(JSON.stringify(payload)).not.toContain('owner@gmail.com')
       expect(await db.prepare('SELECT from_name, from_email FROM messages').first()).toEqual({
         from_name: '', from_email: 'bank@aliases.example',
