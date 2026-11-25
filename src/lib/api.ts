@@ -67,7 +67,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
+  // Authenticated state must also bypass responses left in the browser's HTTP cache by an old CDN rule.
+  const response = await fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store' })
   const contentType = response.headers.get('Content-Type') ?? ''
   const data = contentType.includes('application/json') ? await response.json() : null
   if (!response.ok) {

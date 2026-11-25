@@ -1,8 +1,7 @@
-const CACHE = 'whelkmail-v4'
+const CACHE = 'whelkmail-v5'
 const PREFERENCES = 'whelkmail-preferences'
 const PUSH_LANGUAGE = '/api/device/push-language'
-const SHELL = [
-  '/',
+const SHELL_FILES = [
   '/favicon.svg',
   '/whelkmail-logo.svg',
   '/manifest.webmanifest',
@@ -10,68 +9,101 @@ const SHELL = [
   '/notification-icon.png',
 ]
 
+function usable(response) {
+  return response.status === 200 && !response.redirected && response.headers.get('cf-mitigated') !== 'challenge'
+}
+
+function assetResponse(pathname, response) {
+  if (!usable(response)) return false
+  const mime = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()
+  if (/\.m?js$/.test(pathname)) return /^(text|application)\/(java|ecma)script$/.test(mime ?? '')
+  if (pathname.endsWith('.css')) return mime === 'text/css'
+  return Boolean(mime && mime !== 'text/html')
+}
+
+async function cacheShell(response) {
+  if (!usable(response) || !/^text\/html\b/i.test(response.headers.get('Content-Type') ?? '')) return false
+  const html = await response.clone().text()
+  if (!html.includes('<div id="root">')) return false
+  // The Vite dev server still needs an active worker for push testing. Its
+  // source modules require the live server and cannot form an offline shell.
+  if (html.includes('src="/@vite/client"') && html.includes('src="/src/main.tsx"')) return true
+  // Vite emits absolute, content-hashed entry URLs. Keep the old offline
+  // document until every script and stylesheet referenced by the new one exists.
+  const entries = html.matchAll(/\b(?:src|href)=["'](\/assets\/[\w.-]+\.(?:m?js|css))["']/g)
+  const assets = [...new Set(Array.from(entries, (match) => match[1]))]
+  if (!assets.some((path) => /\.m?js$/.test(path))) return false
+  const cache = await caches.open(CACHE)
+  await Promise.all(assets.map(async (path) => {
+    if (await cache.match(path)) return
+    const asset = await fetch(path, { cache: 'no-store' })
+    if (!assetResponse(path, asset)) throw new Error('Unavailable shell asset')
+    await cache.put(path, asset)
+  }))
+  await cache.put('/', response)
+  return true
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .catch(() => undefined)
-      .then(() => self.skipWaiting()),
-  )
+  event.waitUntil((async () => {
+    const response = await fetch('/', { cache: 'no-store' })
+    if (!(await cacheShell(response))) throw new Error('Unavailable application shell')
+    const cache = await caches.open(CACHE)
+    await Promise.allSettled(SHELL_FILES.map(async (path) => {
+      const asset = await fetch(path, { cache: 'no-store' })
+      if (assetResponse(path, asset)) await cache.put(path, asset)
+    }))
+    await self.skipWaiting()
+  })())
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE && key !== PREFERENCES).map((key) => caches.delete(key))),
-      )
-      .then(() => self.clients.claim()),
-  )
+  event.waitUntil((async () => {
+    const keys = await caches.keys()
+    await Promise.all(keys.filter((key) => /^whelkmail-v\d+$/.test(key) && key !== CACHE).map((key) => caches.delete(key)))
+    await self.clients.claim()
+  })())
 })
 
 self.addEventListener('fetch', (event) => {
   const request = event.request
-  if (request.method !== 'GET') {
-    return
-  }
   const url = new URL(request.url)
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
-    return
-  }
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
 
+  const cached = () => caches.match(request, { cacheName: CACHE }).catch(() => undefined)
   if (request.mode === 'navigate') {
-    event.respondWith(
-      // Revalidate the shell with the network: a stale index.html keeps an
-      // installed PWA on an old bundle even after a deploy.
-      fetch(request, { cache: 'no-cache' })
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put('/', copy)).catch(() => undefined)
-          return response
-        })
-        .catch(() => caches.match('/').then((cached) => cached ?? Response.error())),
-    )
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request, { cache: 'no-store' })
+        event.waitUntil(cacheShell(response.clone()).catch(() => undefined))
+        return response
+      } catch {
+        return (await caches.match('/', { cacheName: CACHE })) ?? Response.error()
+      }
+    })())
     return
   }
 
-  if (
-    url.pathname.startsWith('/assets/') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.webmanifest')
-  ) {
-    event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ??
-          fetch(request).then((response) => {
-            const copy = response.clone()
-            caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined)
-            return response
-          }),
-      ),
-    )
+  const immutable = url.pathname.startsWith('/assets/')
+  if (immutable || SHELL_FILES.includes(url.pathname)) {
+    event.respondWith((async () => {
+      if (immutable) {
+        const hit = await cached()
+        if (hit) return hit
+      }
+      try {
+        const response = immutable ? await fetch(request) : await fetch(request, { cache: 'no-store' })
+        if (assetResponse(url.pathname, response)) {
+          const copy = response.clone()
+          event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined))
+        }
+        return response
+      } catch (error) {
+        const hit = await cached()
+        if (hit) return hit
+        throw error
+      }
+    })())
   }
 })
 

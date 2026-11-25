@@ -27,6 +27,7 @@ import type {
 } from '../shared/types'
 import { useI18n } from './i18n'
 import { api, ApiError, type AccountError } from './lib/api'
+import { onPageResume } from './lib/page-resume'
 import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
 import { errorText, oauthReasonText } from './lib/errors'
@@ -48,7 +49,7 @@ import { Topbar } from './components/Topbar'
 import { UpdateNotice } from './components/UpdateNotice'
 
 type View = 'mail' | 'settings' | 'contacts'
-type AuthState = 'loading' | 'needed' | 'ok'
+type AuthState = 'loading' | 'needed' | 'ok' | { error: string }
 
 interface MailRoute {
   view: View
@@ -163,8 +164,9 @@ export default function App() {
   })
   const [initialRoute] = useState<MailRoute>(() => parseRoute())
   const [auth, setAuth] = useState<AuthState>('loading')
-  const [fatal, setFatal] = useState<string | null>(null)
+  const loadGeneration = useRef(0)
   const [accounts, setAccounts] = useState<Account[]>([])
+  const accountsMissing = accounts.length === 0
   const [labels, setLabels] = useState<Label[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [filters, setFilters] = useState<MailFilter[]>([])
@@ -269,14 +271,17 @@ export default function App() {
   const selectedLabel = labels.find((item) => item.id === selectedLabelId) ?? null
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
     setAuth('loading')
-    setFatal(null)
     try {
       const [accountsResponse, storageResponse, healthResponse] = await Promise.all([
         api.accounts(),
         api.storageOptions(),
         api.health(),
       ])
+      if (generation !== loadGeneration.current) {
+        return
+      }
       setAccounts(accountsResponse.accounts)
       setStorage(storageResponse)
       setHealth(healthResponse)
@@ -284,7 +289,11 @@ export default function App() {
       // delay the inbox, so it runs in the background.
       api
         .updateStatus()
-        .then(setUpdate)
+        .then((status) => {
+          if (generation === loadGeneration.current) {
+            setUpdate(status)
+          }
+        })
         .catch(() => undefined)
       const optional = async <T,>(promise: Promise<T>): Promise<T | null> => {
         try {
@@ -303,6 +312,9 @@ export default function App() {
           optional(api.filters()),
           optional(api.contacts()),
         ])
+      if (generation !== loadGeneration.current) {
+        return
+      }
       if (labelsResponse) {
         setLabels(labelsResponse.labels)
       }
@@ -328,17 +340,25 @@ export default function App() {
       setAuth('ok')
       void syncPushSubscription()
     } catch (error) {
+      if (generation !== loadGeneration.current) {
+        return
+      }
       if (error instanceof ApiError && error.isUnauthorized) {
         setAuth('needed')
         return
       }
-      setFatal(errorText(error, tRef.current))
+      setAuth({ error: errorText(error, tRef.current) })
     }
+  }, [])
+
+  const invalidateLoad = useCallback(() => {
+    loadGeneration.current++
   }, [])
 
   useEffect(() => {
     void load()
-  }, [load])
+    return invalidateLoad
+  }, [load, invalidateLoad])
 
   useEffect(() => {
     if (auth !== 'ok') {
@@ -355,6 +375,32 @@ export default function App() {
     )
     return () => window.clearInterval(timer)
   }, [auth])
+
+  // A phone may have opened first-time setup before a mailbox was added elsewhere.
+  useEffect(() => {
+    if (auth !== 'ok' || !accountsMissing) {
+      return
+    }
+    let latest = 0
+    const unsubscribe = onPageResume(() => {
+      const request = ++latest
+      void api.accounts()
+        .then(({ accounts: saved }) => {
+          if (request === latest && saved.length > 0) {
+            setAccounts((current) => current.length === 0 ? saved : current)
+          }
+        })
+        .catch((error: unknown) => {
+          if (request === latest && error instanceof ApiError && error.isUnauthorized) {
+            setAuth('needed')
+          }
+        })
+    })
+    return () => {
+      latest++
+      unsubscribe()
+    }
+  }, [auth, accountsMissing])
 
   // A mobile PWA can stay alive for days: when it comes back to the foreground,
   // labels and filters may have changed on another device and a sync may have
@@ -466,7 +512,7 @@ export default function App() {
   }, [selectedAccountId, folder, selectedLabelId])
 
   useEffect(() => {
-    if (auth !== 'ok') {
+    if (auth !== 'ok' || accountsMissing) {
       return
     }
     // Settings and Contacts do not need the mail list: fetching it there was pure
@@ -544,7 +590,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [auth, selectedAccountId, folder, selectedLabelId, refreshKey, view])
+  }, [auth, accountsMissing, selectedAccountId, folder, selectedLabelId, refreshKey, view])
 
   // One chain of sync chunks per stale account: `partial` means there is more to
   // fetch, so the list keeps asking until the folder reports done. The request
@@ -1212,7 +1258,10 @@ export default function App() {
     setOnboardingError(null)
     try {
       const response = await api.createAccount(input)
-      setAccounts((current) => [...current, response.account])
+      setAccounts((current) => [
+        ...current.filter((item) => item.id !== response.account.id),
+        response.account,
+      ])
       setSelectedAccountId(response.account.id)
       setSelectedLabelId(null)
       setAddingAccount(false)
@@ -1555,7 +1604,9 @@ export default function App() {
     try {
       await api.logout()
     } finally {
+      invalidateLoad()
       setAccounts([])
+      setAddingAccount(false)
       setMessages([])
       setDetail(null)
       setSelectedMessageId(null)
@@ -1717,11 +1768,11 @@ export default function App() {
     )
   }
 
-  if (fatal) {
+  if (typeof auth === 'object') {
     return (
       <div className="flex min-h-full flex-col items-center justify-center gap-3 px-4 text-center">
         <AlertCircle size={32} className="text-brand" />
-        <p className="text-sm text-slate-700">{fatal}</p>
+        <p className="text-sm text-slate-700">{auth.error}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -1737,7 +1788,7 @@ export default function App() {
     return <Login onSuccess={() => void load()} />
   }
 
-  if (accounts.length === 0 || addingAccount) {
+  if (accountsMissing || addingAccount) {
     return (
       <Onboarding
         accounts={accounts}
@@ -1745,6 +1796,7 @@ export default function App() {
         health={health}
         busy={onboardingBusy}
         error={onboardingError}
+        onEdit={() => setAddingAccount(true)}
         onCancel={
           accounts.length > 0
             ? () => {

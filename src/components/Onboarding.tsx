@@ -23,13 +23,14 @@ interface OnboardingProps {
   health: HealthStatus | null
   busy: boolean
   error: string | null
+  onEdit: () => void
   onCancel?: () => void
   onCreate: (input: AccountCreateInput) => Promise<Account | null>
 }
 
 const DEFAULT_PRESET = 'gmail'
 
-export function Onboarding({ accounts, storage, health, busy, error, onCancel, onCreate }: OnboardingProps) {
+export function Onboarding({ accounts, storage, health, busy, error, onEdit, onCancel, onCreate }: OnboardingProps) {
   const { t } = useI18n()
   const initial = findPreset(DEFAULT_PRESET) ?? MAIL_PRESETS[0]
   const [mode, setMode] = useState<'imap' | 'relay'>('imap')
@@ -223,7 +224,16 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
           ) : null}
         </div>
 
-        <form onSubmit={submit} className="space-y-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <form
+          onChange={onEdit}
+          onClick={(event) => {
+            if (event.target instanceof Element && event.target.closest('button')) {
+              onEdit()
+            }
+          }}
+          onSubmit={submit}
+          className="space-y-6 rounded-2xl border border-line bg-white p-6 shadow-sm"
+        >
           <div className="flex gap-2 rounded-xl bg-slate-100 p-1 text-sm">
             <button
               type="button"
