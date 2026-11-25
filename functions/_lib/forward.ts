@@ -1,5 +1,6 @@
 import type { AccountRow } from './db'
 import type { Env } from './env'
+import { generatedMailText } from './generated-mail'
 import { loadRaw } from './mail/load'
 import { bodyText, parseFull, toMailbox } from './mail/parse'
 import { sendWithAccount } from './mail/smtp'
@@ -65,17 +66,18 @@ export async function forwardFilteredMessage(
 
     const email = await parseFull(loaded.bytes)
     const from = toMailbox(email.from)
-    const subject = email.subject?.trim() || message.subject || '(nessun oggetto)'
+    const labels = generatedMailText(env.MAIL_LOCALE)
+    const subject = email.subject?.trim() || message.subject || labels.noSubject
     if (recipients.length === 0) {
       await logForward(env, filterId, account.id, message.id, 'failed', 'No recipients')
       return 'failed'
     }
     const originalText = bodyText(email).slice(0, 5000)
     const forwardedText = [
-      '---------- Messaggio inoltrato ----------',
-      `Da: ${from.name ? `${from.name} <${from.email}>` : from.email}`,
-      `Data: ${email.date ?? message.sent_at}`,
-      `Oggetto: ${subject}`,
+      `---------- ${labels.forwarded} ----------`,
+      `${labels.from}${from.name ? `${from.name} <${from.email}>` : from.email}`,
+      `${labels.date}${email.date ?? message.sent_at}`,
+      `${labels.subject}${subject}`,
       '',
       originalText,
     ].join('\n')

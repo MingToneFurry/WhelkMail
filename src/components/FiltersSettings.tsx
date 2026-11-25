@@ -4,6 +4,7 @@ import type { Account, FilterInput, Label, LabelColor, MailFilter } from '../../
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { logText } from '../locales/panels-extra'
 import { runFilterApplication } from '../lib/apply-filters'
 import { cn, labelStyle, parseAddresses } from '../lib/utils'
 
@@ -17,15 +18,15 @@ interface FiltersSettingsProps {
   onCreateLabel: (name: string, color: LabelColor) => Promise<Label | null>
 }
 
-function criteriaSummary(filter: MailFilter, allMail: string): string {
+function criteriaSummary(filter: MailFilter, t: (key: string) => string): string {
   const parts: string[] = []
-  if (filter.from) parts.push(`From: ${filter.from}`)
-  if (filter.to) parts.push(`To: ${filter.to}`)
-  if (filter.subject) parts.push(`Subject: ${filter.subject}`)
+  if (filter.from) parts.push(`${t('compose.from')}: ${filter.from}`)
+  if (filter.to) parts.push(`${t('compose.to')}: ${filter.to}`)
+  if (filter.subject) parts.push(`${t('compose.subject')}: ${filter.subject}`)
   if (filter.hasWords) parts.push(`+ ${filter.hasWords}`)
   if (filter.doesntHave) parts.push(`- ${filter.doesntHave}`)
-  if (filter.hasAttachment) parts.push('Attachment')
-  return parts.length > 0 ? parts.join(' · ') : allMail
+  if (filter.hasAttachment) parts.push(t('filters.hasAttachment'))
+  return parts.length > 0 ? parts.join(' · ') : t('filters.allMail')
 }
 
 export function FiltersSettings({
@@ -390,7 +391,7 @@ export function FiltersSettings({
                     </div>
                   ) : null}
                   <p className="text-[11px] text-muted">
-                    {criteriaSummary(filter, t('filters.allMail'))}
+                    {criteriaSummary(filter, t)}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {filter.labelIds.map((id) => {
@@ -415,8 +416,8 @@ export function FiltersSettings({
                   ) : null}
                   {filter.lastForwardStatus ? (
                     <p className="mt-1 text-[11px] text-muted">
-                      {t('filters.lastForward')}: {filter.lastForwardStatus}
-                      {filter.lastForwardError ? ` — ${filter.lastForwardError}` : ''}
+                      {t('filters.lastForward')}: {logText(filter.lastForwardStatus, t)}
+                      {filter.lastForwardError ? ` — ${logText(filter.lastForwardError, t)}` : ''}
                     </p>
                   ) : null}
                 </div>

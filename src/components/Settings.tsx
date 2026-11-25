@@ -142,6 +142,7 @@ function RichTextField({
 }
 
 function ConfigBadge({ ok, label }: { ok: boolean; label: string }) {
+  const { t } = useI18n()
   return (
     <span
       className={cn(
@@ -151,6 +152,7 @@ function ConfigBadge({ ok, label }: { ok: boolean; label: string }) {
     >
       {ok ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
       {label}
+      <span className="sr-only">{ok ? t('settings.serviceReady') : t('settings.serviceMissing')}</span>
     </span>
   )
 }
@@ -466,19 +468,22 @@ function AccountCard({
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted">IMAP</p>
                 <input
+                  aria-label={t('settings.connectionHost', { protocol: 'IMAP' })}
                   value={imapHost}
                   onChange={(event) => setImapHost(event.target.value)}
-                  placeholder="imap.esempio.it"
+                  placeholder="imap.example.com"
                   className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                 />
                 <div className="flex gap-2">
                   <input
+                    aria-label={t('settings.connectionPort', { protocol: 'IMAP' })}
                     value={imapPort}
                     onChange={(event) => setImapPort(event.target.value)}
                     inputMode="numeric"
                     className="w-20 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                   />
                   <select
+                    aria-label={t('settings.connectionSecurity', { protocol: 'IMAP' })}
                     value={imapSecurity}
                     onChange={(event) => setImapSecurity(event.target.value as MailSecurity)}
                     className="flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
@@ -491,19 +496,22 @@ function AccountCard({
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted">SMTP</p>
                 <input
+                  aria-label={t('settings.connectionHost', { protocol: 'SMTP' })}
                   value={smtpHost}
                   onChange={(event) => setSmtpHost(event.target.value)}
-                  placeholder="smtp.esempio.it"
+                  placeholder="smtp.example.com"
                   className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                 />
                 <div className="flex gap-2">
                   <input
+                    aria-label={t('settings.connectionPort', { protocol: 'SMTP' })}
                     value={smtpPort}
                     onChange={(event) => setSmtpPort(event.target.value)}
                     inputMode="numeric"
                     className="w-20 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                   />
                   <select
+                    aria-label={t('settings.connectionSecurity', { protocol: 'SMTP' })}
                     value={smtpSecurity}
                     onChange={(event) => setSmtpSecurity(event.target.value as MailSecurity)}
                     className="flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
@@ -734,6 +742,7 @@ function AccountCard({
             <p className="mb-2 text-xs font-medium text-muted">{t('settings.relayProvider')}</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <select
+                aria-label={t('settings.relayProvider')}
                 value={relayProvider}
                 onChange={(event) => setRelayProvider(event.target.value)}
                 className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
@@ -746,6 +755,7 @@ function AccountCard({
               </select>
               <input
                 type="password"
+                aria-label={relayMeta?.manual ? t('onboarding.relayPassword') : t('settings.relayApiKey')}
                 value={relayApiKey}
                 onChange={(event) => setRelayApiKey(event.target.value)}
                 placeholder={
@@ -758,6 +768,7 @@ function AccountCard({
               {relayMeta?.manual ? (
                 <>
                   <input
+                    aria-label={t('settings.connectionHost', { protocol: 'SMTP' })}
                     value={smtpHost}
                     onChange={(event) => setSmtpHost(event.target.value)}
                     placeholder={t('settings.smtpHost')}
@@ -765,6 +776,7 @@ function AccountCard({
                   />
                   <div className="flex gap-2">
                     <input
+                      aria-label={t('settings.connectionPort', { protocol: 'SMTP' })}
                       value={smtpPort}
                       onChange={(event) => setSmtpPort(event.target.value)}
                       inputMode="numeric"
@@ -772,6 +784,7 @@ function AccountCard({
                       className="w-20 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-brand"
                     />
                     <select
+                      aria-label={t('settings.connectionSecurity', { protocol: 'SMTP' })}
                       value={smtpSecurity}
                       onChange={(event) =>
                         setSmtpSecurity(event.target.value as MailSecurity)
@@ -809,12 +822,13 @@ function AccountCard({
                   />
                   {relayMeta.needsRegion ? (
                     <select
+                      aria-label={t('settings.relayRegion')}
                       value={relayRegion}
                       onChange={(event) => setRelayRegion(event.target.value)}
                       className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none"
                     >
-                      <option value="us">US</option>
-                      <option value="eu">EU</option>
+                      <option value="us">{t('settings.regionUS')}</option>
+                      <option value="eu">{t('settings.regionEU')}</option>
                     </select>
                   ) : null}
                 </div>
@@ -1186,6 +1200,8 @@ export function Settings({
     { id: 'system' as const, label: t('settings.tabSystem') },
   ]
 
+  const relayLabelKey = findRelayProvider(health?.relayProvider)?.labelKey
+  const relayLabel = relayLabelKey ? t(relayLabelKey) : health?.relayLabel ?? ''
   const installedVersion = health?.version ?? __APP_VERSION__
   let updateSummary: string
   if (!update) {
@@ -1537,7 +1553,7 @@ export function Settings({
               <div className="flex flex-wrap gap-2">
                 <ConfigBadge
                   ok={Boolean(health?.relayConfigured)}
-                  label={`${t('settings.relayProvider')} ${health?.relayLabel ?? ''}`.trim()}
+                  label={`${t('settings.relayProvider')} ${relayLabel}`.trim()}
                 />
                 <ConfigBadge ok={Boolean(health?.driveConfigured)} label={t('settings.googleOAuth')} />
                 <ConfigBadge

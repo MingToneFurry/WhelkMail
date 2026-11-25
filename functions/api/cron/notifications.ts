@@ -185,7 +185,7 @@ export async function runScheduledTasks(
           const title = row.from_name || row.from_email || account.display_name
           const payload = {
             title,
-            body: row.subject || '(nessun oggetto)',
+            body: row.subject || '',
             url: `/?message=${encodeURIComponent(row.id)}`,
             tag: row.id,
           }

@@ -1,5 +1,13 @@
 import { api } from './api'
 
+/** Service workers cannot read the language preference from localStorage. */
+export function syncPushLanguage(locale: string, noSubject: string): void {
+  if (!('serviceWorker' in navigator)) return
+  void navigator.serviceWorker.ready
+    .then(({ active }) => active?.postMessage({ type: 'push-language', locale, noSubject }))
+    .catch(() => undefined)
+}
+
 /**
  * Re-registers the existing Web Push subscription on every app start.
  *

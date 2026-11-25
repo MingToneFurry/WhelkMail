@@ -4,6 +4,7 @@ import type { Account, AccountPatch, DeletionLog } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { logText } from '../locales/panels-extra'
 import { cn, formatDate } from '../lib/utils'
 
 interface DeletionPanelProps {
@@ -87,13 +88,13 @@ export function DeletionPanel({ account, busy, onUpdate }: DeletionPanelProps) {
                 )}
               >
                 {log.status === 'done' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                {log.status}
+                {logText(log.status, t)}
               </span>
               <span className="text-[10px] text-muted">
                 {formatDate(log.createdAt, locale)}
               </span>
               {log.error ? (
-                <span className="w-full text-[10px] text-brand-strong">{log.error}</span>
+                <span className="w-full text-[10px] text-brand-strong">{logText(log.error, t)}</span>
               ) : null}
             </div>
           ))}

@@ -1,4 +1,10 @@
 export type AccountKind = 'imap' | 'relay'
+
+/** Localizable metadata accompanying the plain-text warning for older clients. */
+export interface WarningMessage {
+  key: string
+  vars: Record<string, string>
+}
 /**
  * `provider` keeps mail on the mail server. Relay accounts choose `drive` or
  * `r2` for their sent copies/drafts, or `imap` to append them to the mailbox of

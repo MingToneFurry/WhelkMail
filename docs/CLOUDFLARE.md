@@ -1,44 +1,54 @@
-# Deploying WhelkMail on Cloudflare
+<a id="deploying-whelkmail-on-cloudflare"></a>
 
-This is the complete, step-by-step guide to run WhelkMail on Cloudflare. You do not need a VPS, a mail server, or an external backend.
+# 在 Cloudflare 上部署 WhelkMail
 
-> **Workers is the default target.** This guide focuses on Pages, which remains fully supported for existing installations. For the Workers deployment see [DEPLOYMENT.md](DEPLOYMENT.md); the backend is the same and both use D1, R2 and `cloudflare:sockets`.
+本指南介绍如何使用 Cloudflare 运行 WhelkMail。你只需要一个 Cloudflare 账户，无须准备 VPS、邮件服务器或额外的后端服务。
 
-> **Important:** this is not a static site. Deploy it as a **Pages project with Functions**, or as a **Worker with static assets**. The `functions/` directory is the Pages API (IMAP/SMTP over `cloudflare:sockets`); the Workers entrypoint lives in `server/entries/workers.ts`. Uploading only `dist` without a backend will break every API call.
+> **新部署默认使用 Workers。** 已使用 Pages 的用户可以继续按照本指南部署。Workers 的步骤见[部署指南](DEPLOYMENT.md)。两个版本共用后端代码，都使用 D1、R2 和 `cloudflare:sockets`。
 
-## What you will create
+> 网页和后端需要一起部署。请选择**带 Functions 的 Pages 项目**或**托管静态资源的 Worker**。Pages 从 `functions/` 加载 API，通过 `cloudflare:sockets` 连接 IMAP/SMTP；Workers 的入口是 `server/entries/workers.ts`。只上传 `dist` 会导致所有 API 请求失败。
 
-| Cloudflare resource | Purpose |
+<a id="what-you-will-create"></a>
+
+## 需要创建的资源
+
+| Cloudflare 资源 | 用途 |
 |---|---|
-| Pages project | Static UI + Pages Functions (`functions/`) |
-| D1 database | Accounts, settings, IMAP sync metadata, relay archive/drafts metadata |
-| Secrets | App password, encryption key, optional OAuth and relay keys |
-| R2 bucket (optional) | Sent/draft archive for relay accounts; optional IMAP body/attachment archive |
-| Custom domain (optional) | HTTPS hostname for the app |
+| Pages 项目 | 托管网页和 Pages Functions（`functions/`） |
+| D1 数据库 | 存储账户、设置、IMAP 同步进度，以及中继账户的归档和草稿信息 |
+| 密钥（Secrets） | 存储网站登录密码、加密密钥以及可选的 OAuth 和中继凭据 |
+| R2 存储桶（可选） | 存储中继账户的已发送邮件、草稿，以及选择归档的 IMAP 正文和附件 |
+| 自定义域名（可选） | 为网站配置 HTTPS 访问地址 |
 
-## Before you start
+<a id="before-you-start"></a>
 
-- A Cloudflare account.
-- A GitHub repository containing this project.
-- Node.js 24 or newer and npm (the Pages/Workers build itself also runs on Node 22).
-- Wrangler authenticated:
+## 准备工作
+
+- 一个 Cloudflare 账户。
+- 包含本项目代码的 GitHub 仓库。
+- Node.js 24 或更高版本及 npm。Pages 和 Workers 的构建过程也支持 Node.js 22。
+- 运行以下命令登录 Wrangler。
   ```bash
   npx wrangler login
   ```
-- A Workers Paid plan is strongly recommended. IMAP/SMTP TLS handshakes and authentication routinely exceed the 10 ms CPU budget of the free plan.
+- 上游建议使用 Workers 付费套餐。IMAP/SMTP 的 TLS 握手和身份验证经常超过免费套餐每次调用的 10 毫秒 CPU 时间上限。
 
-## 1. Deploy from GitHub (recommended)
+<a id="1-deploy-from-github-recommended"></a>
 
-### 1.1 Create the D1 database
+## 1. 通过 GitHub 部署（推荐）
+
+<a id="11-create-the-d1-database"></a>
+
+### 1.1 创建 D1 数据库
 
 ```bash
 npx wrangler d1 create mail-client
 ```
 
-The command prints a `database_id`. Use it in one of two ways:
+命令会输出 `database_id`。配置方法取决于部署方式。
 
-- **GitHub deployment:** set the `DB` binding in the Pages dashboard; the tracked `wrangler.jsonc` only supplies local bindings.
-- **CLI/local:** replace the placeholder in `wrangler.jsonc`:
+- **通过 GitHub 部署**：在 Pages 控制台设置 `DB` 绑定。仓库中的 `wrangler.jsonc` 只提供本地开发用的绑定。
+- **通过 CLI 或在本地运行**：将 `wrangler.jsonc` 里的占位符替换为实际 ID。
 
 ```jsonc
 "d1_databases": [
@@ -50,147 +60,139 @@ The command prints a `database_id`. Use it in one of two ways:
 ]
 ```
 
-Keep the change out of commits when you publish a fork. Remove any legacy local
-`wrangler.toml`: Pages does not support custom configuration paths. The zero UUID
-in the public repository is fine for local development; remote CLI commands need
-the real D1 ID.
+发布自己的 fork 时，请将真实的数据库 ID 留在本地。Pages 不支持自定义配置文件路径，请移除本地旧的 `wrangler.toml`。公开仓库中的全零 UUID 可用于本地开发，CLI 操作远程数据库时则需要真实的 D1 ID。
 
-> The D1 database intentionally keeps the legacy name `mail-client` so existing deployments and data continue to work after the whelkmail rebrand. Only the Pages project is named `whelkmail`.
+> D1 沿用旧名称 `mail-client`，以便更名为 WhelkMail 后仍能使用原部署和数据。Pages 项目名为 `whelkmail`。
 
-Dashboard equivalent: **Storage & Databases → D1 SQL Database → Create**.
+也可以在 Cloudflare 控制台进入 **Storage & Databases → D1 SQL Database → Create** 创建数据库。
 
-### 1.2 Create the Pages project from GitHub
+<a id="12-create-the-pages-project-from-github"></a>
 
-1. Open **Workers & Pages** in the Cloudflare dashboard.
-2. **Create** → **Pages** → **Connect to Git**.
-3. Select the repository and branch.
-4. Project name: `whelkmail`.
-5. Build settings:
+### 1.2 从 GitHub 创建 Pages 项目
 
-| Setting | Value |
+1. 在 Cloudflare 控制台打开 **Workers & Pages**。
+2. 选择 **Create → Pages → Connect to Git**。
+3. 选择仓库和分支。
+4. 项目名称填写 `whelkmail`。
+5. 填写构建设置。
+
+| 设置 | 值 |
 |---|---|
-| Framework preset | None / Vite |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory | `/` |
+| 框架预设（Framework preset） | None 或 Vite |
+| 构建命令（Build command） | `npm run build` |
+| 构建输出目录（Build output directory） | `dist` |
+| 根目录（Root directory） | `/` |
 
-Add an environment variable `NODE_VERSION=22` in the Pages project settings if the default Node version is older.
+如默认 Node.js 版本较旧，请在 Pages 项目设置中添加环境变量 `NODE_VERSION=22`。Pages 会自动识别 `functions/`。
 
-`functions/` is detected automatically; no extra configuration is needed.
+<a id="13-add-bindings"></a>
 
-### 1.3 Add bindings
+### 1.3 添加资源绑定
 
-In the Pages project: **Settings → Bindings**.
+在 Pages 项目中打开 **Settings → Bindings**。
 
-Required:
+| 绑定名称 | 类型 | 目标 | 是否必需 |
+|---|---|---|---|
+| `DB` | D1 数据库 | `mail-client` | 必需 |
+| `BUCKET` | R2 存储桶 | 你创建的存储桶 | 可选 |
 
-| Binding name | Type | Target |
+请保留绑定名称及大小写，应用通过 `env.DB` 和 `env.BUCKET` 访问资源。
+
+<a id="14-add-secrets-and-variables"></a>
+
+### 1.4 添加密钥和环境变量
+
+在 Pages 项目中打开 **Settings → Variables and Secrets**，为生产环境（**Production**）添加以下两项。如果使用预览部署，也请为 **Preview** 添加相应配置。
+
+| 名称 | 类型 | 值 |
 |---|---|---|
-| `DB` | D1 database | `mail-client` |
+| `APP_PASSWORD` | 密钥 | 整个 WhelkMail 网站的登录密码 |
+| `TOKEN_ENC_KEY` | 密钥 | 将 32 个随机字节编码为 Base64 后得到的字符串 |
 
-Optional:
-
-| Binding name | Type | Target |
-|---|---|---|
-| `BUCKET` | R2 bucket | any bucket you create |
-
-Use exactly these names. The code reads `env.DB` and `env.BUCKET`.
-
-### 1.4 Add secrets and variables
-
-In the Pages project: **Settings → Variables and Secrets**. Add them to **Production** and, if you use preview deployments, to **Preview** as well.
-
-Required:
-
-| Name | Type | Value |
-|---|---|---|
-| `APP_PASSWORD` | Secret | the login password for the whole app |
-| `TOKEN_ENC_KEY` | Secret | 32 random bytes encoded in base64 |
-
-Generate the key:
+生成加密密钥：
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-CLI equivalent:
+也可以使用 CLI 设置这两个密钥：
 
 ```bash
 npx wrangler pages secret put APP_PASSWORD --project-name whelkmail
 npx wrangler pages secret put TOKEN_ENC_KEY --project-name whelkmail
 ```
 
-Optional:
+其他配置按需添加。
 
-| Name | Type | Purpose |
+| 名称 | 类型 | 用途 |
 |---|---|---|
-| `GOOGLE_MAIL_CLIENT_ID` | Secret | Google OAuth for IMAP/SMTP |
-| `GOOGLE_MAIL_CLIENT_SECRET` | Secret | Google OAuth secret |
-| `GOOGLE_CLIENT_ID` | Secret | Google Drive archive |
-| `GOOGLE_CLIENT_SECRET` | Secret | Google Drive secret |
-| `MICROSOFT_CLIENT_ID` | Secret | Microsoft OAuth |
-| `MICROSOFT_CLIENT_SECRET` | Secret | Microsoft OAuth secret |
-| `MICROSOFT_TENANT` | Variable | `common` or a tenant ID |
-| `RELAY_PROVIDER` | Variable | deployment-wide relay fallback |
-| `RELAY_API_KEY` | Secret | deployment-wide relay key fallback |
-| `RELAY_API_SECRET` | Secret | Mailjet fallback secret |
-| `MAILGUN_DOMAIN` | Variable | Mailgun fallback domain |
-| `MAILGUN_REGION` | Variable | `us` or `eu` |
-| `VAPID_PUBLIC_KEY` | Variable/Secret | Web Push public key |
-| `VAPID_PRIVATE_KEY` | Secret | Web Push private key |
-| `VAPID_SUBJECT` | Variable | `mailto:` contact for VAPID |
-| `CRON_SECRET` | Secret | shared secret for the cron worker |
+| `GOOGLE_MAIL_CLIENT_ID` | 密钥 | Gmail IMAP/SMTP 的 Google OAuth 客户端 ID |
+| `GOOGLE_MAIL_CLIENT_SECRET` | 密钥 | Gmail OAuth 客户端密钥 |
+| `GOOGLE_CLIENT_ID` | 密钥 | Google 云端硬盘归档客户端 ID |
+| `GOOGLE_CLIENT_SECRET` | 密钥 | Google 云端硬盘客户端密钥 |
+| `MICROSOFT_CLIENT_ID` | 密钥 | Microsoft OAuth 客户端 ID |
+| `MICROSOFT_CLIENT_SECRET` | 密钥 | Microsoft OAuth 客户端密钥 |
+| `MICROSOFT_TENANT` | 变量 | `common` 或租户 ID |
+| `RELAY_PROVIDER` | 变量 | 部署级的默认中继服务商 |
+| `RELAY_API_KEY` | 密钥 | 部署级的默认中继 API 密钥 |
+| `RELAY_API_SECRET` | 密钥 | Mailjet 默认 API Secret |
+| `MAILGUN_DOMAIN` | 变量 | Mailgun 默认发信域名 |
+| `MAILGUN_REGION` | 变量 | `us` 或 `eu` |
+| `VAPID_PUBLIC_KEY` | 变量或密钥 | 网页推送的 VAPID 公钥 |
+| `VAPID_PRIVATE_KEY` | 密钥 | 网页推送的 VAPID 私钥 |
+| `VAPID_SUBJECT` | 变量 | VAPID 联系人，例如 `mailto:you@example.com` |
+| `CRON_SECRET` | 密钥 | 定时任务 Worker 与 Pages 后端共享的密钥 |
 
-Relay credentials entered per account in the UI take precedence over the deployment fallbacks.
+在界面中为单个账户输入的中继凭据优先于部署默认值。更改 `TOKEN_ENC_KEY` 后，之前保存的 IMAP/SMTP 密码、OAuth 刷新令牌和中继 API 密钥会失效。轮换前请安排好重新录入和授权。
 
-Changing `TOKEN_ENC_KEY` later invalidates all stored IMAP/SMTP passwords, OAuth refresh tokens and relay API keys. Plan key rotation accordingly.
+<a id="15-apply-the-database-schema"></a>
 
-### 1.5 Apply the database schema
+### 1.5 初始化数据库结构
 
 ```bash
 npm run db:init:remote
 ```
 
-This runs:
+该命令会执行以下 SQL 文件：
 
 ```bash
 wrangler d1 execute mail-client --remote --file=./db/schema.sql
 ```
 
-Verify:
+列出数据表，确认输出中包含 `accounts` 和 `messages`：
 
 ```bash
 npx wrangler d1 execute mail-client --remote \
   --command "SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-You should see `accounts` and `messages`.
-
-If the database already existed before labels and signatures were added, apply the additive migration:
+如果数据库早于标签和签名功能，请运行增量迁移：
 
 ```bash
 npm run db:migrate:remote
 ```
 
-That runs `db/migrations/001_labels_signatures.sql` through `db/migrations/016_sync_lock.sql`, which add the schema for labels, filters, contacts, IMAP sync/archive, push, filter-based forwarding, provider deletion logs, the per-account automatic-sync flag, the security tables (sessions, login rate limiting, one-time OAuth state), the cached drafts and spam folders, the short-lived body cache, and the cross-isolate sync lock.
+`db/migrations/001_labels_signatures.sql` 至 `db/migrations/016_sync_lock.sql` 等迁移陆续加入了标签、过滤器、联系人、IMAP 同步与归档、推送、按过滤器转发、服务商邮件删除记录、每账户自动同步设置、安全表（会话、登录频率限制、一次性 OAuth 状态）、草稿和垃圾邮件文件夹缓存、短期正文缓存，以及跨实例同步锁。
 
-If earlier migrations were already applied, only the missing ones are a problem. The script records what it applied in `schema_migrations`, so a plain rerun of the same command is enough; to force a starting point:
+脚本会将已执行的迁移写入 `schema_migrations`。再次运行会从缺失的迁移继续。如需指定起点：
 
 ```bash
 node scripts/migrate.mjs remote --from=013
 ```
 
-Migration `012` also invalidates existing sessions: users must sign in again. Two-factor authentication is available in Settings → Security and is disabled by default.
+迁移 `012` 会使现有会话失效，用户需要重新登录。双重验证默认关闭，可在「设置 → 安全」启用。
 
-### 1.6 Web Push notifications (optional)
+<a id="16-web-push-notifications-optional"></a>
 
-Generate a VAPID key pair:
+### 1.6 网页推送通知（可选）
+
+生成 VAPID 密钥对：
 
 ```bash
 npm run vapid
 ```
 
-Add to the Pages project:
+为 Pages 项目添加以下密钥：
 
 ```bash
 npx wrangler pages secret put VAPID_PUBLIC_KEY --project-name whelkmail
@@ -198,40 +200,40 @@ npx wrangler pages secret put VAPID_PRIVATE_KEY --project-name whelkmail
 npx wrangler pages secret put CRON_SECRET --project-name whelkmail
 ```
 
-`VAPID_SUBJECT` can be a plain variable such as `mailto:you@example.com`.
+`VAPID_SUBJECT` 可以是普通变量，例如 `mailto:you@example.com`。
 
-The cron worker config is personal, so it is gitignored. Copy the template, set your Pages URL and deploy:
+定时任务 Worker 的配置因部署而异，Git 默认忽略它。请复制模板，设置 Pages 地址并部署：
 
 ```bash
 cp worker/wrangler.toml.example worker/wrangler.toml
-# set APP_URL in worker/wrangler.toml to https://<your-project>.pages.dev
+# 在 worker/wrangler.toml 中将 APP_URL 设为 https://<your-project>.pages.dev
 npx wrangler secret put CRON_SECRET -c worker/wrangler.toml
 npm run cron:deploy
 ```
 
-`npm run cron:deploy` creates the file from the template when it is missing and stops with a clear error while `APP_URL` is still empty or a placeholder.
+如果配置文件尚不存在，`npm run cron:deploy` 会从模板生成一份。`APP_URL` 为空或仍为占位符时，脚本会停止并提示修正。
 
-The worker wakes up every minute and calls `POST /api/cron/notifications` on the Pages app. Notifications, automatic forwarding rules and the optional provider cleanup run on every wake-up; each account's automatic background sync follows its own interval (**Settings → account → Check for mail**, 1, 2, 5, 10, 15 or 30 minutes, 5 by default). Enable notifications from **Settings → Push notifications**, background sync per account in Settings, and forwarding/deletion in the account/filter sections.
+Worker 每分钟唤醒一次，调用 Pages 的 `POST /api/cron/notifications`。每次都会检查通知、自动转发和可选的服务商清理任务。每个账户的后台同步有独立周期，在「设置 → 账户 → 检查新邮件」中选择 1、2、5、10、15 或 30 分钟，默认 5 分钟。在「设置 → 推送通知」中启用通知，在账户设置中启用后台同步，在账户和过滤器设置中分别配置清理和转发。
 
-If you deployed the worker before this change, run `npm run cron:deploy` again: the trigger changed from `*/5 * * * *` to `* * * * *`, and an old trigger would cap every account at five minutes.
+如果升级前已部署该 Worker，请重新运行 `npm run cron:deploy`。触发器已从 `*/5 * * * *` 改为 `* * * * *`；保留旧配置会让所有账户最快每五分钟才能检查一次。
 
-On Workers Free (10 ms of CPU per invocation, 100,000 requests a day) the every-minute trigger is cheap while nothing is due — about 1,400 invocations, 3% of the daily quota — but a 1 or 2 minute interval opens a TLS connection every minute and will usually hit the CPU limit, so those two values are for Paid. A Free deployment can put `crons = ["*/5 * * * *"]` in `worker/wrangler.toml` and lose only the intervals it cannot use.
+Workers 免费套餐每次调用限用 10 毫秒 CPU 时间，每日请求配额为 100,000 次。没有到期任务时，每分钟一次的调度每天约唤醒 1,440 次，另外还会请求 Pages 后端。1 或 2 分钟的同步周期会频繁建立 TLS 连接，通常需要付费套餐。免费部署可改用 `crons = ["*/5 * * * *"]`，代价是无法实现短于五分钟的同步周期。
 
-If the database already existed before relay support was added, apply the missing migrations with the script rather than by hand:
+如数据库早于中继功能，请使用迁移脚本：
 
 ```bash
 npm run db:migrate:remote
 ```
 
-It records what it applied, so a rerun only continues with what is left. A database created before the newer relay features also needs the columns added later, all covered by the same command:
+脚本会记录进度，重复执行只补齐缺失的迁移。较老的数据库还需要后续加入的中继字段，以上命令会一并更新。
 
-| Migration | Adds |
-| --- | --- |
-| `020_relay_sent_copy` | `accounts.sent_copy_account_id` (Drive/R2/IMAP destination of the sent copies) |
-| `022_reply_account` | `accounts.reply_account_id` (which relay answers for a forwarding mailbox) |
-| `026_relay_any_address` | `accounts.relay_any_address` (`Send from any address on this domain`) |
+| 迁移 | 新增内容 |
+|---|---|
+| `020_relay_sent_copy` | `accounts.sent_copy_account_id`，指定保存已发送副本的位置（Drive、R2 或 IMAP 邮箱） |
+| `022_reply_account` | `accounts.reply_account_id`，指定收到转发邮件的邮箱要使用哪个账户回复 |
+| `026_relay_any_address` | `accounts.relay_any_address`，允许以本域名的任意地址发信 |
 
-The four first relay columns, for a database so old that it predates relay support entirely:
+完全没有中继支持的旧版数据库最早新增了以下四列：
 
 ```sql
 ALTER TABLE accounts ADD COLUMN relay_api_key_enc TEXT;
@@ -240,39 +242,41 @@ ALTER TABLE accounts ADD COLUMN relay_domain TEXT;
 ALTER TABLE accounts ADD COLUMN relay_region TEXT;
 ```
 
-### 1.6 Deploy
+<a id="16-deploy"></a>
 
-- **Git integration:** push to the connected branch. Cloudflare builds and deploys automatically.
-- **Manual retry:** Pages project → **Deployments** → **Retry deployment**.
+### 1.6 部署
 
-The first deployment URL is `https://whelkmail.pages.dev` (or the project name you chose).
+- **Git 集成**：推送到关联分支，Cloudflare 会自动构建和部署。
+- **手动重试**：在 Pages 项目中进入 **Deployments**，选择 **Retry deployment**。
 
-### 1.7 First login and account setup
+初次部署的地址通常是 `https://whelkmail.pages.dev`。如果项目使用其他名称，请用实际项目名替换 `whelkmail`。
 
-1. Open the deployment URL.
-2. Sign in with `APP_PASSWORD`.
-3. Click **Add account** (Sidebar or Settings).
-4. Choose **IMAP/SMTP mailbox** or **Send-only (relay)**.
-5. For an IMAP mailbox:
-   - Select the provider preset or enter IMAP/SMTP hosts, ports and security manually.
-   - Choose OAuth where supported, or enter a password / app password.
-   - Use **Test connection** in Settings.
-6. For a send-only domain:
-   - Select the relay provider and paste its API key.
-   - Choose where sent copies and drafts go: **Google Drive**, **R2** (only if the `BUCKET` binding exists) or **another account's mailbox**. The third option appends every message to that IMAP account's Sent folder and every draft to its Drafts folder, and needs a connected IMAP account: without one the option stays disabled and saving drafts would fail (`sent_copy_target_not_connected`).
-   - Only one destination is active at a time; switching back to Drive/R2 clears the mailbox choice.
-7. Send a test message.
-8. Save a draft, reopen it from **Drafts**, and delete it. With a mailbox destination, check that the draft also shows up in that account's Drafts folder on the provider.
-9. Add a second account to see address labels and the unified inbox.
+<a id="17-first-login-and-account-setup"></a>
 
-### 1.8 Custom domain
+### 1.7 首次登录并添加账户
 
-1. Pages project → **Custom domains** → **Set up a custom domain**.
-2. Enter the hostname and follow the DNS instructions.
-3. Wait for the certificate to become active.
-4. If you use OAuth, update the redirect URIs to the new hostname.
+1. 打开部署地址。
+2. 输入 `APP_PASSWORD` 登录。
+3. 在侧栏或设置中选择**添加账户**。
+4. 选择 **IMAP/SMTP 邮箱**或**仅发信（中继）**。
+5. 添加 IMAP 邮箱时，选择服务商预设或手动输入 IMAP/SMTP 主机、端口和安全协议。支持 OAuth 的服务商可以使用 OAuth，也可以按服务商要求填写密码或应用专用密码。在设置中运行**测试连接**。
+6. 添加仅发信域名时，选择中继服务商，粘贴其 API 密钥。选择已发送副本和草稿的保存位置：**Google 云端硬盘**、**R2**（需要 `BUCKET` 绑定）或**其他账户的邮箱**。邮箱方案会将邮件追加到指定 IMAP 账户的已发送或草稿文件夹，需要一个已连接的 IMAP 账户。没有符合条件的账户时，该选项不可用；目标账户断开时，草稿可能保存失败并返回 `sent_copy_target_not_connected`。一次只能选择一个保存位置，切换回 Drive/R2 会清除邮箱目标。
+7. 发送一封测试邮件。
+8. 保存一封草稿，在**草稿箱**重新打开并删除。如保存位置是 IMAP 邮箱，还应在服务商的草稿文件夹检查副本。
+9. 添加第二个账户，查看地址标签及统一收件箱。
 
-## 2. Deploy from the CLI instead of GitHub
+<a id="18-custom-domain"></a>
+
+### 1.8 自定义域名
+
+1. 在 Pages 项目中进入 **Custom domains → Set up a custom domain**。
+2. 输入主机名，按提示配置 DNS。
+3. 等待证书生效。
+4. 如使用 OAuth，请同步更新回调 URI 中的主机名。
+
+<a id="2-deploy-from-the-cli-instead-of-github"></a>
+
+## 2. 通过 CLI 部署
 
 ```bash
 npx wrangler pages project create whelkmail
@@ -280,178 +284,205 @@ npm run build
 npx wrangler pages deploy dist --project-name whelkmail
 ```
 
-Or simply:
+也可以运行：
 
 ```bash
 npm run deploy:pages
 ```
 
-`npm run deploy:pages` runs `npm run build` and then `wrangler pages deploy dist`.
+`npm run deploy:pages` 会先执行 `npm run build`，再执行 `wrangler pages deploy dist`。
 
-With CLI deployments, bindings and secrets come from `wrangler.jsonc` (replace its placeholder D1 id locally) and from `wrangler secret put`. With GitHub deployments, configure the D1 binding and secrets in the Pages dashboard instead; the public `wrangler.jsonc` keeps the placeholder.
+CLI 部署从 `wrangler.jsonc` 读取资源绑定（在本地替换 D1 ID 占位符），通过 Wrangler 的密钥命令设置密钥。GitHub 部署则在 Pages 控制台配置 D1 绑定和密钥；公开的 `wrangler.jsonc` 文件可以继续保留占位符。
 
-## 3. OAuth setup
+<a id="3-oauth-setup"></a>
 
-OAuth is optional for generic IMAP and for app-password accounts. It is required for Microsoft 365 / Outlook accounts, which no longer accept basic authentication for IMAP/SMTP.
+## 3. 配置 OAuth
 
-### 3.1 Google OAuth for IMAP/SMTP
+通用 IMAP 邮箱和使用应用专用密码的账户可以按需选择 OAuth。Microsoft 365 和 Outlook 已停用 IMAP/SMTP 的基本身份验证，因此需要 OAuth。
 
-Use a dedicated OAuth client, separate from the Drive client, so the Drive-only configuration remains non-sensitive.
+<a id="31-google-oauth-for-imapsmtp"></a>
 
-1. Google Cloud Console → create or select a project.
-2. OAuth consent screen → **External** (or **Internal** for Workspace-only use).
-3. Add scopes:
-   - `openid`
-   - `email`
-   - `https://mail.google.com/`
-4. Create an OAuth client ID of type **Web application**.
-5. Authorized redirect URIs:
+### 3.1 为 Gmail IMAP/SMTP 配置 Google OAuth
+
+为 Gmail 单独创建 OAuth 客户端；云端硬盘继续使用范围较小的独立客户端。
+
+1. 在 Google Cloud 控制台创建或选择项目。
+2. 将 OAuth 同意屏幕的受众设为**外部（External）**。仅在自己的 Workspace 组织中使用时，也可选择**内部（Internal）**。
+3. 添加权限范围 `openid`、`email`、`https://mail.google.com/`。
+4. 创建类型为 **Web 应用（Web application）**的 OAuth 客户端 ID。
+5. 添加已获授权的重定向 URI：
    - `https://<your-domain>/api/google/oauth/callback`
-   - `http://localhost:8788/api/google/oauth/callback` for local development
-6. Set `GOOGLE_MAIL_CLIENT_ID` and `GOOGLE_MAIL_CLIENT_SECRET`.
+   - 本地开发可用 `http://localhost:8788/api/google/oauth/callback`
+6. 设置 `GOOGLE_MAIL_CLIENT_ID` 和 `GOOGLE_MAIL_CLIENT_SECRET`。
 
-Important: `https://mail.google.com/` is a **restricted** Google scope.
+`https://mail.google.com/` 属于 Google 的**受限权限范围**。
 
-- A public production app requires Google verification (CASA).
-- A personal deployment can stay in **Testing** by adding the Google account as a test user. OAuth works, but refresh tokens expire after 7 days.
-- A Google Workspace **Internal** app avoids verification but only works inside that organization.
-- If OAuth is not configured, use an app password with 2-Step Verification enabled.
+- 面向公众的生产应用需要通过 Google 验证，并按要求完成 CASA 安全评估。
+- 个人部署可保持**测试（Testing）**状态，并把自己的 Google 账户加入测试用户。该模式下刷新令牌 7 天后过期。
+- Google Workspace 的**内部（Internal）**应用只对本组织用户开放，无须走公众应用的验证流程。
+- 如果没有配置 OAuth，可在开启两步验证后使用应用专用密码。
 
-### 3.2 Google Drive OAuth (relay and IMAP archive, optional)
+<a id="32-google-drive-oauth-relay-and-imap-archive-optional"></a>
 
-1. Google Cloud Console → enable the Google Drive API.
-2. OAuth consent screen → **External**.
-3. Scopes: `openid`, `email`, `https://www.googleapis.com/auth/drive.file`.
-4. Create an OAuth client ID of type **Web application**.
-5. Redirect URIs:
+### 3.2 Google 云端硬盘 OAuth（中继与 IMAP 归档，可选）
+
+1. 在 Google Cloud 控制台启用 Google Drive API。
+2. 将 OAuth 同意屏幕的受众设为**外部（External）**。
+3. 添加 `openid`、`email`、`https://www.googleapis.com/auth/drive.file` 三项权限范围。
+4. 创建 **Web 应用（Web application）**类型的 OAuth 客户端 ID。
+5. 添加重定向 URI：
    - `https://<your-domain>/api/drive/oauth/callback`
    - `http://localhost:8788/api/drive/oauth/callback`
-6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-7. Set the consent screen to **In production** to avoid 7-day refresh-token expiry. `drive.file` is non-sensitive, so no CASA assessment is required.
+6. 设置 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`。
+7. 将应用发布状态设为**正式发布（In production）**，避免测试模式下刷新令牌 7 天后过期。`drive.file` 属于非敏感权限范围，无需 CASA 评估。
 
-The same credentials serve IMAP accounts that enable **Archive bodies and attachments** in Settings. They are separate from the Gmail mail client (`GOOGLE_MAIL_CLIENT_ID`/`GOOGLE_MAIL_CLIENT_SECRET`).
+在设置中启用**归档正文和附件**的 IMAP 账户也会使用这组凭据。Gmail 收发信使用独立的 `GOOGLE_MAIL_CLIENT_ID` 和 `GOOGLE_MAIL_CLIENT_SECRET`。
 
-### 3.3 Microsoft OAuth (Outlook / Microsoft 365)
+<a id="33-microsoft-oauth-outlook--microsoft-365"></a>
 
-1. Microsoft Entra ID → **App registrations** → **New registration**.
-2. Supported account types: personal and/or organizational, depending on your users.
-3. Redirect URI (Web):
+### 3.3 Microsoft OAuth（Outlook / Microsoft 365）
+
+1. 进入 **Microsoft Entra ID → App registrations → New registration**。
+2. 按实际用户选择支持的账户类型：个人账户、组织账户或两者均支持。
+3. 添加 Web 平台的重定向 URI：
    - `https://<your-domain>/api/microsoft/oauth/callback`
    - `http://localhost:8788/api/microsoft/oauth/callback`
-4. **Certificates & secrets** → create a client secret.
-5. API permissions (delegated):
-   - Office 365 Exchange Online: `IMAP.AccessAsUser.All`, `SMTP.Send`
-   - OpenID: `offline_access`, `openid`, `email`, `profile`
-6. Grant admin consent if the tenant requires it.
-7. Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and optionally `MICROSOFT_TENANT` (`common` for personal + work).
+4. 进入 **Certificates & secrets**，创建客户端密钥。
+5. 添加委托 API 权限：
+   - Office 365 Exchange Online：`IMAP.AccessAsUser.All`、`SMTP.Send`
+   - OpenID：`offline_access`、`openid`、`email`、`profile`
+6. 如租户要求，请授予管理员同意。
+7. 设置 `MICROSOFT_CLIENT_ID` 和 `MICROSOFT_CLIENT_SECRET`。可选变量 `MICROSOFT_TENANT` 填 `common` 时同时支持个人及工作账户。
 
-### 3.4 Relay provider setup
+<a id="34-relay-provider-setup"></a>
 
-For send-only accounts:
+### 3.4 配置中继服务商
 
-1. Create an account with the relay provider.
-2. Verify the sending domain with the provider (SPF and DKIM).
-3. Copy the provider API key.
-4. Paste it in the account creation form or in Settings.
-5. Choose where the sent copies and drafts go: **Google Drive**, **R2** or **another account's mailbox**. The third option appends every message to the Sent folder (and every draft to the Drafts folder) of a connected IMAP account instead of storing them on Drive/R2; it is an alternative, not an addition.
+为仅发信账户配置中继：
 
-> A relay account always needs a **working** destination. If the sent copy cannot be saved (Drive not connected, no `BUCKET` binding, or the chosen IMAP mailbox disconnected) the send is aborted **before** the relay is called and comes back as `storage_failed`.
+1. 在服务商处注册账户。
+2. 在服务商控制台验证发信域名，配置 SPF 和 DKIM。
+3. 复制服务商提供的 API 密钥。
+4. 在 WhelkMail 的添加账户表单或设置中填写密钥。
+5. 选择**Google 云端硬盘**、**R2** 或**其他账户的邮箱**作为已发送副本和草稿的保存位置。选择 IMAP 邮箱时，两类邮件会分别追加到已连接账户的已发送和草稿文件夹。
 
-Supported providers: SMTP2GO, Resend, Mailgun, Brevo, SendGrid, Mailjet, Postmark, Cloudflare Email Service.
+> 中继账户需要一个可用的保存目标。如果目标本身不可用（例如 Drive 未连接、缺少 `BUCKET` 绑定，或所选 IMAP 邮箱断开），发信前的检查可能会中止投递并返回配置或存储错误。使用 IMAP 目标时，中继先接受邮件，随后才写入已发送文件夹；若此时写入失败，请先确认投递状态，再决定是否重发。
 
-**Cloudflare Email Service** ([docs](https://developers.cloudflare.com/email-service/api/send-emails/rest-api/)):
+支持的服务包括 SMTP2GO、Resend、Mailgun、Brevo、SendGrid、Mailjet、Postmark 和 Cloudflare Email Service。
 
-> **Experimental.** The maintainer has not tested this provider against a real Cloudflare account. The steps below follow the documented REST API, but actual delivery, suppression handling and rate limits are unverified: treat it as a preview and keep a tested relay for mail you care about.
+**Cloudflare Email Service**（[REST API 文档](https://developers.cloudflare.com/email-service/api/send-emails/rest-api/)）
 
-- API key: an API token with the **Email Sending: Edit** permission. An account API token is simplest: it reaches exactly one account.
-- Account ID: optional. Left blank, WhelkMail looks it up from the API token when the account is saved, which works when the token reaches exactly one account (an account API token always does). A user API token that reaches several accounts needs the ID entered (dashboard → account home, or the URL after `dash.cloudflare.com/`). Either way, the token is checked against the account on save; for a user token reaching more than 500 accounts that check can't complete, so use an account token instead. A token that reaches **no** account at all is refused with `relay_account_unavailable`: no account ID can fix that, create an account-scoped token with **Email Sending: Edit** in the account you send from.
-- The sending domain must be onboarded under **Email Service → Email Sending** in the same account. Each subdomain is onboarded separately. If it isn't, sending fails with a message naming the domain (Cloudflare error `10203`). WhelkMail can't check this when saving: listing a zone's sending domains needs a token that can also read zones.
-- By default, a message with any recipient on Cloudflare's suppression list is rejected outright (error `10205`). Turn on **Drop suppressed recipients** for the sending domain to send to the other recipients instead; WhelkMail then reports the dropped addresses as not delivered.
-- The custom SMTP option can't be used with Cloudflare's SMTP endpoint (`smtp.mx.cloudflare.net`): Workers block TCP sockets to Cloudflare's own IP ranges.
-- Limits enforced by WhelkMail before the API call: at most **50 recipients** per message (to, cc and bcc combined) and **15 MiB of attachments**, to stay under Cloudflare's 25 MiB encoded-message limit. Larger messages are rejected with `too_many_recipients` or `attachment_too_large`.
+> **实验性功能。** 上游维护者尚未使用真实 Cloudflare 账户验证该适配器。以下配置依据 REST API 文档，实际投递、抑制列表处理和限流行为仍需验证。建议用测试邮件验证后再处理重要往来。
 
-## 4. Optional R2 archive
+- **API 密钥**：使用拥有 **Email Sending: Edit** 权限的 API 令牌。账户级 API 令牌仅关联一个账户，配置最简单。
+- **账户 ID**：可留空。保存时，若令牌只能访问一个账户，WhelkMail 会查出其 ID。可访问多个账户的用户令牌需要填写 ID，位置在控制台账户首页或 `dash.cloudflare.com/` 后的 URL 路径。无论哪种方式，保存时都会检查令牌对账户的访问权限。用户令牌可访问超过 500 个账户时，无法完成检查，应改用账户级令牌。若令牌无法访问任何账户，会返回 `relay_account_unavailable`；请在发信账户中创建有 **Email Sending: Edit** 权限的账户级令牌。
+- **发信域名**：在同一账户下的 **Email Service → Email Sending** 中启用域名。每个子域名都需要单独启用，否则发信时会出现包含域名的错误（Cloudflare 错误码 `10203`）。列出某个区域的发信域名还需要读取区域的权限，WhelkMail 在保存账户时无法完成这项检查。
+- **抑制列表**：默认情况下，只要有一个收件人属于 Cloudflare 的抑制列表，整封邮件就会被拒绝（`10205`）。在发信域名下打开 **Drop suppressed recipients** 后，其他收件人仍可收到邮件，WhelkMail 会列出未投递的地址。
+- **自定义 SMTP**：Workers 会阻止连接 Cloudflare 自有 IP 段的 TCP 套接字，因此该选项无法连接 `smtp.mx.cloudflare.net`。
+- **限制**：调用 API 前，WhelkMail 会检查每封邮件的收件人数（含抄送和密送，最多 **50 人**）和附件总量（最多 **15 MiB**），以符合 Cloudflare 对编码后邮件 **25 MiB** 的限制。超限会返回 `too_many_recipients` 或 `attachment_too_large`。
 
-R2 is used by send-only relay accounts and by IMAP accounts that enable the optional body/attachment archive. By default IMAP accounts keep everything on the mail provider.
+<a id="4-optional-r2-archive"></a>
 
-1. **R2 Object Storage → Create bucket**.
-2. Pages project → **Settings → Bindings** → add an R2 bucket binding named `BUCKET`.
-3. Redeploy.
+## 4. 使用 R2 归档（可选）
 
-If the binding is absent, the R2 option is hidden in the UI.
+仅发信中继账户可使用 R2；IMAP 账户也可以启用 R2 归档正文和附件。默认情况下，IMAP 邮件保存在邮箱服务商处。
 
-## 5. Verification checklist
+1. 进入 **R2 Object Storage → Create bucket** 创建存储桶。
+2. 在 Pages 项目下进入 **Settings → Bindings**，添加名为 `BUCKET` 的 R2 存储桶绑定。
+3. 重新部署。
 
-- `GET /api/health` returns `ok: true`.
-- Login succeeds with `APP_PASSWORD` (plus the TOTP code if 2FA is enabled).
-- Optional: 2FA can be enabled in Settings → Security, and a recovery code can complete the login.
-- Security headers are present on `/` and `/api/health`.
-- **Test connection** succeeds for an IMAP account.
-- Sending adds a copy to the provider Sent folder (or the app appends it when `auto_saves_sent` is off).
-- A draft can be saved, reopened and deleted.
-- Two accounts produce colored labels and a unified inbox.
-- Optional: Drive/R2 archive works for relay accounts and for IMAP accounts with body archiving enabled.
-- Optional: OAuth reconnect works after a token refresh.
+未配置绑定时，界面会隐藏 R2 选项。
 
-## 6. Operations
+<a id="5-verification-checklist"></a>
 
-### Logs
+## 5. 部署验证
 
-Pages project → **Deployments** → select deployment → **Logs**, or:
+- `GET /api/health` 返回 `ok: true`。
+- 使用 `APP_PASSWORD` 成功登录。启用双重验证时还应输入 TOTP 验证码。
+- 可选验证：在「设置 → 安全」启用双重验证，再使用恢复码登录。
+- `/` 和 `/api/health` 的响应中包含安全响应头。
+- 对 IMAP 账户运行**测试连接**并确认成功。
+- 发信后，服务商的已发送文件夹存在副本。关闭 `auto_saves_sent` 时，由应用将副本追加到该文件夹。
+- 草稿可保存、重新打开及删除。
+- 添加两个账户后，可以看到彩色标签和统一收件箱。
+- 可选验证：中继账户以及启用了正文归档的 IMAP 账户能使用 Drive/R2 归档。
+- 可选验证：OAuth 令牌刷新后可以重新连接。
+
+<a id="6-operations"></a>
+
+## 6. 运行维护
+
+<a id="logs"></a>
+
+### 查看日志
+
+在 Pages 项目中进入 **Deployments**，选择一次部署并打开 **Logs**，也可使用命令：
 
 ```bash
 npx wrangler pages deployment tail --project-name whelkmail
 ```
 
-### Rollback
+<a id="rollback"></a>
 
-Pages project → **Deployments** → select a previous deployment → **Rollback**.
+### 回滚
 
-### D1 backup
+在 Pages 项目中进入 **Deployments**，选择之前的部署并点击 **Rollback**。
+
+<a id="d1-backup"></a>
+
+### 备份 D1
 
 ```bash
 npx wrangler d1 export mail-client --remote --output backup.sql
 ```
 
-### Schema updates
+<a id="schema-updates"></a>
 
-Re-run `npm run db:remote` after changing `db/schema.sql`. `CREATE TABLE IF NOT EXISTS` does not alter existing tables; use `ALTER TABLE` for additive changes.
+### 更新数据库结构
 
-### Secret rotation
+修改 `db/schema.sql` 后，重新运行 `npm run db:remote`。`CREATE TABLE IF NOT EXISTS` 对已存在的表不做改动；增加字段等变更应通过 `ALTER TABLE` 迁移。
 
-- Rotating `APP_PASSWORD` does not revoke existing sessions automatically; they remain valid until their 7-day expiry. To revoke all sessions immediately, delete the rows in `sessions` (or change `TOKEN_ENC_KEY`, which also invalidates credentials).
-- Rotating `TOKEN_ENC_KEY` invalidates all stored credentials, sessions and pending OAuth states. Users must re-enter passwords and reconnect OAuth accounts.
+<a id="secret-rotation"></a>
 
-## 7. Troubleshooting
+### 轮换密钥
 
-| Symptom | Cause / fix |
+- 更新 `APP_PASSWORD` 后，现有会话将在原定的 7 天有效期内继续可用。要立即注销所有会话，可清空 `sessions` 表中的会话记录。更换 `TOKEN_ENC_KEY` 也会注销会话，但还会使已保存的凭据失效。
+- 更新 `TOKEN_ENC_KEY` 后，已加密的凭据、会话和进行中的 OAuth 授权都会失效。用户需要重新输入密码并重新授权 OAuth 账户。
+
+<a id="7-troubleshooting"></a>
+
+## 7. 故障排查
+
+| 现象 | 常见原因或处理方法 |
 |---|---|
-| `database_id` placeholder error | Replace the placeholder in `wrangler.jsonc` for local CLI use, or set the `DB` binding in the Pages dashboard |
-| `D1_ERROR: no such table: accounts` | Apply the schema and record the baseline: `npm run db:init:remote` |
-| `D1_ERROR: no such table: labels` / `message_labels` / `app_settings` / `filters` / `contacts` / `imap_sync` / `imap_messages` / `push_subscriptions` / `push_prefs` / `forward_log` / `deletion_log` / `sessions` / `login_attempts` / `oauth_states` / `imap_body_cache` / `imap_sync_locks` / `schema_migrations` | Run `npm run db:migrate:remote`: migrations already recorded are skipped |
-| `D1_ERROR: no such column: archive_imap_bodies` / `archive_key` / `imap_archive_driver` / `auto_sync` / `delete_after_archive` / `forward_to_json` / `drafts_folder` / `spam_folder` | Run `npm run db:migrate:remote`, or apply the missing `006`–`016` migrations in order |
-| 401 loop after login | `APP_PASSWORD` mismatch, cookie blocked, site not served over HTTPS, or the `sessions` table missing (run `node scripts/migrate.mjs remote --from=012`) |
-| 500 on every API call | Missing `DB` binding, missing secrets, or missing security tables |
-| Relay 503 | Relay provider not configured for the account and no deployment fallback |
-| Google OAuth 503 | `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` missing |
-| Microsoft OAuth 503 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` missing |
-| OAuth redirect error | Redirect URI does not exactly match the app configuration |
-| Google OAuth stops after ~7 days | Consent screen still in Testing; use Internal, verification, or an app password |
-| R2 option missing | `BUCKET` binding not configured |
-| `CPU time limit exceeded` | Upgrade to Workers Paid |
-| IMAP timeout | Wrong host/port/security: 993 TLS, 465 TLS, 587 STARTTLS, 143 STARTTLS |
-| Drafts fail | The provider has no `\Drafts` folder or does not allow `APPEND` |
-| Duplicate sent copies | `auto_saves_sent` is disabled but the provider already stores sent mail |
-| Sending from a relay account fails with `storage_failed` | No working sent-copy destination: connect Google Drive, create the `BUCKET` binding, or pick an IMAP mailbox for Sent/Drafts. The send is aborted before the relay is called |
-| `too_many_recipients` when sending | The relay caps recipients per message (to + cc + bcc combined); Cloudflare Email Service allows 50 |
-| Custom SMTP relay to `smtp.gmail.com` (465/587) or `smtp.mail.yahoo.com:465` fails with `Network connection lost.` | Those hosts drop the connection from Workers before AUTH. Use an app password on a host that accepts the connection, or an HTTP relay |
-| Custom domain error 1014/522 | DNS record missing or origin not ready |
+| 提示 `database_id` 为占位符 | 通过本地 CLI 部署时替换 `wrangler.jsonc` 中的占位符；通过 GitHub 部署时在 Pages 控制台设置 `DB` 绑定 |
+| `D1_ERROR: no such table: accounts` | 运行 `npm run db:init:remote`，初始化结构并记录基线 |
+| `D1_ERROR: no such table: labels` 或缺少 `message_labels`、`app_settings`、`filters`、`contacts`、`imap_sync`、`imap_messages`、`push_subscriptions`、`push_prefs`、`forward_log`、`deletion_log`、`sessions`、`login_attempts`、`oauth_states`、`imap_body_cache`、`imap_sync_locks`、`schema_migrations` | 运行 `npm run db:migrate:remote`，已记录的迁移会被跳过 |
+| `D1_ERROR: no such column: archive_imap_bodies` 或缺少 `archive_key`、`imap_archive_driver`、`auto_sync`、`delete_after_archive`、`forward_to_json`、`drafts_folder`、`spam_folder` | 运行 `npm run db:migrate:remote`，也可按顺序补齐缺失的 `006` 至 `016` 迁移 |
+| 登录后反复返回 401 | 检查 `APP_PASSWORD`、浏览器对 Cookie 的限制、HTTPS 以及 `sessions` 表。缺表时运行 `node scripts/migrate.mjs remote --from=012` |
+| 所有 API 调用均返回 500 | 检查 `DB` 绑定、必需密钥和安全相关数据表 |
+| 中继服务返回 503 | 账户未配置中继服务商，部署也没有默认配置 |
+| Google OAuth 返回 503 | 检查 `GOOGLE_MAIL_CLIENT_ID` 和 `GOOGLE_MAIL_CLIENT_SECRET` |
+| Microsoft OAuth 返回 503 | 检查 `MICROSOFT_CLIENT_ID` 和 `MICROSOFT_CLIENT_SECRET` |
+| OAuth 重定向报错 | 授权重定向 URI 必须与应用配置完全匹配 |
+| Google OAuth 约 7 天后失效 | 同意屏幕处于测试状态。可按账户类型改用 Internal、完成生产应用验证，或使用应用专用密码 |
+| 找不到 R2 选项 | 配置 `BUCKET` 绑定 |
+| `CPU time limit exceeded` | 升级至 Workers 付费套餐 |
+| IMAP 连接超时 | 核对主机、端口和加密方式。IMAP 通常使用 993/TLS 或 143/STARTTLS；SMTP 通常使用 465/TLS 或 587/STARTTLS |
+| 草稿保存失败 | 服务商没有 `\Drafts` 文件夹，或未允许 `APPEND` |
+| 已发送副本重复 | 服务商已自行保存邮件，账户却关闭了 `auto_saves_sent` |
+| 中继账户发信返回 `storage_failed` | 检查已发送和草稿的保存位置，连接 Google 云端硬盘、绑定 `BUCKET`，或选择可用的 IMAP 邮箱。若中继已接受邮件而后续归档报错，应先核实投递状态 |
+| 发信返回 `too_many_recipients` | 收件人数量超过中继单封上限（含抄送、密送）。Cloudflare Email Service 上限为 50 人 |
+| 自定义 SMTP 连接 `smtp.gmail.com`（465/587）或 `smtp.mail.yahoo.com:465` 时出现 `Network connection lost.` | 这些主机可能在身份验证前断开来自 Workers 的连接。可改用接受该连接的主机及应用专用密码，或使用 HTTP 中继 |
+| 自定义域名出现 1014/522 | 检查 DNS 记录以及源站是否就绪 |
 
-## 8. Costs and limits
+<a id="8-costs-and-limits"></a>
 
-- Pages and Workers have free quotas, but IMAP/SMTP is CPU-heavy: use Workers Paid (from $5/month).
-- D1 free tier: 5 GB storage and daily read/write quotas.
-- R2 free tier: 10 GB storage, free egress.
-- Google Drive: 15 GB shared with the Google account.
-- No IMAP IDLE/push: the UI refreshes on navigation, after sending, or on reload.
-- Last 30 messages per folder are listed; search is client-side over loaded messages.
+## 8. 费用与限制
+
+- Pages 和 Workers 都有免费额度。IMAP/SMTP 的 CPU 开销较高，上游建议使用 Workers 付费套餐，起价为每月 5 美元。
+- D1 免费套餐提供 5 GB 存储空间，读写操作有每日额度。
+- R2 免费套餐提供 10 GB 存储空间，免出站流量费。
+- Google 云端硬盘的 15 GB 免费空间与同一 Google 账户的其他服务共用。
+- 客户端使用定期同步，尚不支持 IMAP IDLE 实时推送。切换页面、发信或重新载入时也会更新界面。
+- 邮件列表分批加载最近的邮件；搜索范围受已同步的数据和正文索引进度影响。

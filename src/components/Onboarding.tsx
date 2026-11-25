@@ -255,7 +255,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                 onChange={(event) => setDisplayName(event.target.value)}
                 required
                 maxLength={120}
-                placeholder="Mario Rossi"
+                placeholder={t('onboarding.exampleName')}
                 className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               />
             </label>
@@ -266,7 +266,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                placeholder="mario@dominio.it"
+                placeholder={t('onboarding.exampleEmail')}
                 className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
               />
             </label>
@@ -295,7 +295,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                 <input
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder={email || 'nomeutente'}
+                  placeholder={email || t('settings.username')}
                   autoComplete="username"
                   className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                 />
@@ -380,19 +380,22 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted">IMAP</p>
                     <input
+                      aria-label={t('settings.connectionHost', { protocol: 'IMAP' })}
                       value={imapHost}
                       onChange={(event) => setImapHost(event.target.value)}
-                      placeholder="imap.esempio.it"
+                      placeholder="imap.example.com"
                       className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
                     />
                     <div className="flex gap-2">
                       <input
+                        aria-label={t('settings.connectionPort', { protocol: 'IMAP' })}
                         value={imapPort}
                         onChange={(event) => setImapPort(event.target.value)}
                         inputMode="numeric"
                         className="w-24 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
                       />
                       <select
+                        aria-label={t('settings.connectionSecurity', { protocol: 'IMAP' })}
                         value={imapSecurity}
                         onChange={(event) => setImapSecurity(event.target.value as MailSecurity)}
                         className="flex-1 rounded-lg border border-line px-2 py-2 text-sm outline-none"
@@ -405,19 +408,22 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted">SMTP</p>
                     <input
+                      aria-label={t('settings.connectionHost', { protocol: 'SMTP' })}
                       value={smtpHost}
                       onChange={(event) => setSmtpHost(event.target.value)}
-                      placeholder="smtp.esempio.it"
+                      placeholder="smtp.example.com"
                       className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
                     />
                     <div className="flex gap-2">
                       <input
+                        aria-label={t('settings.connectionPort', { protocol: 'SMTP' })}
                         value={smtpPort}
                         onChange={(event) => setSmtpPort(event.target.value)}
                         inputMode="numeric"
                         className="w-24 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand"
                       />
                       <select
+                        aria-label={t('settings.connectionSecurity', { protocol: 'SMTP' })}
                         value={smtpSecurity}
                         onChange={(event) => setSmtpSecurity(event.target.value as MailSecurity)}
                         className="flex-1 rounded-lg border border-line px-2 py-2 text-sm outline-none"
@@ -502,7 +508,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                       <input
                         value={relaySmtpHost}
                         onChange={(event) => setRelaySmtpHost(event.target.value)}
-                        placeholder="smtp.esempio.it"
+                        placeholder="smtp.example.com"
                         className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                       />
                     </label>
@@ -541,7 +547,7 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                       <input
                         value={relayUsername}
                         onChange={(event) => setRelayUsername(event.target.value)}
-                        placeholder={email || 'nomeutente'}
+                        placeholder={email || t('settings.username')}
                         className="w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-brand"
                       />
                     </label>
@@ -580,8 +586,8 @@ export function Onboarding({ accounts, storage, health, busy, error, onCancel, o
                           onChange={(event) => setRelayRegion(event.target.value)}
                           className="rounded-lg border border-line px-3 py-2 outline-none"
                         >
-                          <option value="us">US</option>
-                          <option value="eu">EU</option>
+                          <option value="us">{t('settings.regionUS')}</option>
+                          <option value="eu">{t('settings.regionEU')}</option>
                         </select>
                       </label>
                     ) : null}

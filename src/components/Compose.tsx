@@ -318,7 +318,11 @@ export function Compose({
       if (result.draftId) {
         setDraftId(result.draftId)
       }
-      setDraftWarning(result.warning ?? null)
+      setDraftWarning(
+        result.warningMessage
+          ? t(result.warningMessage.key, result.warningMessage.vars)
+          : (result.warning ?? null),
+      )
       if (versionRef.current === versionAtStart) {
         setDirty(false)
         setLastSavedAt(Date.now())
@@ -472,7 +476,10 @@ export function Compose({
     setError(null)
     try {
       const result = await api.send(fromEmail ? { ...payload, fromEmail } : payload)
-      onSent(result.warning, result.sentFolder, result.undelivered)
+      const warning = result.warningMessage
+        ? t(result.warningMessage.key, result.warningMessage.vars)
+        : result.warning
+      onSent(warning, result.sentFolder, result.undelivered)
     } catch (err) {
       sendingRef.current = false
       setError(errorText(err, t))
@@ -502,6 +509,7 @@ export function Compose({
         // submit the whole message.
         onSubmit={(event) => event.preventDefault()}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
           if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
             event.preventDefault()
           }
@@ -591,7 +599,7 @@ export function Compose({
               onChange={setTo}
               contacts={contacts}
               onAddContact={onAddContact}
-              placeholder="destinatario@dominio.it"
+              placeholder={t('compose.recipientPlaceholder')}
               inputClassName="w-full bg-transparent outline-none"
             />
             <div className="flex shrink-0 gap-2 text-xs text-muted">

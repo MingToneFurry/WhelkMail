@@ -35,6 +35,7 @@ import type {
   TotpSetup,
   TwoFactorStatus,
   UpdateStatus,
+  WarningMessage,
 } from '../../shared/types'
 
 export class ApiError extends Error {
@@ -335,7 +336,7 @@ export const api = {
   deleteFilter(id: string): Promise<{ ok: boolean }> {
     return request(`/api/filters/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
-  testAccount(id: string): Promise<{ ok: boolean; checks?: Record<string, string> }> {
+  testAccount(id: string): Promise<{ ok: boolean; checks?: Record<string, string>; folderCount?: number }> {
     return request(`/api/accounts/${id}/test`, { method: 'POST' })
   },
   messages(
@@ -390,7 +391,13 @@ export const api = {
       body: JSON.stringify({ ids, action, target }),
     })
   },
-  send(payload: SendPayload): Promise<{ ok: boolean; warning?: string; sentFolder?: string; undelivered?: string[] }> {
+  send(payload: SendPayload): Promise<{
+    ok: boolean
+    warning?: string
+    warningMessage?: WarningMessage
+    sentFolder?: string
+    undelivered?: string[]
+  }> {
     return request('/api/messages/send', { method: 'POST', body: JSON.stringify(payload) })
   },
   draft(id: string): Promise<{ draft: DraftPayload }> {
@@ -398,7 +405,7 @@ export const api = {
   },
   saveDraft(
     payload: DraftSavePayload,
-  ): Promise<{ ok: boolean; draftId?: string; warning?: string }> {
+  ): Promise<{ ok: boolean; draftId?: string; warning?: string; warningMessage?: WarningMessage }> {
     return request('/api/drafts', { method: 'POST', body: JSON.stringify(payload) })
   },
   deleteDraft(id: string): Promise<{ ok: boolean }> {

@@ -4,6 +4,7 @@ import type { StorageCleanupEntry } from '../../shared/types'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { logText } from '../locales/panels-extra'
 import { formatDate } from '../lib/utils'
 
 /**
@@ -74,12 +75,12 @@ export function StorageCleanupPanel() {
             <li key={entry.id} className="rounded-lg bg-slate-50 px-2.5 py-2 text-[11px]">
               <p className="flex items-center gap-1.5 font-medium text-slate-700">
                 <AlertCircle size={12} className="text-amber-600" />
-                {entry.accountEmail} · {entry.driver}
+                {entry.accountEmail} · {logText(entry.driver, t)}
               </p>
               <p className="mt-0.5 break-all text-muted">{entry.key}</p>
               <p className="mt-0.5 text-muted">
                 {formatDate(entry.createdAt, locale)}
-                {entry.error ? ` · ${entry.error}` : ''}
+                {entry.error ? ` · ${logText(entry.error, t)}` : ''}
               </p>
             </li>
           ))}

@@ -1,5 +1,5 @@
 const QUOTE_MARKER =
-  /^\s*(?:On\s.+\swrote:\s*$|Il giorno\s.+\sha scritto:\s*$|-{2,}\s*(?:Original Message|Messaggio originale)\s*-{2,}|_{5,}\s*$|>{1})/im
+  /^\s*(?:On\s.+\swrote:\s*$|Il giorno\s.+\sha scritto:\s*$|.+\s于\s.+写道[：:]\s*$|-{2,}\s*(?:Original Message|Messaggio originale|原始邮件|原邮件)\s*-{2,}|_{5,}\s*$|>{1})/im
 
 /**
  * Split a plain-text body at the start of the quoted original, the way Gmail

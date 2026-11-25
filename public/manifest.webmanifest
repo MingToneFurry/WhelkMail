@@ -1,7 +1,12 @@
 {
   "name": "WhelkMail",
   "short_name": "WhelkMail",
-  "description": "Self-hosted webmail client for IMAP and SMTP mailboxes",
+  "lang": "zh-CN",
+  "description": "在网页中统一收发邮件，支持 IMAP 和 SMTP 邮箱。",
+  "description_localized": {
+    "en": "Self-hosted webmail client for IMAP and SMTP mailboxes",
+    "it": "Client di posta web self-hosted per caselle IMAP e SMTP"
+  },
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

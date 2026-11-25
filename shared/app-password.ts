@@ -25,17 +25,28 @@ const KNOWN_PLACEHOLDERS = new Set([
   'qwerty',
 ])
 
-/** Returns a human readable problem, or null when the password is acceptable. */
-export function appPasswordProblem(value: string | undefined | null): string | null {
+export type PasswordIssue = 'empty' | 'example' | 'short'
+
+export function appPasswordIssue(value: string | undefined | null): PasswordIssue | null {
   const password = (value ?? '').trim()
   if (!password) {
-    return 'APP_PASSWORD is empty.'
+    return 'empty'
   }
   if (KNOWN_PLACEHOLDERS.has(password.toLowerCase())) {
-    return `APP_PASSWORD is still the example value "${password}".`
+    return 'example'
   }
   if (password.length < MIN_APP_PASSWORD_LENGTH) {
-    return `APP_PASSWORD is shorter than ${MIN_APP_PASSWORD_LENGTH} characters.`
+    return 'short'
   }
   return null
+}
+
+/** Diagnostic for the Node startup log. The web guard localizes these same issues. */
+export function appPasswordProblem(value: string | undefined | null): string | null {
+  switch (appPasswordIssue(value)) {
+    case 'empty': return 'APP_PASSWORD is empty.'
+    case 'example': return `APP_PASSWORD is still the example value "${value?.trim()}".`
+    case 'short': return `APP_PASSWORD is shorter than ${MIN_APP_PASSWORD_LENGTH} characters.`
+    default: return null
+  }
 }

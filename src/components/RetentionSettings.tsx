@@ -18,7 +18,7 @@ function formatDate(value: string | null, locale: string): string {
   if (Number.isNaN(date.getTime())) {
     return ''
   }
-  return date.toLocaleString(locale === 'it' ? 'it-IT' : 'en-GB', {
+  return date.toLocaleString(locale === 'en' ? 'en-GB' : locale, {
     dateStyle: 'short',
     timeStyle: 'short',
   })

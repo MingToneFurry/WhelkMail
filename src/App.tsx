@@ -29,7 +29,7 @@ import { useI18n } from './i18n'
 import { api, ApiError, type AccountError } from './lib/api'
 import { nextChainDelay, runSyncChain } from './lib/sync-chain'
 import { pickSyncRequests } from './lib/sync-queue'
-import { errorText } from './lib/errors'
+import { errorText, oauthReasonText } from './lib/errors'
 import { syncPushSubscription } from './lib/push'
 import { syncSignature } from './lib/sync-signature'
 import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
@@ -156,7 +156,7 @@ function routeUrl(route: MailRoute): string {
 }
 
 export default function App() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const tRef = useRef(t)
   useEffect(() => {
     tRef.current = t
@@ -332,7 +332,7 @@ export default function App() {
         setAuth('needed')
         return
       }
-      setFatal(error instanceof Error ? error.message : 'Loading error')
+      setFatal(errorText(error, tRef.current))
     }
   }, [])
 
@@ -401,7 +401,7 @@ export default function App() {
         setNotice(t('app.driveConnected'))
       }
     } else {
-      setNotice(t('app.connectFailed', { reason: params.get('reason') ?? 'error' }))
+      setNotice(t('app.connectFailed', { reason: oauthReasonText(params.get('reason'), t) }))
     }
     const accountId = params.get('account')
     if (accountId) {
@@ -1107,9 +1107,11 @@ export default function App() {
       .split(/\r?\n/)
       .map((line) => `> ${line}`)
       .join('\n')
-    const text = `\n\nOn ${new Date(message.date).toLocaleString()}, ${displayAddress(
-      message.from,
-    )} wrote:\n${quoted}`
+    const attribution = t('compose.quotedReply', {
+      date: new Date(message.date).toLocaleString(locale),
+      sender: displayAddress(message.from),
+    })
+    const text = `\n\n${attribution}\n${quoted}`
     // Gmail quietly keeps people you reply to in Other contacts. Doing it when
     // the reply opens means an interrupted reply still remembers the address.
     if (contactAutoAdd) {
@@ -1269,14 +1271,10 @@ export default function App() {
     setSettingsError(null)
     try {
       const response = await api.testAccount(id)
-      const checks = response.checks
-        ? Object.entries(response.checks).map(([key, value]) => `${key}: ${value}`)
-        : []
-      setNotice(
-        checks.length > 0
-          ? t('app.connectionOk', { checks: checks.join(' · ') })
-          : t('app.connectionOk', { checks: 'OK' }),
-      )
+      const checks = response.folderCount !== undefined
+        ? t('diagnostics.connectionChecks', { count: response.folderCount })
+        : t('diagnostics.ok')
+      setNotice(t('app.connectionOk', { checks }))
     } catch (error) {
       setSettingsError(errorText(error, t))
     } finally {

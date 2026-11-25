@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-export type Locale = 'en' | 'it'
+import { diagnostics } from './locales/diagnostics'
+import { mailExtra } from './locales/mail-extra'
+import { settingsExtra } from './locales/settings-extra'
+import { panelsExtra } from './locales/panels-extra'
+import { apiExtra } from './locales/api-extra'
+import { zhCN } from './locales/zh-CN'
+import { syncPushLanguage } from './lib/push'
+
+export type Locale = 'en' | 'it' | 'zh-CN'
 
 export const LOCALES: { id: Locale; label: string }[] = [
+  { id: 'zh-CN', label: '简体中文' },
   { id: 'en', label: 'English' },
   { id: 'it', label: 'Italiano' },
 ]
@@ -1526,7 +1535,11 @@ const it: Record<string, string> = {
   'relayProviders.custom.label': 'SMTP personalizzato',
 }
 
-const messages: Record<Locale, Record<string, string>> = { en, it }
+export const messages: Record<Locale, Record<string, string>> = {
+  en: { ...en, ...diagnostics.en, ...mailExtra.en, ...settingsExtra.en, ...panelsExtra.en, ...apiExtra.en },
+  it: { ...it, ...diagnostics.it, ...mailExtra.it, ...settingsExtra.it, ...panelsExtra.it, ...apiExtra.it },
+  'zh-CN': { ...zhCN, ...diagnostics['zh-CN'], ...mailExtra['zh-CN'], ...settingsExtra['zh-CN'], ...panelsExtra['zh-CN'], ...apiExtra['zh-CN'] },
+}
 
 interface I18nValue {
   locale: Locale
@@ -1539,12 +1552,10 @@ const I18nContext = createContext<I18nValue | null>(null)
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     try {
-      return (localStorage.getItem('whelkmail_locale') ?? localStorage.getItem('mc_locale')) ===
-        'it'
-        ? 'it'
-        : 'en'
+      const saved = localStorage.getItem('whelkmail_locale') ?? localStorage.getItem('mc_locale')
+      return LOCALES.find(({ id }) => id === saved)?.id ?? 'zh-CN'
     } catch {
-      return 'en'
+      return 'zh-CN'
     }
   })
 
@@ -1569,6 +1580,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     },
     [locale],
   )
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+    syncPushLanguage(locale, t('list.noSubject'))
+  }, [locale, t])
 
   const contextValue = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
 

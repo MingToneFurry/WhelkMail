@@ -63,6 +63,7 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
     setMessage(null)
     let partial = false
     try {
+      let failed = false
       for (const folder of FOLDERS) {
         let result = await api.runSync(account.id, folder)
         setStates(result.folders)
@@ -73,13 +74,14 @@ export function SyncPanel({ account, onSynced, onUpdate }: SyncPanelProps) {
           guard += 1
         }
         if (result.error) {
-          setError(result.error)
+          failed = true
+          setError(t('sync.folderError', { folder: folderLabel(folder, t), detail: result.error }))
         }
         if (result.hasMore) {
           partial = true
         }
       }
-      setMessage(partial ? t('sync.partialHint') : t('sync.done'))
+      if (!failed) setMessage(partial ? t('sync.partialHint') : t('sync.done'))
     } catch (reason) {
       setError(errorText(reason, t))
     } finally {

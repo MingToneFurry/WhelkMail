@@ -18,6 +18,12 @@ describe('parseAddresses', () => {
     expect(parseAddresses('"Rossi; Mario" <m@x.it>')).toEqual(['m@x.it'])
   })
 
+  it('handles fullwidth separators without splitting quoted names', () => {
+    expect(parseAddresses('a@x.cn，"小明，销售部" <m@x.cn>；c@x.cn')).toEqual([
+      'a@x.cn', 'm@x.cn', 'c@x.cn',
+    ])
+  })
+
   it('lowercases and drops empty entries', () => {
     expect(parseAddresses('Mario <MIA@Email.IT>, ,')).toEqual(['mia@email.it'])
     expect(parseAddresses('')).toEqual([])

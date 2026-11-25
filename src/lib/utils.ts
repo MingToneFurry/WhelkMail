@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]): string {
 export function formatDate(value: string, locale: string = 'en'): string {
   const date = new Date(value)
   const now = new Date()
-  const intl = locale === 'it' ? 'it-IT' : 'en-US'
+  const intl = locale === 'en' ? 'en-US' : locale
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
     date.getMonth() === now.getMonth() &&
@@ -59,7 +59,7 @@ export function parseAddresses(value: string): string[] {
     .filter(Boolean)
 }
 
-function splitAddressList(value: string): string[] {
+export function splitAddressList(value: string): string[] {
   const parts: string[] = []
   let current = ''
   let inQuotes = false
@@ -75,7 +75,7 @@ function splitAddressList(value: string): string[] {
         inBrackets = true
       } else if (char === '>') {
         inBrackets = false
-      } else if (!inBrackets && (char === ',' || char === ';')) {
+      } else if (!inBrackets && ',;，；'.includes(char)) {
         parts.push(current)
         current = ''
         continue

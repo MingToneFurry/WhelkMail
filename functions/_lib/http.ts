@@ -32,21 +32,23 @@ export const MAX_JSON_BYTES = 32 * 1024 * 1024
 export async function readJson<T>(request: Request): Promise<T> {
   const declared = Number(request.headers.get('Content-Length') ?? '0')
   if (Number.isFinite(declared) && declared > MAX_JSON_BYTES) {
-    throw new HttpError(413, 'Payload too large')
+    throw new HttpError(413, 'Payload too large', 'payload_too_large')
   }
   try {
     return (await request.json()) as T
   } catch {
-    throw new HttpError(400, 'Invalid JSON')
+    throw new HttpError(400, 'Invalid JSON', 'invalid_json')
   }
 }
 
 export class HttpError extends Error {
   status: number
+  code: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 

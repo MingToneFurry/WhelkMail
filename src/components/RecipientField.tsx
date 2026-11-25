@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import type { Contact } from '../../shared/types'
 import { useI18n } from '../i18n'
-import { displayAddress, isValidEmail, matchesContactPrefix } from '../lib/utils'
+import {
+  displayAddress,
+  isValidEmail,
+  matchesContactPrefix,
+  parseAddresses,
+  splitAddressList,
+} from '../lib/utils'
 
 interface RecipientFieldProps {
   value: string
@@ -26,15 +32,10 @@ export function RecipientField({
   const [active, setActive] = useState(0)
   const [adding, setAdding] = useState(false)
 
-  const lastComma = value.lastIndexOf(',')
-  const prefix = lastComma >= 0 ? value.slice(0, lastComma + 1) : ''
-  const token = (lastComma >= 0 ? value.slice(lastComma + 1) : value).trim()
-  const usedEmails = new Set(
-    value
-      .toLowerCase()
-      .match(/[^\s,<>]+@[^\s,<>]+/g)
-      ?.map((email) => email.replace(/[>,;]+$/, '')) ?? [],
-  )
+  const segment = splitAddressList(value).at(-1) ?? ''
+  const prefix = value.slice(0, value.length - segment.length)
+  const token = segment.trim()
+  const usedEmails = new Set(parseAddresses(value))
   const needle = token.toLowerCase()
   const suggestions = contacts
     .filter((contact) => {
@@ -59,7 +60,14 @@ export function RecipientField({
 
   function choose(contact: Contact) {
     const separator = prefix ? `${prefix.trimEnd()} ` : ''
-    onChange(`${separator}${displayAddress(contact)}, `)
+    // The input is an address list. Preserve separators inside display names.
+    let name = contact.name
+    if (/["<>\\]/.test(name)) {
+      name = ''
+    } else if (/[,;，；]/.test(name)) {
+      name = `"${name}"`
+    }
+    onChange(`${separator}${displayAddress({ name, email: contact.email })}, `)
     setOpen(false)
     setActive(0)
   }
@@ -111,6 +119,9 @@ export function RecipientField({
         onFocus={() => setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+            return
+          }
           if (event.key === 'Enter') {
             // Enter only picks the highlighted suggestion (including "Add to
             // contacts") or commits the address. It must never reach the form

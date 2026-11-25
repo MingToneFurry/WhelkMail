@@ -268,9 +268,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   return json({
     ok: true,
     draftId: `r_${relayId}`,
-    ...(rescuedWith
+    ...(rescuedWith && copyTarget
       ? {
-          warning: `The draft was saved to ${rescuedWith === 'r2' ? 'R2' : 'Google Drive'} because ${copyTarget?.email ?? 'the mailbox'} rejected the copy (${appendError ?? 'IMAP error'}). It is not in that mailbox.`,
+          warning: `The draft was saved to ${rescuedWith === 'r2' ? 'R2' : 'Google Drive'} because ${copyTarget.email} rejected the copy (${appendError ?? 'IMAP error'}). It is not in that mailbox.`,
+          warningMessage: {
+            key: 'diagnostics.draftRescued',
+            vars: {
+              storage: rescuedWith === 'r2' ? 'R2' : 'Google Drive',
+              email: copyTarget.email,
+              detail: appendError ?? 'IMAP error',
+            },
+          },
         }
       : {}),
   })

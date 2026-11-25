@@ -51,7 +51,7 @@ export async function handleRequest(
 
     // An insecure APP_PASSWORD must not serve the application at all: the Node
     // entry refuses to start, this is the same policy for Workers.
-    const blocked = passwordGuard(env, url.pathname)
+    const blocked = passwordGuard(env, url.pathname, request.headers.get('Accept-Language') ?? '')
     if (blocked) {
       return withSecurityHeaders(blocked)
     }
@@ -102,7 +102,7 @@ export async function handleRequest(
     return withSecurityHeaders(response)
   } catch (error) {
     if (error instanceof HttpError) {
-      return withSecurityHeaders(fail(error.message, error.status))
+      return withSecurityHeaders(fail(error.message, error.status, undefined, error.code))
     }
     return withSecurityHeaders(fail('Internal error', 500, undefined, 'internal'))
   }

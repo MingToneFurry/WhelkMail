@@ -45,7 +45,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // Pages has no startup hook either: the policy is applied per request, as on
     // Workers.
-    const blocked = passwordGuard(context.env, url.pathname)
+    const blocked = passwordGuard(context.env, url.pathname, request.headers.get('Accept-Language') ?? '')
     if (blocked) {
       return withSecurityHeaders(blocked)
     }
@@ -67,7 +67,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return withSecurityHeaders(await context.next())
   } catch (error) {
     if (error instanceof HttpError) {
-      return withSecurityHeaders(fail(error.message, error.status))
+      return withSecurityHeaders(fail(error.message, error.status, undefined, error.code))
     }
     return withSecurityHeaders(fail('Internal error', 500, undefined, 'internal'))
   }

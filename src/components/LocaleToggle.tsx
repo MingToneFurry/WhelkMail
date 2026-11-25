@@ -9,6 +9,8 @@ export function LocaleToggle({ className }: { className?: string }) {
         <button
           key={item.id}
           type="button"
+          lang={item.id}
+          aria-pressed={locale === item.id}
           onClick={() => setLocale(item.id)}
           className={cn(
             'rounded-md px-2 py-1 text-[11px]',

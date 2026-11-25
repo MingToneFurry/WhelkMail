@@ -20,11 +20,21 @@ describe('password guard', () => {
     expect(await response?.json()).toMatchObject({ code: 'app_password_insecure' })
   })
 
-  it('answers HTML for a page request', () => {
+  it('answers HTML in Simplified Chinese by default', async () => {
     const response = passwordGuard(envWith('short'), '/')
 
     expect(response?.status).toBe(503)
     expect(response?.headers.get('Content-Type')).toContain('text/html')
+    expect(await response?.text()).toContain('APP_PASSWORD 长度不足。')
+  })
+
+  it('localizes the cached password issue for each request', async () => {
+    const env = envWith('change-me')
+    const english = passwordGuard(env, '/api/accounts', 'en-GB')
+    const italian = passwordGuard(env, '/api/accounts', 'en;q=0.4, it-IT;q=0.9')
+    expect(await english?.json()).toMatchObject({ detail: 'APP_PASSWORD still uses an example value.' })
+    expect(italian?.headers.get('Content-Language')).toBe('it')
+    expect(await italian?.json()).toMatchObject({ detail: 'APP_PASSWORD contiene ancora una password di esempio.' })
   })
 
   it('keeps the health endpoint reachable so monitoring still works', () => {

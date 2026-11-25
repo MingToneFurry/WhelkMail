@@ -285,7 +285,7 @@ export function Sidebar({
                     key={item.id}
                     type="button"
                     onClick={() => setColor(item.id)}
-                    aria-label={item.id}
+                    aria-label={t(`labels.color.${item.id}`)}
                     className={cn(
                       'h-4 w-4 rounded-full ring-offset-1',
                       item.dot,
@@ -331,7 +331,7 @@ export function Sidebar({
                           key={item.id}
                           type="button"
                           onClick={() => setEditColor(item.id)}
-                          aria-label={item.id}
+                          aria-label={t(`labels.color.${item.id}`)}
                           className={cn(
                             'h-4 w-4 rounded-full ring-offset-1',
                             item.dot,

@@ -1,3 +1,5 @@
+import { preferredLocale } from '../shared/request-locale'
+
 interface Env {
   APP_URL: string
   CRON_SECRET: string
@@ -17,7 +19,9 @@ export default {
       }).then(() => undefined),
     )
   },
-  async fetch(): Promise<Response> {
-    return new Response('WhelkMail notification cron worker')
+  async fetch(request: Request): Promise<Response> {
+    const locale = preferredLocale(request.headers.get('Accept-Language'))
+    const names = { 'zh-CN': 'WhelkMail 定时通知服务', en: 'WhelkMail notification cron worker', it: 'Servizio notifiche pianificate di WhelkMail' }
+    return new Response(names[locale], { headers: { 'Content-Language': locale, Vary: 'Accept-Language' } })
   },
 }

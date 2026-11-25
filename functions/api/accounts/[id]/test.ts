@@ -16,9 +16,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   const checks: Record<string, string> = {}
+  let folderCount: number
   try {
     const folders = await withImap(context.env, row, (connection) => connection.listFolders())
-    checks.imap = `ok (${folders.length} folders)`
+    folderCount = folders.length
+    checks.imap = `ok (${folderCount} folders)`
   } catch (error) {
     return fail(
       'IMAP connection failed',
@@ -53,5 +55,5 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
 
-  return json({ ok: true, kind: 'imap', checks })
+  return json({ ok: true, kind: 'imap', checks, folderCount })
 }

@@ -30,6 +30,12 @@ describe('splitQuotedText', () => {
     })
   })
 
+  it('recognizes a Chinese reply attribution and original-message separator', () => {
+    const chinese = '收到。\n\n小明 <ming@example.com> 于 2026/11/25 18:15 写道：\n> 请查收'
+    expect(splitQuotedText(chinese)?.body).toBe('收到。')
+    expect(splitQuotedText('好的。\n\n-----原始邮件-----\n发件人：小李')?.body).toBe('好的。')
+  })
+
   it('leaves normal messages alone', () => {
     expect(splitQuotedText('Buongiorno, nessuna citazione qui.')).toBeNull()
     expect(splitQuotedText('')).toBeNull()

@@ -1,5 +1,6 @@
 import type { AccountRow } from './db'
 import type { Env } from './env'
+import { generatedMailText } from './generated-mail'
 import { appendToSent } from './mail/imap'
 import { sendWithAccount } from './mail/smtp'
 import { buildMime } from './mime'
@@ -9,11 +10,8 @@ const SENDER_COOLDOWN_MS = 24 * 60 * 60 * 1000
 /** Never auto-reply to mail older than this, even if it is the first sync. */
 const MAX_MESSAGE_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
-const DEFAULT_BODY =
-  'I am currently out of the office and will get back to you as soon as possible.'
-
 const NO_REPLY_SENDER = /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounce|notifications?)(\+.*)?@/i
-const AUTO_REPLY_SUBJECT = /^(auto(matic)?[ -]?reply|out of office|fuori sede|risposta automatica)\b/i
+const AUTO_REPLY_SUBJECT = /^(?:(?:auto(matic)?[ -]?reply|out of office|fuori sede|risposta automatica)\b|自动回复|自動回覆)/i
 
 interface AutoReplyConfig {
   enabled: boolean
@@ -121,9 +119,10 @@ export async function processAutoReply(
     return 'skipped'
   }
 
-  const body = config.body.trim() || DEFAULT_BODY
+  const defaults = generatedMailText(env.MAIL_LOCALE)
+  const body = config.body.trim() || defaults.vacationBody
   const bodyHtml = config.bodyHtml.trim()
-  const subject = (config.subject.trim() || `Re: ${row.subject || 'your message'}`).slice(0, 200)
+  const subject = (config.subject.trim() || `Re: ${row.subject || defaults.yourMessage}`).slice(0, 200)
   const domain = account.email.split('@')[1] ?? 'localhost'
   const outboundId = `<auto-${crypto.randomUUID()}@${domain}>`
   const mime = buildMime({

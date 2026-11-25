@@ -1,6 +1,21 @@
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { SECURITY_HEADERS } from './app'
+import { preferredLocale } from '../shared/request-locale'
+
+const errorPages = {
+  'zh-CN': { 404: '找不到此资源。', 405: '不支持此请求方式。', 500: '缺少前端构建文件，请运行 npm run build。' },
+  en: { 404: 'Not found', 405: 'Method not allowed', 500: 'The frontend build is missing (run npm run build)' },
+  it: { 404: 'Risorsa non trovata', 405: 'Metodo non consentito', 500: 'Build frontend mancante (esegui npm run build)' },
+}
+
+function errorPage(request: Request, status: 404 | 405 | 500): Response {
+  const locale = preferredLocale(request.headers.get('Accept-Language'))
+  return new Response(request.method === 'HEAD' ? null : errorPages[locale][status], {
+    status,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Language': locale, Vary: 'Accept-Language' },
+  })
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -76,7 +91,7 @@ async function readAsset(
 export async function serveStatic(request: Request, root: string): Promise<Response> {
   const url = new URL(request.url)
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return new Response('Method not allowed', { status: 405 })
+    return errorPage(request, 405)
   }
 
   const asset = await readAsset(root, url.pathname)
@@ -86,18 +101,12 @@ export async function serveStatic(request: Request, root: string): Promise<Respo
 
   if (!asset) {
     if (extname(url.pathname) !== '') {
-      return new Response('Not found', {
-        status: 404,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      })
+      return errorPage(request, 404)
     }
     try {
       body = await readFile(join(root, 'index.html'))
     } catch {
-      return new Response('The frontend build is missing (run npm run build)', {
-        status: 500,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      })
+      return errorPage(request, 500)
     }
     contentType = MIME['.html']
   }

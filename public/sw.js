@@ -1,4 +1,6 @@
-const CACHE = 'whelkmail-v3'
+const CACHE = 'whelkmail-v4'
+const PREFERENCES = 'whelkmail-preferences'
+const PUSH_LANGUAGE = '/api/device/push-language'
 const SHELL = [
   '/',
   '/favicon.svg',
@@ -22,7 +24,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE && key !== PREFERENCES).map((key) => caches.delete(key))),
+      )
       .then(() => self.clients.claim()),
   )
 })
@@ -156,6 +160,40 @@ self.addEventListener('pushsubscriptionchange', (event) => {
   )
 })
 
+self.addEventListener('message', (event) => {
+  if (event.origin !== self.location.origin || event.data?.type !== 'push-language') return
+  const { locale, noSubject } = event.data
+  if (typeof locale !== 'string' || typeof noSubject !== 'string') return
+  event.waitUntil(
+    caches.open(PREFERENCES)
+      .then((cache) => cache.put(PUSH_LANGUAGE, Response.json({ locale, noSubject })))
+      .catch(() => undefined),
+  )
+})
+
+async function showMailNotification(payload) {
+  let body = payload.body
+  let lang
+  if (body === '') {
+    const language = await caches.match(PUSH_LANGUAGE, { cacheName: PREFERENCES })
+      .then((response) => response?.json())
+      .catch(() => undefined)
+    lang = language?.locale || 'zh-CN'
+    body = language?.noSubject || '（无主题）'
+  }
+  const title = payload.title || 'WhelkMail'
+  await self.registration.showNotification(title, {
+    body: body || '',
+    lang,
+    // Android masks the badge into a monochrome silhouette in the status bar and
+    // only renders bitmaps there, so both assets are PNG (see scripts/generate-icons.mjs).
+    icon: payload.icon || '/notification-icon.png',
+    badge: payload.badge || '/notification-badge.png',
+    data: { url: payload.url || '/', tag: payload.tag || undefined },
+    tag: payload.tag || undefined,
+  })
+}
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {
@@ -163,17 +201,7 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = {}
   }
-  const title = payload.title || 'WhelkMail'
-  const options = {
-    body: payload.body || '',
-    // Android masks the badge into a monochrome silhouette in the status bar and
-    // only renders bitmaps there, so both assets are PNG (see scripts/generate-icons.mjs).
-    icon: payload.icon || '/notification-icon.png',
-    badge: payload.badge || '/notification-badge.png',
-    data: { url: payload.url || '/', tag: payload.tag || undefined },
-    tag: payload.tag || undefined,
-  }
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(showMailNotification(payload))
 })
 
 self.addEventListener('notificationclick', (event) => {

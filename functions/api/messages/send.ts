@@ -1,6 +1,6 @@
 import { canSendFrom } from '../../../shared/from-address'
 import { sendSchema } from '../../../shared/schemas'
-import type { AttachmentMeta, Mailbox } from '../../../shared/types'
+import type { AttachmentMeta, Mailbox, WarningMessage } from '../../../shared/types'
 import { addAutoContacts } from '../../_lib/contacts'
 import { fromBase64 } from '../../_lib/crypto'
 import {
@@ -218,6 +218,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
     await addAutoContacts(context.env, [...to, ...cc, ...bcc])
     let warning: string | undefined
+    let warningMessage: WarningMessage | undefined
     let sentFolder: string | undefined
     if (!account.auto_saves_sent) {
       try {
@@ -230,9 +231,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           account.sent_folder = appended.folder
         }
       } catch (error) {
-        warning = `Message sent, but the copy in ${account.sent_folder} wasn't saved: ${
-          error instanceof Error ? error.message : 'IMAP error'
-        }`
+        const detail = error instanceof Error ? error.message : 'IMAP error'
+        warning = `Message sent, but the copy in ${account.sent_folder} wasn't saved: ${detail}`
+        warningMessage = { key: 'diagnostics.sentCopyFailed', vars: { folder: account.sent_folder, detail } }
       }
     }
     if (input.draftId) {
@@ -241,7 +242,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       )
     }
     await queueSync(context.env, account, 'sent', (promise) => context.waitUntil(promise)).catch(() => undefined)
-    return json({ ok: true, warning, sentFolder })
+    return json({ ok: true, warning, warningMessage, sentFolder })
   }
 
   if (account.storage_driver === 'r2' && !context.env.BUCKET) {
@@ -340,6 +341,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     relayAccepted = true
     await addAutoContacts(context.env, [...to, ...cc, ...bcc])
     let warning: string | undefined
+    let warningMessage: WarningMessage | undefined
     if (copyTarget) {
       try {
         storageKey = await storeCopyInMailbox(context.env, copyTarget, mime, 'sent')
@@ -363,9 +365,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             // Try the next backend: a revoked Drive token must not lose the copy.
           }
         }
-        warning = rescuedWith
-          ? `Message sent, but the copy in ${copyTarget.sent_folder || 'Sent'} of ${copyTarget.email} wasn't saved (${detail}). The message was archived to ${rescuedWith === 'r2' ? 'R2' : 'Google Drive'} instead.`
-          : `Message sent, but the copy in ${copyTarget.sent_folder || 'Sent'} of ${copyTarget.email} wasn't saved: ${detail}`
+        const folder = copyTarget.sent_folder || 'Sent'
+        const email = copyTarget.email
+        if (rescuedWith) {
+          const storage = rescuedWith === 'r2' ? 'R2' : 'Google Drive'
+          warning = `Message sent, but the copy in ${folder} of ${email} wasn't saved (${detail}). The message was archived to ${storage} instead.`
+          warningMessage = { key: 'diagnostics.relayCopyRescued', vars: { folder, email, detail, storage } }
+        } else {
+          warning = `Message sent, but the copy in ${folder} of ${email} wasn't saved: ${detail}`
+          warningMessage = { key: 'diagnostics.relayCopyFailed', vars: { folder, email, detail } }
+        }
       }
     }
     const row = await persistRelayMessage({
@@ -403,6 +412,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         ok: true,
         message: relayMessageSummary(row, account),
         warning,
+        warningMessage,
         ...(undelivered.length > 0 ? { undelivered } : {}),
       },
       201,
@@ -417,6 +427,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         {
           ok: true,
           warning: `Message accepted by ${relay.label}, but WhelkMail could not record it (${detail}). Check the provider's activity log before sending it again.`,
+          warningMessage: { key: 'diagnostics.acceptedWithoutRecord', vars: { relay: relay.label, detail } },
           messageId: id,
           ...(undelivered.length > 0 ? { undelivered } : {}),
         },

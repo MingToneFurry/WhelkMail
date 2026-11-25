@@ -12,6 +12,8 @@ TOKEN_ENC_KEY=
 # deployments). The Workers entry runs the same work in-process and does not
 # read this secret.
 # CRON_SECRET=
+# 筛选器转发标注和默认休假回复的语言，可选 zh-CN（默认）、en、it。
+# MAIL_LOCALE=zh-CN
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
 # GOOGLE_MAIL_CLIENT_ID=

@@ -84,7 +84,7 @@ function parseList(value: string): string[] {
   return [
     ...new Set(
       value
-        .split(/[,;\n]+/)
+        .split(/[,;，；\n]+/)
         .map((item) => item.trim())
         .filter(Boolean),
     ),

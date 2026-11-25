@@ -20,6 +20,8 @@ export interface Env {
   VAPID_PRIVATE_KEY?: string
   VAPID_SUBJECT?: string
   CRON_SECRET?: string
+  /** Language of server-generated forwards and default vacation replies. */
+  MAIL_LOCALE?: string
   /** Public origin used by the cron worker / Node scheduler. */
   APP_URL?: string
   /** Set to `off` to stop the outbound check for new releases. */
