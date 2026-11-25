@@ -244,6 +244,8 @@ docker compose up -d --build
 | `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` | 通过 Google OAuth 授权 IMAP/SMTP 收发信 |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT` | 为 Outlook 或 Microsoft 365 设置 OAuth |
 | `RELAY_PROVIDER` / `RELAY_API_KEY` / `RELAY_API_SECRET` | 为当前部署设置默认发信中继 |
+| `PRIVACY_SENDER_DOMAIN` | 限制网页通过中继从指定域名发信。新信和草稿须填写或选择发件别名。回复时可点击建议的原收件别名。自动回复和筛选器转发会跳过 |
+| `PRIVACY_SMTP_RELAY_HOST` | 在上述模式下允许一个额外的专用 SMTP 中继主机。自定义中继须使用 TLS 或 STARTTLS。默认支持 `mail.smtp2go.com` 和 `smtp.resend.com` |
 | `MAILGUN_DOMAIN` / `MAILGUN_REGION` | 使用 Mailgun 作为默认中继时的域名和区域 |
 | `BUCKET`（R2 绑定） | 启用可选的 R2 归档 |
 | `UPDATE_CHECK` | 设为 `off` 可停止向 GitHub 查询新版本，详见[升级指南](docs/UPGRADE.md) |

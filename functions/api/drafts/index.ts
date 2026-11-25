@@ -1,4 +1,5 @@
 import { draftSchema } from '../../../shared/schemas'
+import { canSendFrom, domainOf } from '../../../shared/from-address'
 import type { AttachmentMeta } from '../../../shared/types'
 import { fromBase64 } from '../../_lib/crypto'
 import { getAccountRow, mailboxesFromAddresses, type MessageRow } from '../../_lib/db'
@@ -71,11 +72,25 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const cc = mailboxesFromAddresses(input.cc)
   const bcc = mailboxesFromAddresses(input.bcc)
   const id = crypto.randomUUID()
-  const domain = account.email.split('@')[1] ?? 'localhost'
+  const privacyDomain = context.env.PRIVACY_SENDER_DOMAIN?.trim().toLowerCase()
+  const domain = privacyDomain || domainOf(account.email) || 'localhost'
+  let from: { name: string; email: string } | null = { name: account.display_name, email: account.email }
+  if (privacyDomain) {
+    // The storage mailbox may be a personal Gmail account. A draft without a
+    // confirmed sender must not acquire that identity in its stored headers.
+    from = null
+    if (input.fromEmail) {
+      const identity = { kind: account.kind, email: account.email, relayAnyAddress: Boolean(account.relay_any_address) }
+      if (account.kind !== 'relay' || domainOf(input.fromEmail) !== privacyDomain || !canSendFrom(identity, input.fromEmail)) {
+        return fail('Choose an authorized sender address', 400, undefined, 'privacy_sender_required')
+      }
+      from = { name: '', email: input.fromEmail }
+    }
+  }
   const messageId = `<draft-${id}@${domain}>`
   const now = new Date()
   const mime = buildMime({
-    from: { name: account.display_name, email: account.email },
+    from,
     to,
     cc,
     bcc,
@@ -203,9 +218,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       )
     }
     await context.env.DB.prepare(
-      'UPDATE messages SET to_json = ?, cc_json = ?, bcc_json = ?, subject = ?, snippet = ?, body_text = ?, body_html = ?, sent_at = ?, size = ?, storage_driver = ?, storage_key = ?, attachments_json = ?, thread_key = ?, status = ?, folder = ? WHERE id = ?',
+      'UPDATE messages SET from_name = ?, from_email = ?, to_json = ?, cc_json = ?, bcc_json = ?, subject = ?, snippet = ?, body_text = ?, body_html = ?, sent_at = ?, size = ?, storage_driver = ?, storage_key = ?, attachments_json = ?, thread_key = ?, status = ?, folder = ? WHERE id = ?',
     )
       .bind(
+        from?.name ?? '',
+        from?.email ?? '',
         JSON.stringify(to),
         JSON.stringify(cc),
         JSON.stringify(bcc),
@@ -234,8 +251,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         'draft',
         messageId,
         threadKey,
-        account.display_name,
-        account.email,
+        from?.name ?? '',
+        from?.email ?? '',
         JSON.stringify(to),
         JSON.stringify(cc),
         JSON.stringify(bcc),

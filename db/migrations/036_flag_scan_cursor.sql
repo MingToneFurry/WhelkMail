@@ -1,0 +1,1 @@
+ALTER TABLE imap_sync ADD COLUMN flags_before_uid INTEGER NOT NULL DEFAULT 0;

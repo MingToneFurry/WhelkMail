@@ -34,8 +34,9 @@ import { errorText, oauthReasonText } from './lib/errors'
 import { syncPushSubscription } from './lib/push'
 import { syncSignature } from './lib/sync-signature'
 import { domainOf, pickDomainAlias, pickReplyAccount } from '../shared/from-address'
+import { privacyAccountAllowed } from '../shared/privacy-sender'
 import { mergePage } from '../shared/paging'
-import { pickReplySender } from './lib/sender'
+import { pickReplySender, privateReplyAlias, privateSenderAccount } from './lib/sender'
 import { displayAddress, isValidEmail, nameFromEmail } from './lib/utils'
 import { Compose } from './components/Compose'
 import { Contacts } from './components/Contacts'
@@ -183,6 +184,8 @@ export default function App() {
   const [metadataRetentionDays, setMetadataRetentionDays] = useState(0)
   const [storage, setStorage] = useState<StorageOptions>({ drive: true, r2: false })
   const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [privacyDomain, setPrivacyDomain] = useState<string | null>(null)
+  const [privacySmtpRelayHost, setPrivacySmtpRelayHost] = useState<string | null>(null)
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string>(initialRoute.accountId)
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(initialRoute.labelId)
@@ -283,6 +286,8 @@ export default function App() {
         return
       }
       setAccounts(accountsResponse.accounts)
+      setPrivacyDomain(accountsResponse.privacySenderDomain ?? null)
+      setPrivacySmtpRelayHost(accountsResponse.privacySmtpRelayHost ?? null)
       setStorage(storageResponse)
       setHealth(healthResponse)
       // The release check can wait for the cached GitHub answer: it must not
@@ -385,9 +390,11 @@ export default function App() {
     const unsubscribe = onPageResume(() => {
       const request = ++latest
       void api.accounts()
-        .then(({ accounts: saved }) => {
+        .then(({ accounts: saved, privacySenderDomain, privacySmtpRelayHost }) => {
           if (request === latest && saved.length > 0) {
             setAccounts((current) => current.length === 0 ? saved : current)
+            setPrivacyDomain(privacySenderDomain ?? null)
+            setPrivacySmtpRelayHost(privacySmtpRelayHost ?? null)
           }
         })
         .catch((error: unknown) => {
@@ -1095,7 +1102,12 @@ export default function App() {
     })
   }
 
-  function replyTo(message: MessageDetail, all: boolean) {
+  function replyIdentity(message: MessageDetail) {
+    if (privacyDomain) {
+      const fromEmail = privateReplyAlias(message, privacyDomain)
+      const relay = fromEmail && privateSenderAccount(composeAccounts, fromEmail, privacyDomain)
+      return { accountId: relay ? relay.id : '', fromEmail: relay ? fromEmail : null }
+    }
     const receivingAccount = accounts.find((item) => item.id === message.accountId)
     const alias = aliasAccountFor(message)
     const sendingAccountId = pickReplySender({
@@ -1117,8 +1129,17 @@ export default function App() {
           : null
     const fromEmail =
       domainAlias && domainAlias !== sendingAccount?.email.toLowerCase() ? domainAlias : null
+    return { accountId: sendingAccountId, fromEmail }
+  }
+
+  function replyTo(message: MessageDetail, all: boolean) {
+    const { accountId: sendingAccountId, fromEmail } = replyIdentity(message)
+    const sendingAccount = accounts.find((item) => item.id === sendingAccountId)
+    const privateAddresses = privacyDomain
+      ? accounts.filter(item => item.kind === 'imap').flatMap(item => [item.email, item.username])
+      : []
     const ownAddresses = new Set(
-      [message.accountEmail, sendingAccount?.email ?? '', fromEmail ?? '']
+      [message.accountEmail, sendingAccount?.email ?? '', fromEmail ?? '', ...privateAddresses]
         .filter(Boolean)
         .map((email) => email.toLowerCase()),
     )
@@ -1750,6 +1771,13 @@ export default function App() {
     }
   }
 
+  const composeAccounts = privacyDomain
+    ? accounts.filter(item => {
+        const relayProvider = item.relayProvider || health?.relayProvider
+        const configured = item.relayConfigured || (health?.relayConfigured && health.relayProvider === relayProvider)
+        return configured && privacyAccountAllowed(privacyDomain, { ...item, relayProvider }, privacySmtpRelayHost)
+      })
+    : accounts
   const composeAccountId =
     defaultSenderNew !== 'auto' &&
     accounts.some((account) => account.id === defaultSenderNew)
@@ -2179,7 +2207,11 @@ export default function App() {
       {composeOpen ? (
         <Compose
           key={composeKey}
-          accounts={accounts}
+          accounts={composeAccounts}
+          privacyDomain={privacyDomain}
+          draftStorageAccount={privacyDomain
+            ? accounts.find(item => item.id === (composeDraft?.accountId ?? composeAccountId)) ?? accounts[0] ?? null
+            : null}
           contacts={contacts}
           onAddContact={addContactFromEmail}
           defaultAccountId={composeAccountId}

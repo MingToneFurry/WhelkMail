@@ -73,7 +73,7 @@ export async function processAutoReply(
   account: AccountRow,
   row: MessageRowLike,
 ): Promise<'sent' | 'skipped' | 'error'> {
-  if (account.kind !== 'imap' || row.folder !== 'inbox') {
+  if (env.PRIVACY_SENDER_DOMAIN?.trim() || account.kind !== 'imap' || row.folder !== 'inbox') {
     return 'skipped'
   }
   const messageId = row.message_id?.trim() || row.id

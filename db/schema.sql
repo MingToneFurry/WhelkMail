@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS imap_sync (
   uid_validity INTEGER,
   max_uid INTEGER NOT NULL DEFAULT 0,
   min_uid INTEGER NOT NULL DEFAULT 0,
+  flags_before_uid INTEGER NOT NULL DEFAULT 0,
   backfill_done INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'idle',
   error TEXT,

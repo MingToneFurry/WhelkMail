@@ -13,6 +13,7 @@ import { MISSING_FOLDER, withImap, resolveFolderName } from './mail/imap'
 import { applyFilters } from './filters'
 import { processAutoReply } from './auto-reply'
 import { archiveUpdateStatement } from './mail/archive-update'
+import { refreshMirrorFlags } from './mail/refresh-flags'
 import {
   isReplySubject,
   normalizeMessageId,
@@ -45,7 +46,6 @@ import {
 export const SYNC_FOLDERS: Folder[] = ['inbox', 'sent', 'draft', 'spam']
 const CHUNK_SIZE = 40
 const BACKFILL_WINDOW = 400
-const FLAG_WINDOW = 120
 
 export interface SyncRow {
   account_id: string
@@ -53,6 +53,7 @@ export interface SyncRow {
   uid_validity: number | null
   max_uid: number
   min_uid: number
+  flags_before_uid: number
   backfill_done: number
   status: string
   error: string | null
@@ -243,6 +244,7 @@ async function upsertSyncState(
     uidValidity: number | null
     maxUid: number
     minUid: number
+    flagsBeforeUid: number
     backfillDone: boolean
     status: SyncStatus
     error: string | null
@@ -252,9 +254,9 @@ async function upsertSyncState(
   },
 ): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO imap_sync (account_id, folder, uid_validity, max_uid, min_uid, backfill_done, status, error, total, synced, last_synced_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(account_id, folder) DO UPDATE SET uid_validity = excluded.uid_validity, max_uid = excluded.max_uid, min_uid = excluded.min_uid, backfill_done = excluded.backfill_done, status = excluded.status, error = excluded.error, total = excluded.total, synced = excluded.synced, last_synced_at = excluded.last_synced_at, updated_at = excluded.updated_at`,
+    `INSERT INTO imap_sync (account_id, folder, uid_validity, max_uid, min_uid, flags_before_uid, backfill_done, status, error, total, synced, last_synced_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, folder) DO UPDATE SET uid_validity = excluded.uid_validity, max_uid = excluded.max_uid, min_uid = excluded.min_uid, flags_before_uid = excluded.flags_before_uid, backfill_done = excluded.backfill_done, status = excluded.status, error = excluded.error, total = excluded.total, synced = excluded.synced, last_synced_at = excluded.last_synced_at, updated_at = excluded.updated_at`,
   )
     .bind(
       accountId,
@@ -262,6 +264,7 @@ async function upsertSyncState(
       values.uidValidity,
       values.maxUid,
       values.minUid,
+      values.flagsBeforeUid,
       values.backfillDone ? 1 : 0,
       values.status,
       values.error,
@@ -319,6 +322,7 @@ export async function markSyncError(
     uidValidity: row?.uid_validity ?? null,
     maxUid: row?.max_uid ?? 0,
     minUid: row?.min_uid ?? 0,
+    flagsBeforeUid: row?.flags_before_uid ?? 0,
     backfillDone: Boolean(row?.backfill_done),
     status: 'error',
     error,
@@ -983,6 +987,7 @@ async function runSyncChunkLocked(
   let uidValidity = row?.uid_validity ?? null
   let maxUid = row?.max_uid ?? 0
   let minUid = row?.min_uid ?? 0
+  let flagsBeforeUid = row?.flags_before_uid ?? 0
   let backfillDone = Boolean(row?.backfill_done)
   const archiveStorage = getImapArchiveStorage(env, account)
   const archiveBodies = Boolean(archiveStorage)
@@ -1033,6 +1038,7 @@ async function runSyncChunkLocked(
         .catch(() => undefined)
       maxUid = 0
       minUid = 0
+      flagsBeforeUid = 0
       backfillDone = false
     }
 
@@ -1294,22 +1300,7 @@ async function runSyncChunkLocked(
 
     if (maxUid > 0) {
       await renewSyncLock(env, account.id, folder, lock)
-      const flagStart = Math.max(1, maxUid - FLAG_WINDOW)
-      const flagUids = await connection.searchUids(`${flagStart}:${maxUid}`)
-      const flags = await connection.fetchFlags(flagUids)
-      const updates: D1PreparedStatement[] = []
-      for (const item of flags) {
-        const unread =
-          folder === 'draft' || item.flags.some((flag) => flag.toLowerCase() === '\\seen') ? 0 : 1
-        updates.push(
-          env.DB.prepare(
-            'UPDATE imap_messages SET unread = ?, updated_at = ? WHERE account_id = ? AND folder = ? AND uid = ? AND unread <> ?',
-          ).bind(unread, now, account.id, folder, item.uid, unread),
-        )
-      }
-      if (updates.length > 0) {
-        await env.DB.batch(updates)
-      }
+      flagsBeforeUid = await refreshMirrorFlags(env.DB, connection, account.id, folder, uidValidity, maxUid, flagsBeforeUid)
     }
 
     await renewSyncLock(env, account.id, folder, lock)
@@ -1370,6 +1361,7 @@ async function runSyncChunkLocked(
       uidValidity,
       maxUid,
       minUid,
+      flagsBeforeUid,
       backfillDone,
       status: hasMore ? 'partial' : 'done',
       error: null,

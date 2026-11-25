@@ -35,6 +35,8 @@ function required(name: string): string {
 
 const PASSTHROUGH = [
   'MAIL_LOCALE',
+  'PRIVACY_SENDER_DOMAIN',
+  'PRIVACY_SMTP_RELAY_HOST',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_MAIL_CLIENT_ID',

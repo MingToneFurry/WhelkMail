@@ -1,4 +1,5 @@
-import { canSendFrom } from '../../../shared/from-address'
+import { canSendFrom, domainOf } from '../../../shared/from-address'
+import { privacyAccountAllowed } from '../../../shared/privacy-sender'
 import { sendSchema } from '../../../shared/schemas'
 import type { AttachmentMeta, Mailbox, WarningMessage } from '../../../shared/types'
 import { addAutoContacts } from '../../_lib/contacts'
@@ -30,6 +31,7 @@ interface PersistInput {
   account: AccountRow
   /** The From actually used: the account's own address or another on its domain. */
   fromEmail: string
+  fromName: string
   id: string
   messageId: string
   to: Mailbox[]
@@ -60,7 +62,7 @@ async function persistRelayMessage(input: PersistInput): Promise<MessageRow> {
       'sent',
       input.messageId,
       input.threadKey,
-      input.account.display_name,
+      input.fromName,
       input.fromEmail,
       JSON.stringify(input.to),
       JSON.stringify(input.cc),
@@ -108,6 +110,20 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const account = await getAccountRow(context.env, input.accountId)
   if (!account) {
     return fail('Account not found', 404, undefined, 'account_not_found')
+  }
+  const privacyDomain = context.env.PRIVACY_SENDER_DOMAIN?.trim().toLowerCase()
+  if (privacyDomain && (
+    !input.fromEmail || domainOf(input.fromEmail) !== privacyDomain ||
+    !privacyAccountAllowed(privacyDomain, {
+      kind: account.kind,
+      email: account.email,
+      relayProvider: account.relay_provider ?? context.env.RELAY_PROVIDER,
+      smtpHost: account.smtp_host,
+      smtpSecurity: account.smtp_security,
+      username: account.username,
+    }, context.env.PRIVACY_SMTP_RELAY_HOST)
+  )) {
+    return fail('Choose an authorized alias and sending relay', 403, undefined, 'privacy_sender_required')
   }
   // Checked here, not only in the composer: the client can't widen what an
   // account may send as.
@@ -284,8 +300,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (tooManyRecipients) {
     return tooManyRecipients
   }
+  const senderName = privacyDomain ? '' : account.display_name
   const mime = buildMime({
-    from: { name: account.display_name, email: fromEmail },
+    from: { name: senderName, email: fromEmail },
     to,
     cc,
     bcc,
@@ -328,7 +345,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   let relayResult: RelayResult | null = null
   try {
     relayResult = await relay.send({
-      fromName: account.display_name,
+      fromName: senderName,
       fromEmail,
       to: input.to,
       cc: input.cc,
@@ -381,6 +398,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       env: context.env,
       account,
       fromEmail,
+      fromName: senderName,
       id,
       messageId,
       to,
@@ -438,6 +456,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       env: context.env,
       account,
       fromEmail,
+      fromName: senderName,
       id,
       messageId,
       to,

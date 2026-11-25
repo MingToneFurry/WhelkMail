@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrevoRelay } from '../functions/_lib/relay/brevo'
 import { CloudflareRelay } from '../functions/_lib/relay/cloudflare'
+import { CustomSmtpRelay } from '../functions/_lib/relay/custom'
+import { MailgunRelay } from '../functions/_lib/relay/mailgun'
 import { MailjetRelay } from '../functions/_lib/relay/mailjet'
 import { PostmarkRelay } from '../functions/_lib/relay/postmark'
 import { ResendRelay } from '../functions/_lib/relay/resend'
 import { SendGridRelay } from '../functions/_lib/relay/sendgrid'
+import { Smtp2GoRelay } from '../functions/_lib/relay/smtp2go'
 import type { RelayAdapter, RelayMessage } from '../functions/_lib/relay/types'
+import { SmtpConnection } from '../functions/_lib/smtp/client'
 
 /**
  * A message with no Cc and no Bcc must not carry empty recipient fields.
@@ -37,6 +41,20 @@ interface Case {
 }
 
 const cases: Case[] = [
+  {
+    name: 'smtp2go',
+    adapter: () => new Smtp2GoRelay('key'),
+    success: { data: { succeeded: 1, failed: 0, failures: [], email_id: 'id' } },
+    status: 200,
+    body: (text) => JSON.parse(text),
+  },
+  {
+    name: 'mailgun',
+    adapter: () => new MailgunRelay('key', 'example.com'),
+    success: { id: 'id' },
+    status: 200,
+    body: (text) => JSON.parse(text),
+  },
   {
     name: 'brevo',
     adapter: () => new BrevoRelay('key'),
@@ -82,6 +100,7 @@ const cases: Case[] = [
 ]
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -90,7 +109,9 @@ function capture(status: number, body: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init: RequestInit) => {
-      calls.push(String(init.body))
+      calls.push(init.body instanceof FormData
+        ? JSON.stringify(Object.fromEntries(init.body))
+        : String(init.body))
       return new Response(JSON.stringify(body), { status })
     }),
   )
@@ -114,17 +135,39 @@ describe.each(cases)('$name recipient fields', ({ adapter, success, status, body
     expect(findKey(payload as Record<string, unknown>, 'bcc')).toBeUndefined()
   })
 
-  it('sends Cc and Bcc when they are used', async () => {
+  it('keeps To, Cc and Bcc in their own fields', async () => {
     const calls = capture(status, success)
 
     await adapter().send({ ...base, cc: ['cc@example.com'], bcc: ['bcc@example.com'] })
 
     const payload = body(calls[0]) as Record<string, unknown>
-    const ccKey = findKey(payload, 'cc')
-    const bccKey = findKey(payload, 'bcc')
-    expect(ccKey).toBeDefined()
-    expect(bccKey).toBeDefined()
-    expect(JSON.stringify(payload[ccKey as string])).toContain('cc@example.com')
-    expect(JSON.stringify(payload[bccKey as string])).toContain('bcc@example.com')
+    const recipients = { to: 'dest@example.com', cc: 'cc@example.com', bcc: 'bcc@example.com' }
+    for (const [role, address] of Object.entries(recipients)) {
+      const field = findKey(payload, role)
+      expect(field).toBeDefined()
+      // Some adapters send strings, others send address objects.
+      const addresses = JSON.stringify(payload[field!]).match(/[\w.]+@example\.com/g)
+      expect(addresses).toEqual([address])
+    }
   })
+})
+
+it('delivers custom SMTP blind copies only through the envelope', async () => {
+  const sendRaw = vi.fn<SmtpConnection['sendRaw']>().mockResolvedValue(undefined)
+  const connection = Object.create(SmtpConnection.prototype) as SmtpConnection
+  Object.assign(connection, { sendRaw, authenticate: vi.fn(), quit: vi.fn() })
+  vi.spyOn(SmtpConnection, 'open').mockResolvedValue(connection)
+
+  const relay = new CustomSmtpRelay({
+    host: 'relay.example.com', port: 465, security: 'tls', username: 'user', password: 'password',
+  })
+  await relay.send({ ...base, cc: ['copy@example.com'], bcc: ['blind@example.com'] })
+
+  const [mime, from, envelope] = sendRaw.mock.calls[0]
+  expect(from).toBe(base.fromEmail)
+  expect(envelope).toEqual(['dest@example.com', 'copy@example.com', 'blind@example.com'])
+  const headers = new TextDecoder().decode(mime).split('\r\n\r\n')[0]
+  expect(headers).toContain('To: dest@example.com')
+  expect(headers).toContain('Cc: copy@example.com')
+  expect(headers).not.toMatch(/^Bcc:|blind@example\.com/im)
 })

@@ -1,8 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import { pickReplyAccount } from '../shared/from-address'
-import { pickReplySender } from '../src/lib/sender'
+import { pickReplySender, privateReplyAlias, privateSenderAccount } from '../src/lib/sender'
 
 const ids = ['provider', 'domain-relay', 'other']
+
+describe('private reply identity', () => {
+  const domain = 'example.org'
+  const incoming = {
+    folder: 'inbox' as const,
+    verifiedDomains: [domain],
+    aliasAddresses: ['personal@gmail.com', 'shop@example.org'],
+  }
+  const catchAll = { kind: 'relay', email: 'hub@example.org', relayAnyAddress: true }
+
+  it('suggests only one alias from the verified forwarding path', () => {
+    expect(privateReplyAlias(incoming, domain)).toBe('shop@example.org')
+    expect(privateReplyAlias({ ...incoming, verifiedDomains: [] }, domain)).toBeNull()
+    expect(privateReplyAlias({ ...incoming, aliasAddresses: ['personal@gmail.com'] }, domain)).toBeNull()
+    expect(privateReplyAlias({ ...incoming, aliasAddresses: ['one@example.org', 'two@example.org'] }, domain)).toBeNull()
+    expect(privateReplyAlias({ ...incoming, folder: 'sent' }, domain)).toBeNull()
+  })
+
+  it('accepts a manually entered alias only with an unambiguous route on the private domain', () => {
+    expect(privateSenderAccount([catchAll], 'Shop@example.org', domain)).toBe(catchAll)
+    expect(privateSenderAccount([catchAll], '', domain)).toBeNull()
+    expect(privateSenderAccount([catchAll], 'my@gmail.com', domain)).toBeNull()
+    expect(privateSenderAccount([{ ...catchAll, kind: 'imap' }], catchAll.email, domain)).toBeNull()
+    const exact = { ...catchAll, email: 'shop@example.org' }
+    expect(privateSenderAccount([catchAll, exact], exact.email, domain)).toBe(exact)
+    expect(privateSenderAccount([catchAll, exact], 'another@example.org', domain)).toBeNull()
+  })
+})
 
 describe('pickReplySender', () => {
   it('uses the account configured on the mailbox that received the message', () => {

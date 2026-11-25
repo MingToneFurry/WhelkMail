@@ -457,15 +457,11 @@ export class ImapConnection {
     const { parts } = await this.command(`UID FETCH ${uids.join(',')} (UID FLAGS)`)
     const result: { uid: number; flags: string[] }[] = []
     for (const part of parts) {
-      const uidMatch = part.line.match(/\bUID (\d+)/)
-      if (!uidMatch) {
-        continue
+      const uidMatch = part.line.match(/\bUID (\d+)/i)
+      const flagsMatch = part.line.match(/\bFLAGS \(([^)]*)\)/i)
+      if (uidMatch && flagsMatch) {
+        result.push({ uid: Number(uidMatch[1]), flags: flagsMatch[1].split(/\s+/).filter(Boolean) })
       }
-      const flagsMatch = part.line.match(/\bFLAGS \(([^)]*)\)/)
-      result.push({
-        uid: Number(uidMatch[1]),
-        flags: flagsMatch ? flagsMatch[1].split(/\s+/).filter(Boolean) : [],
-      })
     }
     return result
   }

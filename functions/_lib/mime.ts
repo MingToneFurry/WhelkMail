@@ -12,7 +12,8 @@ export interface MimeAttachment {
 }
 
 export interface MimeInput {
-  from: MimeAddress
+  /** A privacy-mode draft can be saved before its author picks an identity. */
+  from: MimeAddress | null
   to: MimeAddress[]
   cc: MimeAddress[]
   bcc: MimeAddress[]
@@ -78,7 +79,7 @@ export function buildMime(input: MimeInput): Uint8Array {
   const mixed = `mix_${crypto.randomUUID()}`
   const alternative = `alt_${crypto.randomUUID()}`
   const headers: string[] = [
-    `From: ${formatAddress(input.from)}`,
+    ...(input.from ? [`From: ${formatAddress(input.from)}`] : []),
     `To: ${input.to.map(formatAddress).join(', ')}`,
   ]
   if (input.inReplyTo) {

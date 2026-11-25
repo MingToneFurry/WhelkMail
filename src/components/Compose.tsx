@@ -27,6 +27,7 @@ import type {
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { privateSenderAccount } from '../lib/sender'
 import { cn, fileToBase64, formatBytes, isValidEmail, parseAddresses } from '../lib/utils'
 import { htmlToPlainText, plainTextToHtml, sanitizeComposeHtml, signatureBlockHtml } from '../lib/rich-text'
 import {
@@ -45,6 +46,8 @@ interface PendingAttachment {
 
 interface ComposeProps {
   accounts: Account[]
+  privacyDomain: string | null
+  draftStorageAccount: Account | null
   contacts: Contact[]
   onAddContact: (email: string) => Promise<Contact | null>
   defaultAccountId: string | null
@@ -124,6 +127,8 @@ function useVisualViewport() {
 
 export function Compose({
   accounts,
+  privacyDomain,
+  draftStorageAccount,
   contacts,
   onAddContact,
   defaultAccountId,
@@ -144,13 +149,20 @@ export function Compose({
   const initialTo = initialDraft?.to ?? seed?.to ?? []
   const initialCc = initialDraft?.cc ?? seed?.cc ?? []
   const initialBcc = initialDraft?.bcc ?? seed?.bcc ?? []
-  const initialAccountId =
-    initialDraft?.accountId ?? seed?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? ''
+  // A saved draft only records its storage account. It cannot establish the
+  // original delivery alias. Reopening one must ask for the sender again.
+  const [privateFrom, setPrivateFrom] = useState('')
+  const suggestedFrom = initialDraft ? null : seed?.fromEmail
+  const usableSuggestion = privacyDomain && suggestedFrom && privateSenderAccount(accounts, suggestedFrom, privacyDomain)
+  const privateAccount = privacyDomain ? privateSenderAccount(accounts, privateFrom, privacyDomain) : null
+  const initialAccountId = privacyDomain
+    ? privateAccount?.id ?? ''
+    : initialDraft?.accountId ?? seed?.accountId ?? defaultAccountId ?? accounts[0]?.id ?? ''
   const initialSignature = signatureOf(
     accounts.find((item) => item.id === initialAccountId),
     defaultSignature,
     defaultSignatureHtml,
-    signatureMode,
+    privacyDomain ? 'per_account' : signatureMode,
   )
   const initialText = initialDraft
     ? initialDraft.text
@@ -167,14 +179,17 @@ export function Compose({
         ? `${emptyBodyWithSignature(initialSignature.html)}<br><br>${seedHtml}`
         : seedHtml
       : emptyBodyWithSignature(initialSignature.html))
-  const [accountId, setAccountId] = useState(initialAccountId)
+  const [selectedAccountId, setAccountId] = useState(initialAccountId)
+  const accountId = privacyDomain ? privateAccount?.id ?? '' : selectedAccountId
   // A reply from a relay allowed to send as any address on its domain starts
   // from the address the message was sent to. It's offered as its own entry in
   // the From list, and only applies while that account is selected.
   const aliasEmail = initialDraft ? null : (seed?.fromEmail ?? null)
   const aliasAccountId = aliasEmail ? (seed?.accountId ?? null) : null
   const [useAlias, setUseAlias] = useState(Boolean(aliasEmail))
-  const fromEmail = useAlias && aliasEmail && accountId === aliasAccountId ? aliasEmail : null
+  const fromEmail = privacyDomain
+    ? privateAccount ? privateFrom.trim().toLowerCase() : null
+    : useAlias && aliasEmail && accountId === aliasAccountId ? aliasEmail : null
   const [to, setTo] = useState(initialTo.join(', '))
   const [cc, setCc] = useState(initialCc.join(', '))
   const [bcc, setBcc] = useState(initialBcc.join(', '))
@@ -216,7 +231,9 @@ export function Compose({
 
   const account = accounts.find((item) => item.id === accountId) ?? null
   const totalBytes = attachments.reduce((total, item) => total + item.size, 0)
-  const limit = account?.maxAttachmentBytes ?? maxAttachmentBytes
+  // Keep autosaves in the original mailbox even if the user changes sender.
+  const storageAccount = draftStorageAccount ?? account
+  const limit = Math.min(account?.maxAttachmentBytes ?? Infinity, storageAccount?.maxAttachmentBytes ?? maxAttachmentBytes)
   const limitMb = Math.max(1, Math.floor(limit / (1024 * 1024)))
 
   async function addFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -246,8 +263,8 @@ export function Compose({
   const inReplyTo = seed?.inReplyTo ?? null
   const references = seed?.references ?? null
 
-  function buildBasePayload(reportError = true): DraftSavePayload | null {
-    if (!accountId) {
+  function buildBasePayload(reportError = true, payloadAccountId = accountId): DraftSavePayload | null {
+    if (!payloadAccountId) {
       if (reportError) {
         setError(t('compose.accountRequired'))
       }
@@ -264,7 +281,7 @@ export function Compose({
       return null
     }
     return {
-      accountId,
+      accountId: payloadAccountId,
       draftId: draftId ?? undefined,
       inReplyTo: inReplyTo ?? undefined,
       references: references ?? undefined,
@@ -301,7 +318,7 @@ export function Compose({
     if (!hasContent()) {
       return false
     }
-    const payload = buildBasePayload(!auto)
+    const payload = buildBasePayload(!auto, storageAccount?.id)
     if (!payload) {
       return false
     }
@@ -314,7 +331,8 @@ export function Compose({
       setError(null)
     }
     try {
-      const result = await api.saveDraft(payload)
+      const confirmedFrom = privacyDomain && storageAccount?.id === account?.id && fromEmail
+      const result = await api.saveDraft(confirmedFrom ? { ...payload, fromEmail: confirmedFrom } : payload)
       if (result.draftId) {
         setDraftId(result.draftId)
       }
@@ -350,7 +368,7 @@ export function Compose({
       accounts.find((item) => item.id === accountId),
       defaultSignature,
       defaultSignatureHtml,
-      signatureMode,
+      privacyDomain ? 'per_account' : signatureMode,
     )
     if (next.text === signatureRef.current.text && next.html === signatureRef.current.html) {
       return
@@ -371,7 +389,7 @@ export function Compose({
       }
       return current
     })
-  }, [accountId, accounts, defaultSignature, defaultSignatureHtml, signatureMode])
+  }, [accountId, accounts, defaultSignature, defaultSignatureHtml, privacyDomain, signatureMode])
 
   async function saveDraftManually() {
     const saved = await persistDraft(false)
@@ -407,7 +425,7 @@ export function Compose({
     }
     versionRef.current += 1
     setDirty(true)
-  }, [accountId, to, cc, bcc, subject, text, html, attachments])
+  }, [accountId, privateFrom, to, cc, bcc, subject, text, html, attachments])
 
   useEffect(() => {
     if (!dirty || busy || deleting) {
@@ -417,7 +435,7 @@ export function Compose({
       void persistRef.current(true)
     }, 5000)
     return () => window.clearTimeout(timer)
-  }, [dirty, busy, deleting, accountId, to, cc, bcc, subject, text, html, attachments, draftId])
+  }, [dirty, busy, deleting, accountId, privateFrom, to, cc, bcc, subject, text, html, attachments, draftId])
 
   useEffect(() => {
     if (!dirty || busy || deleting) {
@@ -541,7 +559,37 @@ export function Compose({
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex items-center gap-3 border-b border-line px-5 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">{t('compose.from')}</span>
-            {accounts.length > 1 || aliasEmail ? (
+            {privacyDomain ? (
+              <div className="min-w-0 flex-1">
+                <input
+                  type="email"
+                  aria-label={t('compose.from')}
+                  list="private-sender-suggestions"
+                  value={privateFrom}
+                  onChange={event => setPrivateFrom(event.target.value)}
+                  placeholder={t('compose.privacySender', { domain: privacyDomain })}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  className="w-full bg-transparent text-sm outline-none"
+                />
+                <datalist id="private-sender-suggestions">
+                  {accounts.map(item => <option key={item.id} value={item.email} />)}
+                </datalist>
+                {usableSuggestion && suggestedFrom && !privateFrom ? (
+                  <button type="button" className="py-1 text-sm font-medium text-brand-strong underline"
+                    onClick={() => setPrivateFrom(suggestedFrom)}>
+                    {t('compose.usePrivateSender', { address: suggestedFrom })}
+                  </button>
+                ) : null}
+                {!privateAccount ? (
+                  <p className="mt-1 text-xs text-amber-800">
+                    {accounts.length === 0
+                      ? t('compose.privacyNoRelay', { domain: privacyDomain })
+                      : t('compose.privacyChooseSender')}
+                  </p>
+                ) : null}
+              </div>
+            ) : accounts.length > 1 || aliasEmail ? (
               <select
                 value={fromEmail ? ALIAS_OPTION : accountId}
                 onChange={(event) => {
@@ -817,7 +865,7 @@ export function Compose({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={saving || autoSaving || busy || deleting || !account}
+              disabled={saving || autoSaving || busy || deleting || !storageAccount}
               onClick={() => void saveDraftManually()}
               className="flex items-center justify-center rounded-full border border-line p-2.5 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               aria-label={saving ? t('compose.savingDraft') : t('compose.saveDraft')}

@@ -132,7 +132,7 @@ export const api = {
   storageOptions(): Promise<StorageOptions> {
     return request('/api/storage/options')
   },
-  accounts(): Promise<{ accounts: Account[] }> {
+  accounts(): Promise<{ accounts: Account[]; privacySenderDomain: string | null; privacySmtpRelayHost: string | null }> {
     return request('/api/accounts')
   },
   createAccount(input: AccountCreateInput): Promise<{ account: Account }> {

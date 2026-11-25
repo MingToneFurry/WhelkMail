@@ -660,6 +660,7 @@ export const zhCN: Record<string, string> = {
   'errors.storage_failed': "存储操作失败",
   'errors.message_invalid': "邮件数据无效",
   'errors.from_address_not_allowed': "此账户无法使用该地址发信",
+  'errors.privacy_sender_required': "请选择获准的域名别名及发信中继",
   'errors.relay_any_address_relay_only': "仅中继账户支持使用本域名下的任意地址发信",
   'errors.message_not_found': "找不到邮件",
   'errors.message_send_failed': "邮件发送失败",

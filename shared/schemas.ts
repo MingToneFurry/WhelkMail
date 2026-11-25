@@ -113,6 +113,7 @@ export const attachmentInputSchema = z.object({
 })
 
 export const draftSchema = z.object({
+  fromEmail: email.optional(),
   accountId: z.string().min(1),
   inReplyTo: z.string().trim().max(998).optional(),
   references: z.string().trim().max(4000).optional(),

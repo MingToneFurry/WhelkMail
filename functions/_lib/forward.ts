@@ -51,6 +51,10 @@ export async function forwardFilteredMessage(
   if (existing?.status === 'sent') {
     return 'sent'
   }
+  if (env.PRIVACY_SENDER_DOMAIN?.trim()) {
+    await logForward(env, filterId, account.id, message.id, 'skipped', 'Privacy mode requires a domain sending relay')
+    return 'skipped'
+  }
 
   try {
     const loaded = await loadRaw(env, message.id)

@@ -22,6 +22,10 @@ export interface Env {
   CRON_SECRET?: string
   /** Language of server-generated forwards and default vacation replies. */
   MAIL_LOCALE?: string
+  /** Only allow an explicit From on this exact domain through a sending relay. */
+  PRIVACY_SENDER_DOMAIN?: string
+  /** Optional additional SMTP relay trusted to preserve the domain identity. */
+  PRIVACY_SMTP_RELAY_HOST?: string
   /** Public origin used by the cron worker / Node scheduler. */
   APP_URL?: string
   /** Set to `off` to stop the outbound check for new releases. */

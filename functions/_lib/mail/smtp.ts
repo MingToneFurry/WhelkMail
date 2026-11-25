@@ -20,6 +20,10 @@ export async function sendWithAccount(
   message: Uint8Array,
   recipients: string[],
 ): Promise<void> {
+  // Applies to scheduled vacation replies and filter forwards as well as manual sends.
+  if (env.PRIVACY_SENDER_DOMAIN?.trim()) {
+    throw new Error('Privacy mode requires a domain sending relay')
+  }
   const credentials = await getMailCredentials(env, account)
   const connection = await SmtpConnection.open(configOf(account))
   try {

@@ -415,6 +415,7 @@ export interface DraftPayload {
 
 export interface DraftSavePayload {
   accountId: string
+  fromEmail?: string
   /** Message-ID answered by this compose, so the copy threads too. */
   inReplyTo?: string | null
   references?: string | null

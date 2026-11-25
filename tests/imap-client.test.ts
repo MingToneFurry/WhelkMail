@@ -194,6 +194,15 @@ describe('IMAP responses', () => {
     await expect(connection.searchUids('5:*')).resolves.toEqual([])
   })
 
+  it('ignores UID responses without FLAGS instead of reclassifying them as unread', async () => {
+    const { socket } = fakeImap({
+      greeting,
+      respond: tag => `* 1 FETCH (UID 7)\r\n* 2 FETCH (UID 8 FLAGS ())\r\n${tag} OK\r\n`,
+    })
+    const connection = await ImapConnection.open(config, 200, connectorOf(socket))
+    await expect(connection.fetchFlags([7, 8])).resolves.toEqual([{ uid: 8, flags: [] }])
+  })
+
   it('reads a header literal and the surrounding FETCH data', async () => {
     const header = 'Subject: Ciao\r\nFrom: Alice <alice@example.com>\r\n\r\n'
     const { socket } = fakeImap({

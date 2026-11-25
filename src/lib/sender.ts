@@ -1,3 +1,31 @@
+import { canSendFrom, domainOf, SENDABLE_ADDRESS, type FromAccount } from '../../shared/from-address'
+import type { MessageDetail } from '../../shared/types'
+
+/** Strict mode only suggests addresses from the verified forwarding path.
+ * To and Cc are authored by the sender and cannot prove which alias received the mail. */
+export function privateReplyAlias(
+  message: Pick<MessageDetail, 'folder' | 'aliasAddresses' | 'verifiedDomains'>,
+  domain: string,
+): string | null {
+  if (message.folder === 'sent' || !message.verifiedDomains?.includes(domain)) return null
+  const addresses = new Set(
+    (message.aliasAddresses ?? []).map(address => address.trim().toLowerCase()).filter(address => domainOf(address) === domain),
+  )
+  const [alias] = addresses
+  return addresses.size === 1 && SENDABLE_ADDRESS.test(alias) ? alias : null
+}
+
+/** Only prefiltered privacy relays are passed here. Prefer an exact sender
+ * account, and never resolve two possible catch-all relays by array order. */
+export function privateSenderAccount<T extends FromAccount>(accounts: T[], address: string, domain: string): T | null {
+  const sender = address.trim().toLowerCase()
+  if (!SENDABLE_ADDRESS.test(sender) || domainOf(sender) !== domain) return null
+  const eligible = accounts.filter(account => account.kind === 'relay' && canSendFrom(account, sender))
+  const exact = eligible.filter(account => account.email.toLowerCase() === sender)
+  const routes = exact.length ? exact : eligible
+  return routes.length === 1 ? routes[0] : null
+}
+
 /**
  * Which account sends a reply.
  *

@@ -25,7 +25,9 @@ export class Smtp2GoRelay implements RelayAdapter {
     const payload = {
       api_key: this.apiKey,
       sender: formatAddress(message.fromName, message.fromEmail),
-      to: [...message.to, ...message.cc, ...message.bcc],
+      to: message.to,
+      cc: message.cc.length > 0 ? message.cc : undefined,
+      bcc: message.bcc.length > 0 ? message.bcc : undefined,
       subject: message.subject,
       text_body: message.text,
       html_body: message.html ?? message.text,

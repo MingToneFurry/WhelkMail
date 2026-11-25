@@ -14,7 +14,11 @@ import { microsoftConfigured } from '../../_lib/microsoft/oauth'
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const rows = await listAccountRows(context.env)
   const r2Available = Boolean(context.env.BUCKET)
-  return json({ accounts: rows.map((row) => publicAccount(row, r2Available)) })
+  return json({
+    accounts: rows.map((row) => publicAccount(row, r2Available)),
+    privacySenderDomain: context.env.PRIVACY_SENDER_DOMAIN?.trim().toLowerCase() || null,
+    privacySmtpRelayHost: context.env.PRIVACY_SMTP_RELAY_HOST?.trim().toLowerCase() || null,
+  })
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
